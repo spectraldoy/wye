@@ -1,3 +1,5 @@
+use ordered_float::NotNan;
+
 // These are slightly more restricted in the actually parsing functionality.
 // See wye.lalrpop
 pub type Identifier = String;
@@ -20,10 +22,10 @@ pub enum LetStatement {
     TypedLet(Identifier, Box<TypeExpression>, Vec<Identifier>, Vec<TypeExpression>, Box<Expression>, Vec<LetStatement>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
     IntegerLiteral(i64),
-    FloatLiteral(f64),
+    FloatLiteral(NotNan<f64>),
     StringLiteral(String),
     List(Vec<Expression>),
     Tuple(Vec<Expression>),
@@ -56,7 +58,7 @@ pub enum TypeExpression {
     FunctionType(Vec<TypeExpression>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Pattern {
     Wildcard,
     ExactMatch(Box<Expression>),
@@ -68,7 +70,7 @@ pub enum Pattern {
     PatternTuple(Vec<Pattern>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operation {
     Add,
     Subtract,

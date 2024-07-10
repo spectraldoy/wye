@@ -2,8 +2,8 @@
 // - https://lalrpop.github.io/lalrpop/index.html
 // - https://github.com/Storyyeller/cubiml-demo/blob/master/src/grammar.lalr
 
-use lalrpop_util::ParseError;
 use super::ast;
+use ordered_float::NotNan;
 
 grammar;
 
@@ -33,14 +33,19 @@ SuffixedList<T, Suffix>: Vec<T> = (<T> Suffix)+;
 Identifier: ast::Identifier = <r"[a-zA-Z_]\w*"> => String::from(<>);
 TypeId: ast::TypeId = <r"[a-zA-Z_]\w*"> => String::from(<>);
 IntegerLiteral: i64 = <r"-?([0-9]|[1-9][0-9]*)"> => <>.parse::<i64>().unwrap();
+FloatLiteral: NotNan<f64> =
+    <r"-?([0-9]|[1-9][0-9]*)\.[0-9]+([eE]-?[0-9]+)?"> => 
+        NotNan::new(<>.parse::<f64>().unwrap()).unwrap();
 
 // Expressions
 
-Expression: ast::Expression = {
-    <i:IntegerLiteral> => ast::Expression::IntegerLiteral(i)
+pub Expression: ast::Expression = {
+    <i:IntegerLiteral> => ast::Expression::IntegerLiteral(i),
+    <f:FloatLiteral> => ast::Expression::FloatLiteral(f),
+    "[" <v:SepList<Expression, ",">> "]" => ast::Expression::List(v),
 };
 
-// Statements
+// Statement
 
 LetEnding: Vec<ast::LetStatement> = {
     ";" => Vec::new(),
