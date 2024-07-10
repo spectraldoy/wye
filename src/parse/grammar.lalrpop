@@ -1,0 +1,55 @@
+// References:
+// - https://lalrpop.github.io/lalrpop/index.html
+// - https://github.com/Storyyeller/cubiml-demo/blob/master/src/grammar.lalr
+
+use lalrpop_util::ParseError;
+use super::ast;
+
+grammar;
+
+// Comments
+match {
+    r"\s*" => { }, // The default whitespace skipping is disabled if an `ignore pattern` is specified
+    r"#[^\n\r]*[\n\r]*" => { }, // Skip `// comments`
+    r#"\(\*[^*]*\*+(?:[^\)*][^*]*\*+)*\)"# => { },  // Skip `(* comments *)`
+} else {
+    _
+}
+
+// Macros
+SepList<T, Sep>: Vec<T> = {
+    <prefix:(<T> Sep)*> <suffix:T?> => match suffix {
+        None => prefix,
+        Some(val) => {
+            let mut out = prefix;
+            out.push(val);
+            out
+        }
+    }
+};
+SuffixedList<T, Suffix>: Vec<T> = (<T> Suffix)+;
+
+// Literals / Identifiers
+Identifier: ast::Identifier = <r"[a-zA-Z_]\w*"> => String::from(<>);
+TypeId: ast::TypeId = <r"[a-zA-Z_]\w*"> => String::from(<>);
+IntegerLiteral: i64 = <r"-?([0-9]|[1-9][0-9]*)"> => <>.parse::<i64>().unwrap();
+
+// Expressions
+
+Expression: ast::Expression = {
+    <i:IntegerLiteral> => ast::Expression::IntegerLiteral(i)
+};
+
+// Statements
+
+LetEnding: Vec<ast::LetStatement> = {
+    ";" => Vec::new(),
+    "where" "{" <blk:LetStatement+> "}" => blk
+}
+
+LetStatement: ast::LetStatement = "let" <ids:Identifier+> "=" <e:Expression> <scope:LetEnding> => {
+    ast::LetStatement::UntypedLet(String::from(&ids[0]), ids[1..].to_vec(), Box::new(e), scope)
+};
+
+pub WyeProgram = <LetStatement+>;
+

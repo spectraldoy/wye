@@ -13,11 +13,11 @@ pub enum Statement {
 
 #[derive(Debug, Clone)]
 pub enum LetStatement {
-    // let <Id> <Id>* = <Expr>
-    UntypedLet(Identifier, Vec<Identifier>, Box<Expression>),
+    // let <Id> <Id>* = <Expr> (where <LetStatement>+)?
+    UntypedLet(Identifier, Vec<Identifier>, Box<Expression>, Vec<LetStatement>),
     // let <Id> ( <Id>: <Type> -> )* <Type> = <Expr>
-    // translated to lhs, typeof lhs, argnames, argtypes
-    TypedLet(Identifier, Box<TypeExpression>, Vec<Identifier>, Vec<TypeExpression>, Box<Expression>),
+    // translated to lhs, typeof lhs, argnames, argtypes (where <LetStatement>+)?
+    TypedLet(Identifier, Box<TypeExpression>, Vec<Identifier>, Vec<TypeExpression>, Box<Expression>, Vec<LetStatement>),
 }
 
 #[derive(Debug, Clone)]
@@ -32,6 +32,8 @@ pub enum Expression {
     TypeVariant(TypeId, Option<Box<Expression>>),
     // <Expr> <Expr>
     FuncApplication(Box<Expression>, Box<Expression>),
+    // <Expr> <Op> <Expr>
+    BinaryOperation(Box<Expression>, Operation, Box<Expression>),
     // match <Expr> { <Pat> => <Expr>; ... ; <Pat> => <Expr> }
     MatchConstruct(Box<Expression>, Vec<Pattern>, Vec<Expression>),
     // if <Expr> then <Expr> else <Expr>
@@ -66,4 +68,20 @@ pub enum Pattern {
     PatternTuple(Vec<Pattern>),
 }
 
+#[derive(Debug, Clone)]
+pub enum Operation {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    FloorDiv,
 
+    Le,
+    Ge,
+    Leq,
+    Geq,
+    Eq,
+    Neq,
+
+    Cons,
+}
