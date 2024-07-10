@@ -3,7 +3,7 @@
 // - https://github.com/Storyyeller/cubiml-demo/blob/master/src/grammar.lalr
 
 use super::ast;
-use ordered_float::NotNan;
+use ordered_float::OrderedFloat;
 
 grammar;
 
@@ -18,7 +18,17 @@ match {
 
 // Macros
 SepList<T, Sep>: Vec<T> = {
-    <prefix:(<T> Sep)*> <suffix:T?> => match suffix {
+    <prefix: (<T> Sep)*> <suffix: T?> => match suffix {
+        None => prefix,
+        Some(val) => {
+            let mut out = prefix;
+            out.push(val);
+            out
+        }
+    }
+};
+SepTuple<T, Sep>: Vec<T> = {
+    <prefix: (<T> Sep)+> <suffix: T?> => match suffix {
         None => prefix,
         Some(val) => {
             let mut out = prefix;
@@ -30,30 +40,44 @@ SepList<T, Sep>: Vec<T> = {
 SuffixedList<T, Suffix>: Vec<T> = (<T> Suffix)+;
 
 // Literals / Identifiers
-Identifier: ast::Identifier = <r"[a-zA-Z_]\w*"> => String::from(<>);
-TypeId: ast::TypeId = <r"[a-zA-Z_]\w*"> => String::from(<>);
+
+Identifier: ast::Identifier = <r"_*[a-z]\w*"> => String::from(<>);
+TypeId: ast::TypeId = <r"_*[A-Z]\w*"> => String::from(<>);
 IntegerLiteral: i64 = <r"-?([0-9]|[1-9][0-9]*)"> => <>.parse::<i64>().unwrap();
-FloatLiteral: NotNan<f64> =
+FloatLiteral: OrderedFloat<f64> =
     <r"-?([0-9]|[1-9][0-9]*)\.[0-9]+([eE]-?[0-9]+)?"> => 
-        NotNan::new(<>.parse::<f64>().unwrap()).unwrap();
+        OrderedFloat(<>.parse::<f64>().unwrap());
+
+BuiltinOp: ast::Operation = {
+    "+" => ast::Operation::Add,
+    "-" => ast::Operation::Subtract,
+    "*" => ast::Operation::Multiply,
+    "/" => ast::Operation::Divide,
+    "//" => ast::Operation::FloorDiv,
+    "<" => ast::Operation::Lt,
+    ">" => ast::Operation::Gt,
+    "<=" => ast::Operation::Leq,
+    ">=" => ast::Operation::Geq,
+    "==" => ast::Operation::Eq,
+    "!=" => ast::Operation::Neq,
+    "::" => ast::Operation::Cons,
+}
 
 // Expressions
 
 pub Expression: ast::Expression = {
-    <i:IntegerLiteral> => ast::Expression::IntegerLiteral(i),
-    <f:FloatLiteral> => ast::Expression::FloatLiteral(f),
-    "[" <v:SepList<Expression, ",">> "]" => ast::Expression::List(v),
+    <i: IntegerLiteral> => ast::Expression::IntegerLiteral(i),
+    <f: FloatLiteral> => ast::Expression::FloatLiteral(f),
+    "[" <v: SepList<Expression, ",">> "]" => ast::Expression::List(v),
+    "(" <t: SepTuple<Expression, ",">> ")" => ast::Expression::Tuple(t),
+    <id: Identifier> => ast::Expression::Variable(id),
+    <tid: TypeId> => ast::Expression::TypeVariant(tid, None),
 };
 
-// Statement
+// Statements
 
-LetEnding: Vec<ast::LetStatement> = {
-    ";" => Vec::new(),
-    "where" "{" <blk:LetStatement+> "}" => blk
-}
-
-LetStatement: ast::LetStatement = "let" <ids:Identifier+> "=" <e:Expression> <scope:LetEnding> => {
-    ast::LetStatement::UntypedLet(String::from(&ids[0]), ids[1..].to_vec(), Box::new(e), scope)
+LetStatement: ast::LetStatement = "let" <ids: Identifier+> "=" <e: Expression> ";" => {
+    ast::LetStatement::UntypedLet(String::from(&ids[0]), ids[1..].to_vec(), Box::new(e))
 };
 
 pub WyeProgram = <LetStatement+>;

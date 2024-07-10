@@ -1,4 +1,6 @@
 /target
 /specification/*
 !/specification/*.pdf
+!/specification/*.bib
+!/specification/*.tex
 .DS_Store

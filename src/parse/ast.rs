@@ -1,11 +1,11 @@
-use ordered_float::NotNan;
+use ordered_float::OrderedFloat;
 
 // These are slightly more restricted in the actually parsing functionality.
 // See wye.lalrpop
 pub type Identifier = String;
 pub type TypeId = String;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Statement {
     LetStatement(LetStatement),
     // type <TypeId> <TypeArgs>? = ( <TypeId> (with <Type?)? )+
@@ -13,23 +13,25 @@ pub enum Statement {
     TypeDeclaration(TypeId, Vec<Identifier>, Vec<TypeId>, Vec<Option<TypeExpression>>)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LetStatement {
-    // let <Id> <Id>* = <Expr> (where <LetStatement>+)?
-    UntypedLet(Identifier, Vec<Identifier>, Box<Expression>, Vec<LetStatement>),
+    // let <Id> <Id>* = <Expr> ;
+    UntypedLet(Identifier, Vec<Identifier>, Box<Expression>),
     // let <Id> ( <Id>: <Type> -> )* <Type> = <Expr>
-    // translated to lhs, typeof lhs, argnames, argtypes (where <LetStatement>+)?
-    TypedLet(Identifier, Box<TypeExpression>, Vec<Identifier>, Vec<TypeExpression>, Box<Expression>, Vec<LetStatement>),
+    // translated to lhs, typeof lhs, argnames, argtypes, expr
+    TypedLet(Identifier, Box<TypeExpression>, Vec<Identifier>, Vec<TypeExpression>, Box<Expression>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
     IntegerLiteral(i64),
-    FloatLiteral(NotNan<f64>),
+    FloatLiteral(OrderedFloat<f64>),
     StringLiteral(String),
     List(Vec<Expression>),
     Tuple(Vec<Expression>),
     Variable(Identifier),
+    // { Statement* Expression }
+    Block(Vec<Statement>, Box<Expression>),
     // <TypeId> ( with <Field> )?
     TypeVariant(TypeId, Option<Box<Expression>>),
     // <Expr> <Expr>
@@ -46,7 +48,7 @@ pub enum Expression {
     ErrorExpression(String)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TypeExpression {
     IntType,
     FloatType,
@@ -78,8 +80,8 @@ pub enum Operation {
     Divide,
     FloorDiv,
 
-    Le,
-    Ge,
+    Lt,
+    Gt,
     Leq,
     Geq,
     Eq,
