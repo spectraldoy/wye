@@ -24,46 +24,46 @@ fn test_parse_literal() {
     assert!(parser.parse("12.888e").is_err());
     assert!(parser.parse("3.145r10").is_err());
     assert!(parser.parse("1.2.3.4").is_err());
-    // TODO: StringLiteral
+    // Ok StringLiteral
+    assert!(parser.parse("\"hello there\"").unwrap() == ast::Expression::StringLiteral(String::from("hello there")));
+    assert!(parser.parse("\"µß£££ç∑ 😎\"").unwrap() == ast::Expression::StringLiteral(String::from("µß£££ç∑ 😎")));
+    // Err StringLiteral
+    assert!(parser.parse("\"hi there\"\"").is_err());
 }
 
-#[test]
-fn test_parse_typevariant() {
-    let parser = grammar::ExpressionParser::new();
-    
-}
 
 #[test]
 fn test_parse_list() {
     let parser = grammar::ExpressionParser::new();
-    // Ok list literal (note: parser does no typechecking)
-    match parser.parse("[]") {
-        Ok(ast::Expression::List(v)) => {
-            assert!(v.len() == 0);
-        },
-        _ => panic!("[] did not parse")
-    }
-    match parser.parse("[4, 5]") {
-        Ok(ast::Expression::List(v)) => {
-            assert!(v[0] == ast::Expression::IntegerLiteral(4));
-            assert!(v[1] == ast::Expression::IntegerLiteral(5));
-            assert!(v.len() == 2);
-        }
-        _ => panic!("[4, 5] did not parse")
-    }
-    match parser.parse("[1.25e-1]") {
-        Ok(ast::Expression::List(v)) => {
-            assert!(v.len() == 1);
-            assert!(v[0] == ast::Expression::FloatLiteral(OrderedFloat(0.125)));
-        }
-        _ => panic!("[1.25e-1] did not parse")
-    }
-
-    // TODO: finish list tests
+    assert!(parser.parse("[]").unwrap() == ast::Expression::List(vec![]));
+    assert!(parser.parse("[4, 5]").unwrap() == ast::Expression::List(vec![
+        ast::Expression::IntegerLiteral(4),
+        ast::Expression::IntegerLiteral(5),
+    ]));
+    // parser doesn't do type checking
+    assert!(parser.parse(r#"[1, "wow ಣ", 1.0, (2), [46, 47], (-52, )]"#).unwrap() == ast::Expression::List(vec![
+        ast::Expression::IntegerLiteral(1),
+        ast::Expression::StringLiteral(String::from("wow ಣ")),
+        ast::Expression::FloatLiteral(OrderedFloat(1.0)),
+        ast::Expression::IntegerLiteral(2),
+        ast::Expression::List(vec![
+            ast::Expression::IntegerLiteral(46),
+            ast::Expression::IntegerLiteral(47),
+        ]),
+        ast::Expression::Tuple(vec![ast::Expression::IntegerLiteral(-52)])
+    ]));
 
     // List of lists
 
     // Err
+    assert!(parser.parse("[4, 5,]").is_err());
 }
 
 // TODO: tuple tests
+
+// #[test]
+// fn test_parse_typevariant() {
+//     let parser = grammar::ExpressionParser::new();
+    
+// }
+

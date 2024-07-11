@@ -65,6 +65,8 @@ TypeVar: ast::TypeVar = <s: r"'_*[a-z]\w*"> => String::from(s[1..].to_string());
 
 IntegerLiteral: i64 = <r"-?([0-9]|[1-9][0-9]*)"> => <>.parse::<i64>().unwrap();
 
+StringLiteral: String = <s: r#""[^\"]*""#> => s[1..s.len() - 1].into();
+
 FloatLiteral: OrderedFloat<f64> =
     <r"-?([0-9]|[1-9][0-9]*)\.[0-9]+([eE]-?[0-9]+)?"> => 
         OrderedFloat(<>.parse::<f64>().unwrap());
@@ -94,11 +96,14 @@ TypeVariantType: (ast::TypeId, Option<ast::TypeExpression>) = {
 pub Expression: ast::Expression = {
     <i: IntegerLiteral> => ast::Expression::IntegerLiteral(i),
     <f: FloatLiteral> => ast::Expression::FloatLiteral(f),
-    "[" <v: SepList<Expression, ",">> "]" => ast::Expression::List(v),
+    <s: StringLiteral> => ast::Expression::StringLiteral(s),
+    "[" <v: SepListAtLeastOne<Expression, ",">> "]" => ast::Expression::List(v),
+    "[" "]" => ast::Expression::List(vec![]),
     "(" <t: SepTuple<Expression, ",">> ")" => ast::Expression::Tuple(t),
     <id: Identifier> => ast::Expression::Variable(id),
     <tid: TypeId> => ast::Expression::TypeVariant(tid, None),
-    <tid: TypeId> "with" <field: Expression> => ast::Expression::TypeVariant(tid, Some(Box::new(field)))
+    <tid: TypeId> "with" <field: Expression> => ast::Expression::TypeVariant(tid, Some(Box::new(field))),
+    "(" <e: Expression> ")" => e,
     // TODO: before doing pattern matching, finish tests for what you already have
 };
 
