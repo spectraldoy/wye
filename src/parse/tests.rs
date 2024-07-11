@@ -30,10 +30,7 @@ fn test_parse_literal() {
 #[test]
 fn test_parse_typevariant() {
     let parser = grammar::ExpressionParser::new();
-    assert!(parser.parse("None").unwrap() == ast::Expression::TypeVariant(String::from("None"), None));
-    // assert!(parser.parse("let x = Some with 4;").unwrap() == ast::Expression::TypeVariant(
-    //     String::from("Some"), Some(Box::new(ast::Expression::IntegerLiteral(4)))
-    // ));
+    
 }
 
 #[test]

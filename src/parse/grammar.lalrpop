@@ -5,6 +5,7 @@
 use super::ast;
 use ordered_float::OrderedFloat;
 
+#[LALR]
 grammar;
 
 // Comments
@@ -27,6 +28,18 @@ SepList<T, Sep>: Vec<T> = {
         }
     }
 };
+SepListAtLeastOne<T, Sep>: Vec<T> = {
+    <mut v: (<T> Sep)*> <suffix: T> => {
+        v.push(suffix);
+        v
+    }
+}
+SepListAtLeastTwo<T, Sep>: Vec<T> = {
+    <mut v: (<T> Sep)+> <suffix: T> => {
+        v.push(suffix);
+        v
+    }
+}
 SepTuple<T, Sep>: Vec<T> = {
     <prefix: (<T> Sep)+> <suffix: T?> => match suffix {
         None => prefix,
@@ -42,8 +55,16 @@ SuffixedList<T, Suffix>: Vec<T> = (<T> Suffix)+;
 // Literals / Identifiers
 
 Identifier: ast::Identifier = <r"_*[a-z]\w*"> => String::from(<>);
+
+TypedIdentifier: (ast::Identifier, ast::TypeExpression) =
+    <id: Identifier> ":" <te: TypeExpression> => (id, te);
+
 TypeId: ast::TypeId = <r"_*[A-Z]\w*"> => String::from(<>);
+
+TypeVar: ast::TypeVar = <s: r"'_*[a-z]\w*"> => String::from(s[1..].to_string());
+
 IntegerLiteral: i64 = <r"-?([0-9]|[1-9][0-9]*)"> => <>.parse::<i64>().unwrap();
+
 FloatLiteral: OrderedFloat<f64> =
     <r"-?([0-9]|[1-9][0-9]*)\.[0-9]+([eE]-?[0-9]+)?"> => 
         OrderedFloat(<>.parse::<f64>().unwrap());
@@ -63,6 +84,11 @@ BuiltinOp: ast::Operation = {
     "::" => ast::Operation::Cons,
 }
 
+TypeVariantType: (ast::TypeId, Option<ast::TypeExpression>) = {
+    <tid: TypeId> => (tid, None),
+    <tid: TypeId> "with" <field_t: TypeExpression> => (tid, Some(field_t))
+}
+
 // Expressions
 
 pub Expression: ast::Expression = {
@@ -72,13 +98,40 @@ pub Expression: ast::Expression = {
     "(" <t: SepTuple<Expression, ",">> ")" => ast::Expression::Tuple(t),
     <id: Identifier> => ast::Expression::Variable(id),
     <tid: TypeId> => ast::Expression::TypeVariant(tid, None),
+    <tid: TypeId> "with" <field: Expression> => ast::Expression::TypeVariant(tid, Some(Box::new(field)))
+    // TODO: before doing pattern matching, finish tests for what you already have
 };
+
+TypeExprHelper: ast::TypeExpression = {
+    "int" => ast::TypeExpression::IntType,
+    "float" => ast::TypeExpression::FloatType,
+    "string" => ast::TypeExpression::StringType,
+    "[" <te: TypeExpression> "]" => ast::TypeExpression::ListType(Box::new(te)),
+    "(" <tes: SepTuple<TypeExpression, ",">> ")" => ast::TypeExpression::TupleType(tes),
+    <tvar: TypeVar> => ast::TypeExpression::TypeVariable(tvar),
+    "(" <ftype: SepListAtLeastTwo<TypeExpression, "->">> ")" => ast::TypeExpression::FunctionType(ftype),
+    "(" <te: TypeExpression> ")" => te
+};
+
+pub TypeExpression: ast::TypeExpression = {
+    <c: TypeExprHelper> => c,
+    <t: TypeId> <targs: TypeExprHelper*> => ast::TypeExpression::DeclaredType(t, targs),
+};
+
 
 // Statements
 
-LetStatement: ast::LetStatement = "let" <ids: Identifier+> "=" <e: Expression> ";" => {
-    ast::LetStatement::UntypedLet(String::from(&ids[0]), ids[1..].to_vec(), Box::new(e))
-};
+Statement: ast::Statement = {
+    "let" <ids: Identifier+> "=" <e: Expression> ";" => {
+        ast::Statement::UntypedLet(String::from(&ids[0]), ids[1..].to_vec(), Box::new(e))
+    },
+    "let" <typed_ids: SepListAtLeastOne<TypedIdentifier, "->">> "=" <e: Expression >";" => {
+        ast::Statement::TypedLet(typed_ids, Box::new(e))
+    },
+    "type" <tid: TypeId> <tvars: TypeVar*> "=" <variants: SepList<TypeVariantType, "|">> ";" => {
+        ast::Statement::TypeDeclaration(tid, tvars, variants)
+    }
+}
 
-pub WyeProgram = <LetStatement+>;
+pub WyeProgram = <Statement+>;
 

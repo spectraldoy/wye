@@ -4,22 +4,18 @@ use ordered_float::OrderedFloat;
 // See wye.lalrpop
 pub type Identifier = String;
 pub type TypeId = String;
+pub type TypeVar = String;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Statement {
-    LetStatement(LetStatement),
-    // type <TypeId> <TypeArgs>? = ( <TypeId> (with <Type?)? )+
-    // translated into TypeId, TypeVars, VariantNames, VariantFields
-    TypeDeclaration(TypeId, Vec<Identifier>, Vec<TypeId>, Vec<Option<TypeExpression>>)
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LetStatement {
     // let <Id> <Id>* = <Expr> ;
     UntypedLet(Identifier, Vec<Identifier>, Box<Expression>),
     // let <Id> ( <Id>: <Type> -> )* <Type> = <Expr>
-    // translated to lhs, typeof lhs, argnames, argtypes, expr
-    TypedLet(Identifier, Box<TypeExpression>, Vec<Identifier>, Vec<TypeExpression>, Box<Expression>),
+    // translated to [(identifier, TypeExpr)] Expression
+    TypedLet(Vec<(Identifier, TypeExpression)>, Box<Expression>),
+    // type <TypeId> <TypeArgs>? = ( <TypeId> (with <Type?)? )+
+    // translated into TypeId, TypeVars, VariantNames, VariantFields
+    TypeDeclaration(TypeId, Vec<TypeVar>, Vec<(TypeId, Option<TypeExpression>)>)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
