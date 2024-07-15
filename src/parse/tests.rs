@@ -175,7 +175,37 @@ fn test_parse_type_variant() {
     assert!(parser.parse("Option int").is_err());
 }
 
-// TODO: test parse function application
+#[test]
+fn test_parse_function_application() {
+    let parser = grammar::ExpressionParser::new();
+
+    // Ok function application
+    assert!(parser.parse("f g").unwrap() == ast::Expression::FuncApplication(
+        Box::new(ast::Expression::Variable(String::from("f"))),
+        Box::new(ast::Expression::Variable(String::from("g")))
+    ));
+    assert!(parser.parse("f -7.9").unwrap() == ast::Expression::FuncApplication(
+        Box::new(ast::Expression::Variable(String::from("f"))),
+        Box::new(ast::Expression::FloatLiteral(OrderedFloat(-7.9)))
+    ));
+    assert!(parser.parse("f 4 2").unwrap() == ast::Expression::FuncApplication(
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::Variable(String::from("f"))),
+            Box::new(ast::Expression::IntegerLiteral(4))
+        )),
+        Box::new(ast::Expression::IntegerLiteral(2))
+    ));
+    // as far as parsing is concerned, this is syntactically valid
+    assert!(parser.parse("4 g").unwrap() == ast::Expression::FuncApplication(
+        Box::new(ast::Expression::IntegerLiteral(4)),
+        Box::new(ast::Expression::Variable(String::from("g")))
+    ));
+    // Err function application
+    assert!(parser.parse("f78").unwrap() != ast::Expression::FuncApplication(
+        Box::new(ast::Expression::Variable(String::from("f"))),
+        Box::new(ast::Expression::IntegerLiteral(78))
+    ));
+}
 
 #[test]
 fn test_parse_type_expr() {

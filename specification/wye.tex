@@ -32,6 +32,8 @@
 }
 \urlstyle{same}
 
+% TODO: need a null builtin constant.
+
 % set up Wye lstlistings
 \definecolor{darkgreen}{rgb}{0.125, 0.73828125, 0.421875}
 
@@ -131,7 +133,7 @@ Expr\substo& IntLiteral \sepbar FloatLiteral \sepbar StringLiteral \sepbar List 
 & \sepbar \texttt{match}\: Expr \: \texttt{\{} \: (Pat \: \texttt{=>}\: Expr\: \texttt{;})*\: Pat\texttt{ => } Expr \: (\texttt{;}?) \: \texttt{\}} \\
 & \sepbar \texttt{if}\: Expr \: \texttt{then} \: Expr \: \texttt{else} \: Expr \\
 & \sepbar \texttt{(}\: Expr \:\texttt{)}\\
-& \sepbar \texttt{\{}\: Statement*\: Expr\texttt{\}} \:\langle \text{let .. in block}\rangle\\
+& \sepbar \texttt{\{}\: LetStatement*\: Expr\texttt{\}} \:\langle \text{let .. in block}\rangle\\
 & \sepbar \texttt{print} \: Expr \\
 & \sepbar \texttt{error} \: Expr \\
 Type \substo& \texttt{int} \sepbar \texttt{float} \sepbar \texttt{string}\\
@@ -236,6 +238,14 @@ function f(int x) {
 Thus, in defining \texttt{plus\_4} as \texttt{f 4}, \texttt{plus\_4} is actually like the function \texttt{g}, which has captured the value of \texttt{4} from an outer scope, and which on input \texttt{y} returns \texttt{4 + y}.
 
 This is also the reason why Wye's function types include an arrow between arguments. The function \texttt{f} has type \texttt{int -> int -> int}, the function \texttt{f 4} has type \texttt{int -> int}, and the value obtained from computing \texttt{plus\_4 5} has type \texttt{int}.
+
+Moreover, because of currying, Wye can safely evaluate functions left to right. That is, Wye functions are \textit{left-associative}. So, for instance, the expression \texttt{f g 4} is evaluated as \texttt{((f g) 4)}. As a concrete example:
+\begin{lstlisting}
+let f g: (int -> int) x: int = (g x);
+let double x: int -> int = 2 * x;
+let z = f double 4;
+\end{lstlisting}
+Here, the function \texttt{f} takes in a function argument \texttt{g} and an integer argument \texttt{x}. 
 
 \subsubsection{List Construction}\label{expr:cons}
 Just like Lisp, OCaml, Haskell, and many other functional languages, lists are an important part of Wye. As such, Wye provides list construction via the ``cons" operator \texttt{::}. Wye also supports pattern matching of lists using cons notation, which is talked about in \ref{expr:pat}.

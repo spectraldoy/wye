@@ -9,7 +9,7 @@ grammar;
 
 // Comments
 match {
-    r"\s*" => { }, // The default whitespace skipping is disabled if an `ignore pattern` is specified
+    // r"\s*" => { }, // The default whitespace skipping is disabled if an `ignore pattern` is specified
     r"#[^\n\r]*[\n\r]*" => { }, // Skip `// comments`
     r#"\(\*[^*]*\*+(?:[^\)*][^*]*\*+)*\)"# => { },  // Skip `(* comments *)`
 } else {
@@ -17,6 +17,8 @@ match {
 }
 
 // Macros
+Spanned<Rule>: ast::Spanned<Rule> =
+    <l: @L> <rule: Rule> <r: @R> => ast::spanned(l, r, rule);
 SepList<T, Sep>: Vec<T> = {
     <prefix: (<T> Sep)*> <suffix: T?> => match suffix {
         None => prefix,
@@ -93,6 +95,7 @@ TypeVariantType: (ast::TypeId, Option<ast::TypeExpression>) = {
 // Expressions
 
 pub Expression: ast::Expression = {
+    #[precedence(level="0")]
     <i: IntegerLiteral> => ast::Expression::IntegerLiteral(i),
     <f: FloatLiteral> => ast::Expression::FloatLiteral(f),
     <s: StringLiteral> => ast::Expression::StringLiteral(s),
@@ -103,7 +106,14 @@ pub Expression: ast::Expression = {
     <tid: TypeId> => ast::Expression::TypeVariant(tid, None),
     <tid: TypeId> "with" <field: Expression> => ast::Expression::TypeVariant(tid, Some(Box::new(field))),
     "(" <e: Expression> ")" => e,
+    // Functions are left-associative
+    #[precedence(level="1")]
+    #[assoc(side="left")]
+    <func: Spanned<Expression>> r"\s+" <arg: Spanned<Expression>> => ast::Expression::FuncApplication(
+        Box::new(func.value), Box::new(arg.value)
+    ),
     // TODO: pattern matching and functions
+    // TODO: finish statement parsing, then impl let block
 };
 
 TypeExprHelper: ast::TypeExpression = {
