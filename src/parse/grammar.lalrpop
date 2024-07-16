@@ -9,40 +9,45 @@ grammar;
 
 // Comments
 match {
-    // r"\s*" => { }, // The default whitespace skipping is disabled if an `ignore pattern` is specified
     r"#[^\n\r]*[\n\r]*" => { }, // Skip `// comments`
     r#"\(\*[^*]*\*+(?:[^\)*][^*]*\*+)*\)"# => { },  // Skip `(* comments *)`
 } else {
     _
 }
 
+Space = r"\s";
+
 // Macros
-Spanned<Rule>: ast::Spanned<Rule> =
-    <l: @L> <rule: Rule> <r: @R> => ast::spanned(l, r, rule);
 SepList<T, Sep>: Vec<T> = {
-    <prefix: (<T> Sep)*> <suffix: T?> => match suffix {
-        None => prefix,
-        Some(val) => {
-            let mut out = prefix;
-            out.push(val);
-            out
+    <prefix: (<T> Space*)?> <body: (<T> Space* Sep Space*)*> <suffix: T?> => {
+        let mut out = match prefix {
+            None => body,
+            Some(val) => {
+                let mut out = vec![val];
+                out.append(body);
+                out
+            }
         }
+        if let Some(val) = suffix {
+            out.push(val);
+        }
+        out
     }
 };
 SepListAtLeastOne<T, Sep>: Vec<T> = {
-    <mut v: (<T> Sep)*> <suffix: T> => {
+    <mut v: (<T> Space* Sep Space*)*> <suffix: T> => {
         v.push(suffix);
         v
     }
 }
 SepListAtLeastTwo<T, Sep>: Vec<T> = {
-    <mut v: (<T> Sep)+> <suffix: T> => {
+    <mut v: (<T> Space* Sep Space*)+> <suffix: T> => {
         v.push(suffix);
         v
     }
 }
 SepTuple<T, Sep>: Vec<T> = {
-    <prefix: (<T> Sep)+> <suffix: T?> => match suffix {
+    <prefix: (<T> Space* Sep Space*)+> <suffix: T?> => match suffix {
         None => prefix,
         Some(val) => {
             let mut out = prefix;
@@ -51,14 +56,13 @@ SepTuple<T, Sep>: Vec<T> = {
         }
     }
 };
-SuffixedList<T, Suffix>: Vec<T> = (<T> Suffix)+;
 
 // Literals / Identifiers
 
 Identifier: ast::Identifier = <r"_*[a-z]\w*"> => String::from(<>);
 
 TypedIdentifier: (ast::Identifier, ast::TypeExpression) =
-    <id: Identifier> ":" <te: TypeExpression> => (id, te);
+    <id: Identifier> Space* ":" Space* <te: TypeExpression> => (id, te);
 
 TypeId: ast::TypeId = <r"_*[A-Z]\w*"> => String::from(<>);
 
@@ -89,7 +93,7 @@ BuiltinOp: ast::Operation = {
 
 TypeVariantType: (ast::TypeId, Option<ast::TypeExpression>) = {
     <tid: TypeId> => (tid, None),
-    <tid: TypeId> "with" <field_t: TypeExpression> => (tid, Some(field_t))
+    <tid: TypeId> Space+ "with" Space+ <field_t: TypeExpression> => (tid, Some(field_t))
 }
 
 // Expressions
@@ -100,7 +104,7 @@ pub Expression: ast::Expression = {
     <f: FloatLiteral> => ast::Expression::FloatLiteral(f),
     <s: StringLiteral> => ast::Expression::StringLiteral(s),
     "[" <v: SepListAtLeastOne<Expression, ",">> "]" => ast::Expression::List(v),
-    "[" "]" => ast::Expression::List(vec![]),
+    "[" Space* "]" => ast::Expression::List(vec![]),
     "(" <t: SepTuple<Expression, ",">> ")" => ast::Expression::Tuple(t),
     <id: Identifier> => ast::Expression::Variable(id),
     <tid: TypeId> => ast::Expression::TypeVariant(tid, None),
@@ -109,8 +113,8 @@ pub Expression: ast::Expression = {
     // Functions are left-associative
     #[precedence(level="1")]
     #[assoc(side="left")]
-    <func: Spanned<Expression>> r"\s+" <arg: Spanned<Expression>> => ast::Expression::FuncApplication(
-        Box::new(func.value), Box::new(arg.value)
+    <func: Expression> Space+ <arg: Expression> => ast::Expression::FuncApplication(
+        Box::new(func), Box::new(arg)
     ),
     // TODO: pattern matching and functions
     // TODO: finish statement parsing, then impl let block
