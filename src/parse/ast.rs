@@ -1,71 +1,67 @@
 use ordered_float::OrderedFloat;
 
-// These are slightly more restricted in the actually parsing functionality.
-// See wye.lalrpop
-pub type Identifier = String;
-pub type TypeId = String;
-pub type TypeVar = String;
+pub type Identifier<'a> = &'a str;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Statement {
+pub enum Statement<'a> {
     // let <Id> <Id>* = <Expr> ;
-    UntypedLet(Identifier, Vec<Identifier>, Box<Expression>),
+    UntypedLet(Identifier<'a>, Vec<Identifier<'a>>, Box<Expression<'a>>),
     // let <Id> ( <Id>: <Type> -> )* <Type> = <Expr>
     // translated to [(identifier, TypeExpr)] Expression
-    TypedLet(Vec<(Identifier, TypeExpression)>, Box<Expression>),
+    TypedLet(Vec<(Identifier<'a>, TypeExpression<'a>)>, Box<Expression<'a>>),
     // type <TypeId> <TypeArgs>? = ( <TypeId> (with <Type?)? )+
     // translated into TypeId, TypeVars, VariantNames, VariantFields
-    TypeDeclaration(TypeId, Vec<TypeVar>, Vec<(TypeId, Option<TypeExpression>)>)
+    TypeDeclaration(Identifier<'a>, Vec<Identifier<'a>>, Vec<(Identifier<'a>, Option<TypeExpression<'a>>)>)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Expression {
+pub enum Expression<'a> {
     IntegerLiteral(i64),
     FloatLiteral(OrderedFloat<f64>),
     StringLiteral(String),
-    List(Vec<Expression>),
-    Tuple(Vec<Expression>),
-    Variable(Identifier),
+    List(Vec<Expression<'a>>),
+    Tuple(Vec<Expression<'a>>),
+    Variable(Identifier<'a>),
     // { Statement* Expression }
-    Block(Vec<Statement>, Box<Expression>),
+    Block(Vec<Statement<'a>>, Box<Expression<'a>>),
     // <TypeId> ( with <Field> )?
-    TypeVariant(TypeId, Option<Box<Expression>>),
+    TypeVariant(Identifier<'a>, Option<Box<Expression<'a>>>),
     // <Expr> <Expr>
-    FuncApplication(Box<Expression>, Box<Expression>),
+    FuncApplication(Box<Expression<'a>>, Box<Expression<'a>>),
     // <Expr> <Op> <Expr>
-    BinaryOperation(Box<Expression>, Operation, Box<Expression>),
+    BinaryOperation(Box<Expression<'a>>, Operation, Box<Expression<'a>>),
     // match <Expr> { <Pat> => <Expr>; ... ; <Pat> => <Expr> }
-    MatchConstruct(Box<Expression>, Vec<Pattern>, Vec<Expression>),
+    MatchConstruct(Box<Expression<'a>>, Vec<Pattern<'a>>, Vec<Expression<'a>>),
     // if <Expr> then <Expr> else <Expr>
-    Conditional(Box<Expression>, Box<Expression>, Box<Expression>),
+    Conditional(Box<Expression<'a>>, Box<Expression<'a>>, Box<Expression<'a>>),
     // print <Expr>
-    PrintExpression(Box<Expression>),
+    PrintExpression(Box<Expression<'a>>),
     // error <ErrorMessage>
     ErrorExpression(String)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TypeExpression {
+pub enum TypeExpression<'a> {
     IntType,
     FloatType,
     StringType,
-    DeclaredType(TypeId, Vec<TypeExpression>),
-    ListType(Box<TypeExpression>),
-    TupleType(Vec<TypeExpression>),
-    TypeVariable(Identifier),
-    FunctionType(Vec<TypeExpression>),
+    DeclaredType(Identifier<'a>, Vec<TypeExpression<'a>>),
+    ListType(Box<TypeExpression<'a>>),
+    TupleType(Vec<TypeExpression<'a>>),
+    TypeVariable(Identifier<'a>),
+    FunctionType(Vec<TypeExpression<'a>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Pattern {
+pub enum Pattern<'a> {
     Wildcard,
-    ExactMatch(Box<Expression>),
+    ExactMatch(Box<Expression<'a>>),
     // <head identifier>, <tail identifier>
-    ListConstruction(Identifier, Identifier),
-    // <VariantType> ( with <field id> )?
-    TypeVariant(TypeId, Option<Identifier>),
-    PatternList(Vec<Pattern>),
-    PatternTuple(Vec<Pattern>),
+    ListConstruction(Identifier<'a>, Identifier<'a>),
+    // <VariantTypeId> ( with <field id> )?
+    TypeVariant(Identifier<'a>, Option<Identifier<'a>>),
+    PatternList(Vec<Pattern<'a>>),
+    PatternTuple(Vec<Pattern<'a>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

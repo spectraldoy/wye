@@ -122,7 +122,7 @@ Witten below in Backus-Naur form is roughly the Wye grammar. The start symbol is
 \begin{align*}
 Program \substo& Statement*\\
 Statement \substo& LetStatement \sepbar TypeDeclaration\\
-LetStatement \substo& \texttt{let}\: Id \: (\texttt{:}\: Type\sepbar Id* \sepbar ((Id\: \texttt{:}\:Type\:\texttt{->})*\:Type))?:\texttt{=}\: Expr\:\texttt{;}\\
+LetStatement \substo& \texttt{let}\: Id \: (\texttt{:}\: Type\sepbar Id* \sepbar ((Id\: \texttt{:}\:Type\:\texttt{->})*\:Type))?\:\texttt{=}\: Expr\:\texttt{;}\\
 TypeDeclaration \substo& \texttt{type}\: TypeId\: (\texttt{'}\: Id)*\: \texttt{=} \: (TypeId \: (\texttt{with}\: Type)?)\\
 &(\texttt{|}\:TypeId \: (\texttt{with}\: Type)?)*\:\texttt{;}\\
 Expr\substo& IntLiteral \sepbar FloatLiteral \sepbar StringLiteral \sepbar List \sepbar Tuple\\

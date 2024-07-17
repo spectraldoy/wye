@@ -1,76 +1,36 @@
-// References:
-// - https://lalrpop.github.io/lalrpop/index.html
-// - https://github.com/Storyyeller/cubiml-demo/blob/master/src/grammar.lalr
-
 use super::ast;
+use super::span::{Spanned, make_spanned};
 use ordered_float::OrderedFloat;
+use lalrpop_util::ParseError;
 
 grammar;
 
 // Comments
 match {
-    r"#[^\n\r]*[\n\r]*" => { }, // Skip `// comments`
+    r"\s+" => { }, // Ignore whitespace
+    r"#[^\n\r]*[\n\r]*" => { }, // Skip `# comments`
     r#"\(\*[^*]*\*+(?:[^\)*][^*]*\*+)*\)"# => { },  // Skip `(* comments *)`
 } else {
     _
 }
 
-Space = r"\s";
+// TODO: null token and lambda
 
 // Macros
-SepList<T, Sep>: Vec<T> = {
-    <prefix: (<T> Space*)?> <body: (<T> Space* Sep Space*)*> <suffix: T?> => {
-        let mut out = match prefix {
-            None => body,
-            Some(val) => {
-                let mut out = vec![val];
-                out.append(body);
-                out
-            }
-        }
-        if let Some(val) = suffix {
-            out.push(val);
-        }
-        out
-    }
-};
-SepListAtLeastOne<T, Sep>: Vec<T> = {
-    <mut v: (<T> Space* Sep Space*)*> <suffix: T> => {
-        v.push(suffix);
-        v
-    }
-}
-SepListAtLeastTwo<T, Sep>: Vec<T> = {
-    <mut v: (<T> Space* Sep Space*)+> <suffix: T> => {
-        v.push(suffix);
-        v
-    }
-}
-SepTuple<T, Sep>: Vec<T> = {
-    <prefix: (<T> Space* Sep Space*)+> <suffix: T?> => match suffix {
-        None => prefix,
-        Some(val) => {
-            let mut out = prefix;
-            out.push(val);
-            out
-        }
-    }
-};
+Sp<Rule>: Spanned<Rule> = <l: @L> <rule: Rule> <r: @R> =>
+    make_spanned(l, r, rule);
 
-// Literals / Identifiers
+// Tokens
+Identifier: ast::Identifier<'input> = r"[a-zA-Z_]\w*";
 
-Identifier: ast::Identifier = <r"_*[a-z]\w*"> => String::from(<>);
+TypedIdentifier: (ast::Identifier<'input>, ast::TypeExpression<'input>) =
+    <id: Identifier> ":" <te: TypeExpression> => (id, te);
 
-TypedIdentifier: (ast::Identifier, ast::TypeExpression) =
-    <id: Identifier> Space* ":" Space* <te: TypeExpression> => (id, te);
-
-TypeId: ast::TypeId = <r"_*[A-Z]\w*"> => String::from(<>);
-
-TypeVar: ast::TypeVar = <s: r"'_*[a-z]\w*"> => String::from(s[1..].to_string());
+TypeVar: ast::Identifier<'input> = <s: r"'_*[a-z]\w*"> => &s[1..];
 
 IntegerLiteral: i64 = <r"-?([0-9]|[1-9][0-9]*)"> => <>.parse::<i64>().unwrap();
 
-StringLiteral: String = <s: r#""[^\"]*""#> => s[1..s.len() - 1].into();
+StringLiteral: String = <s: r#""[^\"]*""#> => s[1..s.len() - 1].to_string();
 
 FloatLiteral: OrderedFloat<f64> =
     <r"-?([0-9]|[1-9][0-9]*)\.[0-9]+([eE]-?[0-9]+)?"> => 
@@ -91,65 +51,59 @@ BuiltinOp: ast::Operation = {
     "::" => ast::Operation::Cons,
 }
 
-TypeVariantType: (ast::TypeId, Option<ast::TypeExpression>) = {
-    <tid: TypeId> => (tid, None),
-    <tid: TypeId> Space+ "with" Space+ <field_t: TypeExpression> => (tid, Some(field_t))
+TypeVariantType: (ast::Identifier<'input>, Option<ast::TypeExpression<'input>>) = {
+    <tid: Identifier> => (tid, None),
+    <tid: Sp<Identifier>> <with: Sp<"with">> <field_t: Sp<TypeExpression>> =>? {
+        if tid.end == with.start {
+            Err(ParseError::User {
+                error: "Type of variant with argument requires space between TypeId and with token"
+            })
+        } else if with.end == field_t.start {
+            Err(ParseError::User {
+                error: "Type of variant with argument requires space between with token and field type"
+            })
+        } else {
+            Ok((tid.value, Some(field_t.value)))
+        }
+    }
 }
 
 // Expressions
 
-pub Expression: ast::Expression = {
-    #[precedence(level="0")]
-    <i: IntegerLiteral> => ast::Expression::IntegerLiteral(i),
-    <f: FloatLiteral> => ast::Expression::FloatLiteral(f),
-    <s: StringLiteral> => ast::Expression::StringLiteral(s),
-    "[" <v: SepListAtLeastOne<Expression, ",">> "]" => ast::Expression::List(v),
-    "[" Space* "]" => ast::Expression::List(vec![]),
-    "(" <t: SepTuple<Expression, ",">> ")" => ast::Expression::Tuple(t),
-    <id: Identifier> => ast::Expression::Variable(id),
-    <tid: TypeId> => ast::Expression::TypeVariant(tid, None),
-    <tid: TypeId> "with" <field: Expression> => ast::Expression::TypeVariant(tid, Some(Box::new(field))),
-    "(" <e: Expression> ")" => e,
-    // Functions are left-associative
-    #[precedence(level="1")]
-    #[assoc(side="left")]
-    <func: Expression> Space+ <arg: Expression> => ast::Expression::FuncApplication(
-        Box::new(func), Box::new(arg)
-    ),
-    // TODO: pattern matching and functions
-    // TODO: finish statement parsing, then impl let block
-};
+// pub Expression: ast::Expression = {
+//     #[precedence(level="0")]
+//     <i: IntegerLiteral> => ast::Expression::IntegerLiteral(i),
+//     <f: FloatLiteral> => ast::Expression::FloatLiteral(f),
+//     <s: StringLiteral> => ast::Expression::StringLiteral(s),
+//     "[" <v: SepListAtLeastOne<Expression, ",">> "]" => ast::Expression::List(v),
+//     "[" "]" => ast::Expression::List(vec![]),
+//     "(" <t: SepTuple<Expression, ",">> ")" => ast::Expression::Tuple(t),
+//     <id: Identifier> => ast::Expression::Variable(id),
+//     <tid: TypeId> => ast::Expression::TypeVariant(tid, None),
+//     <tid: TypeId> "with" <field: Expression> => ast::Expression::TypeVariant(tid, Some(Box::new(field))),
+//     "(" <e: Expression> ")" => e,
+//     // Functions are left-associative
+//     #[precedence(level="1")]
+//     #[assoc(side="left")]
+//     <func: Expression> Space <arg: Expression> => ast::Expression::FuncApplication(
+//         Box::new(func), Box::new(arg)
+//     ),
+//     // TODO: pattern matching and functions
+//     // TODO: finish statement parsing, then impl let block
+// };
 
-TypeExprHelper: ast::TypeExpression = {
+TypeExprHelper: ast::TypeExpression<'input> = {
     "int" => ast::TypeExpression::IntType,
     "float" => ast::TypeExpression::FloatType,
     "string" => ast::TypeExpression::StringType,
-    "[" <te: TypeExpression> "]" => ast::TypeExpression::ListType(Box::new(te)),
-    "(" <tes: SepTuple<TypeExpression, ",">> ")" => ast::TypeExpression::TupleType(tes),
-    <tvar: TypeVar> => ast::TypeExpression::TypeVariable(tvar),
-    "(" <ftype: SepListAtLeastTwo<TypeExpression, "->">> ")" => ast::TypeExpression::FunctionType(ftype),
-    "(" <te: TypeExpression> ")" => te
+    // "[" <te: TypeExpression> "]" => ast::TypeExpression::ListType(Box::new(te)),
+    // "(" <tes: SepTuple<TypeExpression, ",">> ")" => ast::TypeExpression::TupleType(tes),
+    // <tvar: TypeVar> => ast::TypeExpression::TypeVariable(tvar),
+    // "(" <ftype: SepListAtLeastTwo<TypeExpression>> "->" ")" => ast::TypeExpression::FunctionType(ftype),
+    // "(" <te: TypeExpression> ")" => te
 };
 
-pub TypeExpression: ast::TypeExpression = {
+pub TypeExpression: ast::TypeExpression<'input> = {
     <c: TypeExprHelper> => c,
-    <t: TypeId> <targs: TypeExprHelper*> => ast::TypeExpression::DeclaredType(t, targs),
+    // <t: Identifier> <targs: DeclTypeArgs*> => ast::TypeExpression::DeclaredType(t, targs),
 };
-
-
-// Statements
-
-Statement: ast::Statement = {
-    "let" <ids: Identifier+> "=" <e: Expression> ";" => {
-        ast::Statement::UntypedLet(String::from(&ids[0]), ids[1..].to_vec(), Box::new(e))
-    },
-    "let" <typed_ids: SepListAtLeastOne<TypedIdentifier, "->">> "=" <e: Expression >";" => {
-        ast::Statement::TypedLet(typed_ids, Box::new(e))
-    },
-    "type" <tid: TypeId> <tvars: TypeVar*> "=" <variants: SepList<TypeVariantType, "|">> ";" => {
-        ast::Statement::TypeDeclaration(tid, tvars, variants)
-    }
-}
-
-pub WyeProgram = <Statement+>;
-
