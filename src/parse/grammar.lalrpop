@@ -1,5 +1,6 @@
 use super::ast;
-use super::span::{Spanned, make_spanned};
+use super::span::Spanned;
+use super::util;
 use ordered_float::OrderedFloat;
 use lalrpop_util::ParseError;
 
@@ -18,7 +19,7 @@ match {
 // TODO: custom error type and better error messages
 
 // Macros
-Sp<Rule>: Spanned<Rule> = <l: @L> <rule: Rule> <r: @R> => make_spanned(l, r, rule);
+Sp<Rule>: Spanned<Rule> = <l: @L> <rule: Rule> <r: @R> => Spanned::new(l, r, rule);
 
 SepListAtLeastOne<T, Sep>: Vec<T> = { // (1)
     <mut v: (<T> Sep)*> <suffix: T> => {
@@ -95,15 +96,14 @@ TypeVariantType: (ast::Identifier<'input>, Option<ast::TypeExpression<'input>>) 
 
 // Expressions
 
-pub Expression: ast::Expression<'input> = {
-    #[precedence(level="0")]
+pub AtomicExpr: ast::Expression<'input> = {
     <i: IntegerLiteral> => ast::Expression::IntegerLiteral(i),
     <f: FloatLiteral> => ast::Expression::FloatLiteral(f),
     <s: StringLiteral> => ast::Expression::StringLiteral(s),
     "[" "]" => ast::Expression::List(vec![]),
     "[" <v: SepListAtLeastOne<Expression, ",">> "]" => ast::Expression::List(v),
     <id: Identifier> => ast::Expression::Identifier(id),
-    <tid: Sp<Identifier>> <with: Sp<"with">> <field: Sp<Expression>> =>? {
+    <tid: Sp<Identifier>> <with: Sp<"with">> <field: Sp<AtomicExpr>> =>? {
         if tid.end == with.start {
             Err(ParseError::User {
                 error: "Variant with argument requires space between TypeId and `with` token"
@@ -116,21 +116,18 @@ pub Expression: ast::Expression<'input> = {
             Ok(ast::Expression::TypeVariant(tid.value, Box::new(field.value)))
         }
     },
-    // Functions are left-associative
-    #[precedence(level="1")]
-    #[assoc(side="left")]
-    <func: Sp<Expression>> <arg: Sp<Expression>> =>? {
-        if func.end == arg.start {
-            Err(ParseError::User {
-                error: "Space required between tokens here, cannot identify if this is a function call or not"
-            })
-        } else {
-            Ok(ast::Expression::FuncApplication(Box::new(func.value), Box::new(arg.value)))
-        }
-    },
-    #[precedence(level="2")]
+    "(" <t: SepTuple<AtomicExpr, ",">> ")" => ast::Expression::Tuple(t),
     "(" <e: Expression> ")" => e,
-    "(" <t: SepTuple<Expression, ",">> ")" => ast::Expression::Tuple(t),
+}
+
+pub Expression: ast::Expression<'input> = {
+    AtomicExpr,
+    
+    // Functions are left-associative
+    <func: Sp<AtomicExpr>> <args: Sp<AtomicExpr>+> =>? match util::collect_function_application(func, args) {
+        Ok(v) => Ok(v),
+        Err(e) => Err(ParseError::User { error: e })
+    }
     // TODO: pattern matching
     // TODO: finish statement parsing, then impl let block
 }

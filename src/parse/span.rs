@@ -1,13 +1,20 @@
-pub struct Spanned<T> {
+#[derive(Clone)]
+pub struct Spanned<T> 
+where T: Clone
+{
     pub start: usize,
     pub end: usize,
     pub value: T
 }
 
-pub fn make_spanned<T>(start: usize, end: usize, value: T) -> Spanned<T> {
-    Spanned {
-        start,
-        end,
-        value
+impl<T> Spanned<T>
+where T: Clone
+{
+    pub fn new(start: usize, end: usize, value: T) -> Self {
+        Spanned {
+            start,
+            end,
+            value
+        }
     }
 }
