@@ -130,11 +130,14 @@ fn test_parse_identifier_type_variant() {
     assert!(parser.parse("yel⏰o").is_err());
     assert!(parser.parse("31232abcd").is_err());
     assert!(parser.parse("Hel)lo").is_err());
-    assert!(parser.parse("31232AAA").is_err());
+    assert!(parser.parse("31232_AA").is_err());
     assert!(parser.parse("_Yel⏰o").is_err());
     // Ok type variant
     assert!(parser.parse("Some with 4").unwrap() == ast::Expression::TypeVariant(
         "Some", Box::new(ast::Expression::IntegerLiteral(4))
+    ));
+    assert!(parser.parse("(Thing with 4)").unwrap() == ast::Expression::TypeVariant(
+        "Thing", Box::new(ast::Expression::IntegerLiteral(4))
     ));
     assert!(parser.parse("
         Node with (
@@ -163,7 +166,10 @@ fn test_parse_identifier_type_variant() {
     ));
     // Err type variant
     assert!(parser.parse("Yup with [8, 78").is_err());
-    assert!(parser.parse("Option int").is_err());
+    assert!(parser.parse("Some int").is_err());
+    assert!(parser.parse("He)i with 4").is_err());
+    assert!(parser.parse("(__9)with \"hi\"").is_err());
+    assert!(parser.parse("thingy with\"hi\"").is_err());
 }
 
 #[test]
@@ -186,6 +192,42 @@ fn test_parse_function_application() {
         )),
         Box::new(ast::Expression::IntegerLiteral(2))
     ));
+    assert!(parser.parse("(g 5)").unwrap() == ast::Expression::FuncApplication(
+        Box::new(ast::Expression::Identifier("g")),
+        Box::new(ast::Expression::IntegerLiteral(5))
+    ));
+    assert!(parser.parse("func Some 4 g 6 \"hi\"").unwrap() == ast::Expression::FuncApplication(
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::FuncApplication(
+                Box::new(ast::Expression::FuncApplication(
+                    Box::new(ast::Expression::FuncApplication(
+                        Box::new(ast::Expression::Identifier("func")),
+                        Box::new(ast::Expression::Identifier("Some")),
+                    )),
+                    Box::new(ast::Expression::IntegerLiteral(4))
+                )),
+                Box::new(ast::Expression::Identifier("g"))
+            )),
+            Box::new(ast::Expression::IntegerLiteral(6))
+        )),
+        Box::new(ast::Expression::StringLiteral(String::from("hi")))
+    ));
+
+    // assert!(parser.parse("func (Some with 4) (g 5) \"hi\"").unwrap() == ast::Expression::FuncApplication(
+    //     Box::new(ast::Expression::FuncApplication(
+    //         Box::new(ast::Expression::FuncApplication(
+    //             Box::new(ast::Expression::Identifier("func")),
+    //             Box::new(ast::Expression::TypeVariant("Some", Box::new(
+    //                 ast::Expression::IntegerLiteral(4)
+    //             )))
+    //         )),
+    //         Box::new(ast::Expression::FuncApplication(
+    //             Box::new(ast::Expression::Identifier("g")),
+    //             Box::new(ast::Expression::IntegerLiteral(5))
+    //         ))
+    //     )),
+    //     Box::new(ast::Expression::StringLiteral(String::from("hi")))
+    // ));
     // as far as parsing is concerned, this is syntactically valid
     assert!(parser.parse("4 g").unwrap() == ast::Expression::FuncApplication(
         Box::new(ast::Expression::IntegerLiteral(4)),
@@ -195,6 +237,10 @@ fn test_parse_function_application() {
     assert!(parser.parse("f78").unwrap() != ast::Expression::FuncApplication(
         Box::new(ast::Expression::Identifier("f")),
         Box::new(ast::Expression::IntegerLiteral(78))
+    ));
+    assert!(parser.parse("fg").unwrap() != ast::Expression::FuncApplication(
+        Box::new(ast::Expression::Identifier("f")),
+        Box::new(ast::Expression::Identifier("g"))
     ));
 }
 

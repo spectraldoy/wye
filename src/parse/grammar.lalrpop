@@ -100,9 +100,8 @@ pub Expression: ast::Expression<'input> = {
     <i: IntegerLiteral> => ast::Expression::IntegerLiteral(i),
     <f: FloatLiteral> => ast::Expression::FloatLiteral(f),
     <s: StringLiteral> => ast::Expression::StringLiteral(s),
-    "[" <v: SepListAtLeastOne<Expression, ",">> "]" => ast::Expression::List(v),
     "[" "]" => ast::Expression::List(vec![]),
-    "(" <t: SepTuple<Expression, ",">> ")" => ast::Expression::Tuple(t),
+    "[" <v: SepListAtLeastOne<Expression, ",">> "]" => ast::Expression::List(v),
     <id: Identifier> => ast::Expression::Identifier(id),
     <tid: Sp<Identifier>> <with: Sp<"with">> <field: Sp<Expression>> =>? {
         if tid.end == with.start {
@@ -117,7 +116,6 @@ pub Expression: ast::Expression<'input> = {
             Ok(ast::Expression::TypeVariant(tid.value, Box::new(field.value)))
         }
     },
-    "(" <e: Expression> ")" => e,
     // Functions are left-associative
     #[precedence(level="1")]
     #[assoc(side="left")]
@@ -129,7 +127,10 @@ pub Expression: ast::Expression<'input> = {
         } else {
             Ok(ast::Expression::FuncApplication(Box::new(func.value), Box::new(arg.value)))
         }
-    }
+    },
+    #[precedence(level="2")]
+    "(" <e: Expression> ")" => e,
+    "(" <t: SepTuple<Expression, ",">> ")" => ast::Expression::Tuple(t),
     // TODO: pattern matching
     // TODO: finish statement parsing, then impl let block
 }
@@ -162,10 +163,10 @@ TypeExprHelper: ast::TypeExpression<'input> = {
     "float" => ast::TypeExpression::FloatType,
     "string" => ast::TypeExpression::StringType,
     "[" <te: TypeExpression> "]" => ast::TypeExpression::ListType(Box::new(te)),
+    "(" <te: TypeExpression> ")" => te,
     "(" <tes: SepTuple<TypeExpression, ",">> ")" => ast::TypeExpression::TupleType(tes),
     <tvar: TypeVar> => ast::TypeExpression::TypeVariable(tvar),
     "(" <ftype: SepListAtLeastTwo<TypeExpression, "->" >> ")" => ast::TypeExpression::FunctionType(ftype),
-    "(" <te: TypeExpression> ")" => te
 }
 
 // Program
