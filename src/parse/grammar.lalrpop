@@ -15,13 +15,38 @@ match {
 }
 
 // TODO: null token and lambda
+// TODO: custom error type and better error messages
 
 // Macros
-Sp<Rule>: Spanned<Rule> = <l: @L> <rule: Rule> <r: @R> =>
-    make_spanned(l, r, rule);
+Sp<Rule>: Spanned<Rule> = <l: @L> <rule: Rule> <r: @R> => make_spanned(l, r, rule);
+
+SepListAtLeastOne<T, Sep>: Vec<T> = { // (1)
+    <mut v: (<T> Sep)*> <suffix: T> => {
+        v.push(suffix);
+        v
+    }
+}
+
+SepListAtLeastTwo<T, Sep>: Vec<T> = { // (1)
+    <mut v: (<T> Sep)+> <suffix: T> => {
+        v.push(suffix);
+        v
+    }
+}
+
+SepTuple<T, Sep>: Vec<T> = {
+    <mut v: (<T> Sep)+> <suffix: T?> => match suffix {
+        None => v,
+        Some(val) => {
+            v.push(val);
+            v
+        }
+    }
+}
+
 
 // Tokens
-Identifier: ast::Identifier<'input> = r"[a-zA-Z_]\w*";
+Identifier: ast::Identifier<'input> = <r"_*[a-z]\w*">;
 
 TypedIdentifier: (ast::Identifier<'input>, ast::TypeExpression<'input>) =
     <id: Identifier> ":" <te: TypeExpression> => (id, te);
@@ -56,11 +81,11 @@ TypeVariantType: (ast::Identifier<'input>, Option<ast::TypeExpression<'input>>) 
     <tid: Sp<Identifier>> <with: Sp<"with">> <field_t: Sp<TypeExpression>> =>? {
         if tid.end == with.start {
             Err(ParseError::User {
-                error: "Type of variant with argument requires space between TypeId and with token"
+                error: "Type of variant with argument requires space between TypeId and `with` token"
             })
         } else if with.end == field_t.start {
             Err(ParseError::User {
-                error: "Type of variant with argument requires space between with token and field type"
+                error: "Type of variant with argument requires space between `with` token and field type"
             })
         } else {
             Ok((tid.value, Some(field_t.value)))
@@ -70,40 +95,75 @@ TypeVariantType: (ast::Identifier<'input>, Option<ast::TypeExpression<'input>>) 
 
 // Expressions
 
-// pub Expression: ast::Expression = {
-//     #[precedence(level="0")]
-//     <i: IntegerLiteral> => ast::Expression::IntegerLiteral(i),
-//     <f: FloatLiteral> => ast::Expression::FloatLiteral(f),
-//     <s: StringLiteral> => ast::Expression::StringLiteral(s),
-//     "[" <v: SepListAtLeastOne<Expression, ",">> "]" => ast::Expression::List(v),
-//     "[" "]" => ast::Expression::List(vec![]),
-//     "(" <t: SepTuple<Expression, ",">> ")" => ast::Expression::Tuple(t),
-//     <id: Identifier> => ast::Expression::Variable(id),
-//     <tid: TypeId> => ast::Expression::TypeVariant(tid, None),
-//     <tid: TypeId> "with" <field: Expression> => ast::Expression::TypeVariant(tid, Some(Box::new(field))),
-//     "(" <e: Expression> ")" => e,
-//     // Functions are left-associative
-//     #[precedence(level="1")]
-//     #[assoc(side="left")]
-//     <func: Expression> Space <arg: Expression> => ast::Expression::FuncApplication(
-//         Box::new(func), Box::new(arg)
-//     ),
-//     // TODO: pattern matching and functions
-//     // TODO: finish statement parsing, then impl let block
-// };
+pub Expression: ast::Expression<'input> = {
+    #[precedence(level="0")]
+    <i: IntegerLiteral> => ast::Expression::IntegerLiteral(i),
+    <f: FloatLiteral> => ast::Expression::FloatLiteral(f),
+    <s: StringLiteral> => ast::Expression::StringLiteral(s),
+    "[" <v: SepListAtLeastOne<Expression, ",">> "]" => ast::Expression::List(v),
+    "[" "]" => ast::Expression::List(vec![]),
+    "(" <t: SepTuple<Expression, ",">> ")" => ast::Expression::Tuple(t),
+    <id: Identifier> => ast::Expression::Variable(id),
+    <tid: Sp<Identifier>> <with: Sp<"with">> <field: Sp<Expression>> =>? {
+        if tid.end == with.start {
+            Err(ParseError::User {
+                error: "Variant with argument requires space between TypeId and `with` token"
+            })
+        } else if with.end == field.start {
+            Err(ParseError::User {
+                error: "Variant with argument requires space between `with` token and field expression"
+            })
+        } else {
+            Ok(ast::Expression::TypeVariant(tid.value, Some(Box::new(field.value))))
+        }
+    },
+    "(" <e: Expression> ")" => e,
+    // Functions are left-associative
+    #[precedence(level="1")]
+    #[assoc(side="left")]
+    <func: Sp<Expression>> <arg: Sp<Expression>> =>? {
+        if func.end == arg.start {
+            Err(ParseError::User {
+                error: "Space required between tokens here, cannot identify if this is a function call or not"
+            })
+        } else {
+            Ok(ast::Expression::FuncApplication(Box::new(func.value), Box::new(arg.value)))
+        }
+    }
+    // TODO: pattern matching and functions
+    // TODO: finish statement parsing, then impl let block
+}
+
+pub TypeExpression: ast::TypeExpression<'input> = {
+    <c: TypeExprHelper> => c,
+    // <Declared TypeId> <TypeArgs>
+    <t: Sp<Identifier>> <targs: Sp<TypeExprHelper>*> =>? {
+        let mut texpr_spans = vec![(t.start, t.end)];
+        let (targ_vals, mut targ_spans): (Vec<_>, Vec<_>) = targs.iter().map(|el| {
+            (el.value.clone(), (el.start, el.end))
+        }).unzip();
+        texpr_spans.append(&mut targ_spans);
+        for i in 0..(texpr_spans.len() - 1) {
+            let (_, cur_end) = texpr_spans[i];
+            let (nxt_start, _) = texpr_spans[i + 1];
+            if cur_end == nxt_start {
+                return Err(ParseError::User {
+                    error: "Space required between tokens here, cannot identify type arguments"
+                })
+            }
+        }
+
+        Ok(ast::TypeExpression::DeclaredType(t.value, targ_vals))
+    }
+}
 
 TypeExprHelper: ast::TypeExpression<'input> = {
     "int" => ast::TypeExpression::IntType,
     "float" => ast::TypeExpression::FloatType,
     "string" => ast::TypeExpression::StringType,
-    // "[" <te: TypeExpression> "]" => ast::TypeExpression::ListType(Box::new(te)),
-    // "(" <tes: SepTuple<TypeExpression, ",">> ")" => ast::TypeExpression::TupleType(tes),
-    // <tvar: TypeVar> => ast::TypeExpression::TypeVariable(tvar),
-    // "(" <ftype: SepListAtLeastTwo<TypeExpression>> "->" ")" => ast::TypeExpression::FunctionType(ftype),
-    // "(" <te: TypeExpression> ")" => te
-};
-
-pub TypeExpression: ast::TypeExpression<'input> = {
-    <c: TypeExprHelper> => c,
-    // <t: Identifier> <targs: DeclTypeArgs*> => ast::TypeExpression::DeclaredType(t, targs),
-};
+    "[" <te: TypeExpression> "]" => ast::TypeExpression::ListType(Box::new(te)),
+    "(" <tes: SepTuple<TypeExpression, ",">> ")" => ast::TypeExpression::TupleType(tes),
+    <tvar: TypeVar> => ast::TypeExpression::TypeVariable(tvar),
+    "(" <ftype: SepListAtLeastTwo<TypeExpression, "->" >> ")" => ast::TypeExpression::FunctionType(ftype),
+    "(" <te: TypeExpression> ")" => te
+}

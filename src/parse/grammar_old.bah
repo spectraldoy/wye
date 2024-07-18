@@ -9,7 +9,7 @@ grammar;
 
 // Comments
 match {
-    r"\s" => Space,
+    r"\s" => { },
     r"#[^\n\r]*[\n\r]*" => { }, // Skip `# comments`
     r#"\(\*[^*]*\*+(?:[^\)*][^*]*\*+)*\)"# => { },  // Skip `(* comments *)`
 } else {
