@@ -46,12 +46,12 @@ SepTuple<T, Sep>: Vec<T> = {
 
 
 // Tokens
-Identifier: ast::Identifier<'input> = <r"_*[a-z]\w*">;
+Identifier: ast::Identifier<'input> = <r"[a-zA-Z_]\w*">;
 
 TypedIdentifier: (ast::Identifier<'input>, ast::TypeExpression<'input>) =
     <id: Identifier> ":" <te: TypeExpression> => (id, te);
 
-TypeVar: ast::Identifier<'input> = <s: r"'_*[a-z]\w*"> => &s[1..];
+TypeVar: ast::Identifier<'input> = <s: r"'[a-zA-Z_]\w*"> => &s[1..];
 
 IntegerLiteral: i64 = <r"-?([0-9]|[1-9][0-9]*)"> => <>.parse::<i64>().unwrap();
 
@@ -103,7 +103,7 @@ pub Expression: ast::Expression<'input> = {
     "[" <v: SepListAtLeastOne<Expression, ",">> "]" => ast::Expression::List(v),
     "[" "]" => ast::Expression::List(vec![]),
     "(" <t: SepTuple<Expression, ",">> ")" => ast::Expression::Tuple(t),
-    <id: Identifier> => ast::Expression::Variable(id),
+    <id: Identifier> => ast::Expression::Identifier(id),
     <tid: Sp<Identifier>> <with: Sp<"with">> <field: Sp<Expression>> =>? {
         if tid.end == with.start {
             Err(ParseError::User {
@@ -114,7 +114,7 @@ pub Expression: ast::Expression<'input> = {
                 error: "Variant with argument requires space between `with` token and field expression"
             })
         } else {
-            Ok(ast::Expression::TypeVariant(tid.value, Some(Box::new(field.value))))
+            Ok(ast::Expression::TypeVariant(tid.value, Box::new(field.value)))
         }
     },
     "(" <e: Expression> ")" => e,
@@ -130,7 +130,7 @@ pub Expression: ast::Expression<'input> = {
             Ok(ast::Expression::FuncApplication(Box::new(func.value), Box::new(arg.value)))
         }
     }
-    // TODO: pattern matching and functions
+    // TODO: pattern matching
     // TODO: finish statement parsing, then impl let block
 }
 
@@ -167,3 +167,19 @@ TypeExprHelper: ast::TypeExpression<'input> = {
     "(" <ftype: SepListAtLeastTwo<TypeExpression, "->" >> ")" => ast::TypeExpression::FunctionType(ftype),
     "(" <te: TypeExpression> ")" => te
 }
+
+// Program
+
+Statement: ast::Statement<'input> = {
+    // "let" <ids: Identifier+> "=" <e: Expression> ";" => {
+    //     ast::Statement::UntypedLet(String::from(&ids[0]), ids[1..].to_vec(), Box::new(e))
+    // },
+    // "let" <typed_ids: SepListAtLeastOne<TypedIdentifier, "->">> "=" <e: Expression >";" => {
+    //     ast::Statement::TypedLet(typed_ids, Box::new(e))
+    // },
+    // "type" <tid: TypeId> <tvars: TypeVar*> "=" <variants: SepList<TypeVariantType, "|">> ";" => {
+    //    ast::Statement::TypeDeclaration(tid, tvars, variants)
+    // }
+}
+
+pub WyeProgram = <Statement+>;

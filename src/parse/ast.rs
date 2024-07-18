@@ -21,11 +21,11 @@ pub enum Expression<'a> {
     StringLiteral(String),
     List(Vec<Expression<'a>>),
     Tuple(Vec<Expression<'a>>),
-    Variable(Identifier<'a>),
+    Identifier(Identifier<'a>),
     // { Statement* Expression }
     Block(Vec<Statement<'a>>, Box<Expression<'a>>),
     // <TypeId> ( with <Field> )?
-    TypeVariant(Identifier<'a>, Option<Box<Expression<'a>>>),
+    TypeVariant(Identifier<'a>, Box<Expression<'a>>),
     // <Expr> <Expr>
     FuncApplication(Box<Expression<'a>>, Box<Expression<'a>>),
     // <Expr> <Op> <Expr>
