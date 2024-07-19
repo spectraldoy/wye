@@ -125,7 +125,11 @@ pub Expression: ast::Expression<'input> = {
             Ok(ast::Expression::TypeVariant(tid.value, Box::new(field.value)))
         }
     },
-    <func: Sp<AtomicExpr>> <args: Sp<AtomicExpr>+> =>? match util::collect_function_application(func, args) {
+    <func: Sp<AtomicExpr>> <args: Sp<AtomicExpr>+> =>? match util::collect_function::<ast::Expression>(
+        func,
+        args,
+        |e1, e2| ast::Expression::FuncApplication(Box::new(e1), Box::new(e2))
+    ) {
         Ok(v) => Ok(v),
         Err(e) => Err(ParseError::User { error: e })
     },
@@ -196,10 +200,9 @@ AtomicTypeExpr: ast::TypeExpression<'input> = {
     "(" <te: TypeExpression> ")" => te,
     "(" <tes: SepTuple<TypeExpression, ",">> ")" => ast::TypeExpression::TupleType(tes),
     <tvar: TypeVar> => ast::TypeExpression::TypeVariable(tvar),
-    "(" <ftype: SepListAtLeastTwo<TypeExpression, "->" >> ")" => ast::TypeExpression::FunctionType(ftype)
 }
 
-pub TypeExpression: ast::TypeExpression<'input> = {
+NonFuncTypeExpr: ast::TypeExpression<'input> = {
     AtomicTypeExpr,
     // <Declared TypeId> <TypeArgs>
     <t: Sp<Identifier>> <targs: Sp<AtomicTypeExpr>*> =>? {
@@ -208,17 +211,26 @@ pub TypeExpression: ast::TypeExpression<'input> = {
             (el.value.clone(), (el.start, el.end))
         }).unzip();
         texpr_spans.append(&mut targ_spans);
-        for i in 0..(texpr_spans.len() - 1) {
-            let (_, cur_end) = texpr_spans[i];
-            let (nxt_start, _) = texpr_spans[i + 1];
-            if cur_end == nxt_start {
-                return Err(ParseError::User {
-                    error: "Space required between tokens here, cannot identify type arguments"
-                })
-            }
+        if util::spans_overlap(&texpr_spans) {
+            Err(ParseError::User {
+                error: "Space required between tokens here, cannot identify type arguments"
+            })
+        } else {
+            Ok(ast::TypeExpression::DeclaredType(t.value, targ_vals))
         }
-        Ok(ast::TypeExpression::DeclaredType(t.value, targ_vals))
     },
+}
+
+pub TypeExpression: ast::TypeExpression<'input> = {
+    NonFuncTypeExpr,
+    <ftype: SepListAtLeastTwo<Sp<NonFuncTypeExpr>, "->" >> =>? match util::collect_function::<ast::TypeExpression>(
+        ftype[0].clone(),
+        ftype[1..].to_vec(),
+        |t1, t2| ast::TypeExpression::FunctionType(Box::new(t1), Box::new(t2))
+    ) {
+        Ok(v) => Ok(v),
+        Err(e) => Err(ParseError::User { error: e })
+    }
 }
 
 // Program

@@ -75,7 +75,7 @@ pub enum TypeExpression<'a> {
     ListType(Box<TypeExpression<'a>>),
     TupleType(Vec<TypeExpression<'a>>),
     TypeVariable(Identifier<'a>),
-    FunctionType(Vec<TypeExpression<'a>>),
+    FunctionType(Box<TypeExpression<'a>>, Box<TypeExpression<'a>>)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

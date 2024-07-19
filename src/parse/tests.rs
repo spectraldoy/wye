@@ -470,27 +470,56 @@ fn test_parse_list_tuple_type() {
 fn test_parse_function_type() {
     let parser = grammar::TypeExpressionParser::new();
     // Ok function type
-    assert!(parser.parse("(int -> float)").unwrap() == ast::TypeExpression::FunctionType(vec![
-        ast::TypeExpression::IntType,
-        ast::TypeExpression::FloatType
-    ]));
-    assert!(parser.parse("(int->float->        string ->Option)").unwrap() == ast::TypeExpression::FunctionType(vec![
-        ast::TypeExpression::IntType,
-        ast::TypeExpression::FloatType,
-        ast::TypeExpression::StringType,
-        ast::TypeExpression::DeclaredType("Option", vec![])
-    ]));
-    assert!(parser.parse("('a -> 'b -> Option)").unwrap() == ast::TypeExpression::FunctionType(vec![
-        ast::TypeExpression::TypeVariable("a"),
-        ast::TypeExpression::TypeVariable("b"),
-        ast::TypeExpression::DeclaredType("Option", vec![])
-    ]));
+    assert!(parser.parse("int -> float").unwrap() == ast::TypeExpression::FunctionType(
+        Box::new(ast::TypeExpression::IntType),
+        Box::new(ast::TypeExpression::FloatType)
+    ));
+    assert!(parser.parse("(int -> float)").unwrap() == ast::TypeExpression::FunctionType(
+        Box::new(ast::TypeExpression::IntType),
+        Box::new(ast::TypeExpression::FloatType)
+    ));
+    assert!(parser.parse("(int->float->        string ->Option)").unwrap() == ast::TypeExpression::FunctionType(
+        Box::new(ast::TypeExpression::FunctionType(
+            Box::new(ast::TypeExpression::FunctionType(
+                Box::new(ast::TypeExpression::IntType),
+                Box::new(ast::TypeExpression::FloatType)
+            )),
+            Box::new(ast::TypeExpression::StringType)
+        )),
+        Box::new(ast::TypeExpression::DeclaredType("Option", vec![]))
+    ));
+    assert!(parser.parse("'a -> 'b -> (int)").unwrap() == ast::TypeExpression::FunctionType(
+        Box::new(ast::TypeExpression::FunctionType(
+            Box::new(ast::TypeExpression::TypeVariable("a")),
+            Box::new(ast::TypeExpression::TypeVariable("b"))
+        )),
+        Box::new(ast::TypeExpression::IntType)
+    ));
+    assert!(parser.parse("string -> Option int -> float").unwrap() == ast::TypeExpression::FunctionType(
+        Box::new(ast::TypeExpression::FunctionType(
+            Box::new(ast::TypeExpression::StringType),
+            Box::new(ast::TypeExpression::DeclaredType("Option", vec![ast::TypeExpression::IntType]))
+        )),
+        Box::new(ast::TypeExpression::FloatType)
+    ));
+    assert!(parser.parse("'a -> ('a -> int) -> 'a").unwrap() == ast::TypeExpression::FunctionType(
+        Box::new(ast::TypeExpression::FunctionType(
+            Box::new(ast::TypeExpression::TypeVariable("a")),
+            Box::new(ast::TypeExpression::FunctionType(
+                Box::new(ast::TypeExpression::TypeVariable("a")),
+                Box::new(ast::TypeExpression::IntType)
+            ))
+        )),
+        Box::new(ast::TypeExpression::TypeVariable("a"))
+    ));
     // Err function type
     assert!(parser.parse("int ->").is_err());
     assert!(parser.parse("-> float").is_err());
     assert!(parser.parse("(int -> float").is_err());
     assert!(parser.parse("(int - > float)").is_err());
     assert!(parser.parse("(int -> 4)").is_err());
+    assert!(parser.parse("'a int -> int").is_err());
+    assert!(parser.parse("x: int -> y: float -> string").is_err());
 }
 
 #[test]
