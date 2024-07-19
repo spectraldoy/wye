@@ -221,12 +221,61 @@ fn test_parse_function_application() {
         Box::new(ast::Expression::BuiltinOp(ast::Operation::Add)),
         Box::new(ast::Expression::IntegerLiteral(4))
     ));
+    assert!(parser.parse("(::) 4 ((-) -6 \"hi\")").unwrap() == ast::Expression::FuncApplication(
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::BuiltinOp(ast::Operation::Cons)),
+            Box::new(ast::Expression::IntegerLiteral(4))
+        )),
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::FuncApplication(
+                Box::new(ast::Expression::BuiltinOp(ast::Operation::Subtract)),
+                Box::new(ast::Expression::IntegerLiteral(-6))
+            )),
+            Box::new(ast::Expression::StringLiteral(String::from("hi")))
+        ))
+    ));
+    assert!(parser.parse("-9 :: [3, 4]").unwrap() == ast::Expression::FuncApplication(
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::BuiltinOp(ast::Operation::Cons)),
+            Box::new(ast::Expression::IntegerLiteral(-9))
+        )),
+        Box::new(ast::Expression::List(vec![
+            ast::Expression::IntegerLiteral(3),
+            ast::Expression::IntegerLiteral(4)
+        ]))
+    ));
     assert!(parser.parse("a + b").unwrap() == ast::Expression::FuncApplication(
         Box::new(ast::Expression::FuncApplication(
             Box::new(ast::Expression::BuiltinOp(ast::Operation::Add)),
             Box::new(ast::Expression::Identifier("a"))
         )),
         Box::new(ast::Expression::Identifier("b"))
+    ));
+    assert!(parser.parse("a//(b *6)").unwrap() == ast::Expression::FuncApplication(
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::BuiltinOp(ast::Operation::FloorDiv)),
+            Box::new(ast::Expression::Identifier("a"))
+        )),
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::FuncApplication(
+                Box::new(ast::Expression::BuiltinOp(ast::Operation::Multiply)),
+                Box::new(ast::Expression::Identifier("b"))
+            )),
+            Box::new(ast::Expression::IntegerLiteral(6))
+        ))
+    ));
+    assert!(parser.parse("((a<b)   *c)").unwrap() == ast::Expression::FuncApplication(
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::BuiltinOp(ast::Operation::Multiply)),
+            Box::new(ast::Expression::FuncApplication(
+                Box::new(ast::Expression::FuncApplication(
+                    Box::new(ast::Expression::BuiltinOp(ast::Operation::Lt)),
+                    Box::new(ast::Expression::Identifier("a"))
+                )),
+                Box::new(ast::Expression::Identifier("b"))
+            ))
+        )),
+        Box::new(ast::Expression::Identifier("c"))
     ));
     assert!(parser.parse("func Some 4 g 6 \"hi\"").unwrap() == ast::Expression::FuncApplication(
         Box::new(ast::Expression::FuncApplication(
@@ -271,6 +320,13 @@ fn test_parse_function_application() {
         )),
         Box::new(ast::Expression::IntegerLiteral(2))
     ));
+    assert!(parser.parse("f // 2").unwrap() == ast::Expression::FuncApplication(
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::BuiltinOp(ast::Operation::FloorDiv)),
+            Box::new(ast::Expression::Identifier("f"))
+        )),
+        Box::new(ast::Expression::IntegerLiteral(2))
+    ));
     // Err function application
     assert!(parser.parse("f78").unwrap() != ast::Expression::FuncApplication(
         Box::new(ast::Expression::Identifier("f")),
@@ -282,6 +338,9 @@ fn test_parse_function_application() {
     ));
     assert!(parser.parse("f(8)").is_err());
     assert!(parser.parse("__f\"hi\" 5 2").is_err());
+    assert!(parser.parse("(a + b + c)").is_err());
+    assert!(parser.parse("a / b * c").is_err());
+    assert!(parser.parse("a + (b - c - d)").is_err());
 }
 
 // Type Expressions
@@ -435,3 +494,5 @@ fn test_parse_declared_type() {
     assert!(parser.parse("(yello").is_err());
     assert!(parser.parse("X with int").is_err());
 }
+
+// Statements
