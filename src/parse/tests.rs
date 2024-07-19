@@ -283,6 +283,20 @@ fn test_parse_function_application() {
         )),
         Box::new(ast::Expression::Identifier("c"))
     ));
+    assert!(parser.parse("[f g, a + [], Option with 4]").unwrap() == ast::Expression::List(vec![
+        ast::Expression::FuncApplication(
+            Box::new(ast::Expression::Identifier("f")),
+            Box::new(ast::Expression::Identifier("g"))
+        ),
+        ast::Expression::FuncApplication(
+            Box::new(ast::Expression::FuncApplication(
+                Box::new(ast::Expression::BuiltinOp(ast::Operation::Add)),
+                Box::new(ast::Expression::Identifier("a"))
+            )),
+            Box::new(ast::Expression::List(vec![]))
+        ),
+        ast::Expression::TypeVariant("Option", Box::new(ast::Expression::IntegerLiteral(4)))
+    ]));
     assert!(parser.parse("func Some 4 g 6 \"hi\"").unwrap() == ast::Expression::FuncApplication(
         Box::new(ast::Expression::FuncApplication(
             Box::new(ast::Expression::FuncApplication(
@@ -347,6 +361,7 @@ fn test_parse_function_application() {
     assert!(parser.parse("(a + b + c)").is_err());
     assert!(parser.parse("a / b * c").is_err());
     assert!(parser.parse("a + (b - c - d)").is_err());
+    assert!(parser.parse("\"hi\" / ").is_err())
 }
 
 #[test]
@@ -358,6 +373,7 @@ fn test_parse_match() {
         vec![(ast::Pattern::Wildcard, ast::Expression::IntegerLiteral(3))]
     ));
     // Err
+    assert!(parser.parse("match (f g) { }").is_err());
 }
 
 // Type Expressions

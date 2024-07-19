@@ -96,7 +96,7 @@ TypeVariantType: (ast::Identifier<'input>, Option<ast::TypeExpression<'input>>) 
 
 // Expressions
 
-pub AtomicExpr: ast::Expression<'input> = {
+AtomicExpr: ast::Expression<'input> = {
     <i: IntegerLiteral> => ast::Expression::IntegerLiteral(i),
     <f: FloatLiteral> => ast::Expression::FloatLiteral(f),
     <s: StringLiteral> => ast::Expression::StringLiteral(s),
@@ -104,6 +104,8 @@ pub AtomicExpr: ast::Expression<'input> = {
     "[" <v: SepListAtLeastOne<Expression, ",">> "]" => ast::Expression::List(v),
     <id: Identifier> => ast::Expression::Identifier(id),
     "(" <bop: BuiltinOp> ")" => ast::Expression::BuiltinOp(bop),
+    "print" => ast::Expression::Print,
+    "error" => ast::Expression::Error,
     "(" <t: SepTuple<Expression, ",">> ")" => ast::Expression::Tuple(t),
     "(" <e: Expression> ")" => e,
 }
@@ -135,18 +137,55 @@ pub Expression: ast::Expression<'input> = {
         )),
         Box::new(op2)
     ),
-    "match" <matchand: AtomicExpr> "{" <arms: SepListAtLeastOne<(<Pattern> "=>" <Expression>), ",">> "}" => {
-        ast::Expression::MatchConstruct(
-            Box::new(matchand),
-            arms
-        )
-    }
-    // TODO: pattern matching
+    <match_: Sp<"match">> <matchand: Sp<AtomicExpr>> "{" <arms: SepListAtLeastOne<(<Pattern> "=>" <Expression>), ",">> "}" =>? {
+        if match_.end == matchand.start {
+            Err(ParseError::User {
+                error: "Space required between `match` keyword and matchand"
+            })
+        } else {
+            Ok(ast::Expression::MatchConstruct(
+                Box::new(matchand.value), arms
+            ))
+        }
+    },
+    r"\\" <ids: Identifier*> "->" <body: Expression> => ast::Expression::Lambda(ids, Box::new(body))
     // TODO: finish statement parsing, then impl let block
 }
 
-Pattern: ast::Pattern<'input> = {
+AtomicPattern: ast::Pattern<'input> = {
     "_" => ast::Pattern::Wildcard,
+    <i: IntegerLiteral> => ast::Pattern::IntegerLiteral(i),
+    <f: FloatLiteral> => ast::Pattern::FloatLiteral(f),
+    <s: StringLiteral> => ast::Pattern::StringLiteral(s),
+    <id: Identifier> => ast::Pattern::Identifier(id),
+    <tid: Sp<Identifier>> <with: Sp<"with">> <field: Sp<Identifier>> =>? {
+        if tid.end == with.start {
+            Err(ParseError::User {
+                error: "Variant with argument requires space between TypeId and `with` token"
+            })
+        } else if with.end == field.start {
+            Err(ParseError::User {
+                error: "Variant with argument requires space between `with` token and field identifier"
+            })
+        } else {
+            Ok(ast::Pattern::TypeVariant(tid.value, field.value))
+        }
+    }, 
+    "[" "]" => ast::Pattern::EmptyList,
+}
+
+UnguardedPattern: ast::Pattern<'input> = {
+    AtomicPattern,
+    <pats: SepListAtLeastTwo<AtomicPattern, "|">> => ast::Pattern::Union(pats),
+    "~" <pat: AtomicPattern> => ast::Pattern::Complement(Box::new(pat)),
+    <head: Identifier> "::" <tail: Identifier> => ast::Pattern::ListConstruction(head, tail),
+    "[" <pats: SepListAtLeastOne<AtomicPattern, ",">> "]" => ast::Pattern::PatternList(pats),
+    "(" <pats: SepTuple<AtomicPattern, ",">> ")" => ast::Pattern::PatternTuple(pats),
+}
+
+Pattern: ast::Pattern<'input> = {
+    UnguardedPattern,
+    <pat: UnguardedPattern> "if" <guard: Expression> => ast::Pattern::Guarded(Box::new(pat), guard),
 }
 
 AtomicTypeExpr: ast::TypeExpression<'input> = {

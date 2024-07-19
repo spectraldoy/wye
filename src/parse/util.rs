@@ -12,6 +12,7 @@ pub fn collect_function_application<'a>(
     }
 
     // Check spans do not overlap
+    // TODO: checking spans do not overlap can be made into its own function
     let mut spans = vec![(first_func.start, first_func.end)];
     args.iter().for_each(|a| {
         spans.push((a.start, a.end))
