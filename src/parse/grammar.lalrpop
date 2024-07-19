@@ -103,6 +103,7 @@ pub AtomicExpr: ast::Expression<'input> = {
     "[" "]" => ast::Expression::List(vec![]),
     "[" <v: SepListAtLeastOne<Expression, ",">> "]" => ast::Expression::List(v),
     <id: Identifier> => ast::Expression::Identifier(id),
+    "(" <bop: BuiltinOp> ")" => ast::Expression::BuiltinOp(bop),
     <tid: Sp<Identifier>> <with: Sp<"with">> <field: Sp<AtomicExpr>> =>? {
         if tid.end == with.start {
             Err(ParseError::User {
@@ -122,14 +123,31 @@ pub AtomicExpr: ast::Expression<'input> = {
 
 pub Expression: ast::Expression<'input> = {
     AtomicExpr,
-    
-    // Functions are left-associative
     <func: Sp<AtomicExpr>> <args: Sp<AtomicExpr>+> =>? match util::collect_function_application(func, args) {
         Ok(v) => Ok(v),
         Err(e) => Err(ParseError::User { error: e })
-    }
+    },
+    // BuiltinOp
+    <op1: AtomicExpr> <bop: BuiltinOp> <op2: AtomicExpr> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::BuiltinOp(bop)),
+            Box::new(op1)
+        )),
+        Box::new(op2)
+    )
     // TODO: pattern matching
     // TODO: finish statement parsing, then impl let block
+}
+
+TypeExprHelper: ast::TypeExpression<'input> = {
+    "int" => ast::TypeExpression::IntType,
+    "float" => ast::TypeExpression::FloatType,
+    "string" => ast::TypeExpression::StringType,
+    "[" <te: TypeExpression> "]" => ast::TypeExpression::ListType(Box::new(te)),
+    "(" <te: TypeExpression> ")" => te,
+    "(" <tes: SepTuple<TypeExpression, ",">> ")" => ast::TypeExpression::TupleType(tes),
+    <tvar: TypeVar> => ast::TypeExpression::TypeVariable(tvar),
+    "(" <ftype: SepListAtLeastTwo<TypeExpression, "->" >> ")" => ast::TypeExpression::FunctionType(ftype),
 }
 
 pub TypeExpression: ast::TypeExpression<'input> = {
@@ -150,20 +168,8 @@ pub TypeExpression: ast::TypeExpression<'input> = {
                 })
             }
         }
-
         Ok(ast::TypeExpression::DeclaredType(t.value, targ_vals))
     }
-}
-
-TypeExprHelper: ast::TypeExpression<'input> = {
-    "int" => ast::TypeExpression::IntType,
-    "float" => ast::TypeExpression::FloatType,
-    "string" => ast::TypeExpression::StringType,
-    "[" <te: TypeExpression> "]" => ast::TypeExpression::ListType(Box::new(te)),
-    "(" <te: TypeExpression> ")" => te,
-    "(" <tes: SepTuple<TypeExpression, ",">> ")" => ast::TypeExpression::TupleType(tes),
-    <tvar: TypeVar> => ast::TypeExpression::TypeVariable(tvar),
-    "(" <ftype: SepListAtLeastTwo<TypeExpression, "->" >> ")" => ast::TypeExpression::FunctionType(ftype),
 }
 
 // Program
@@ -175,7 +181,7 @@ Statement: ast::Statement<'input> = {
     // "let" <typed_ids: SepListAtLeastOne<TypedIdentifier, "->">> "=" <e: Expression >";" => {
     //     ast::Statement::TypedLet(typed_ids, Box::new(e))
     // },
-    // "type" <tid: TypeId> <tvars: TypeVar*> "=" <variants: SepList<TypeVariantType, "|">> ";" => {
+    // "type" <tid: TypeId> <tvars: TypeVar*> "=" <variants: SepListAtLeastOne<TypeVariantType, "|">> ";" => {
     //    ast::Statement::TypeDeclaration(tid, tvars, variants)
     // }
 }

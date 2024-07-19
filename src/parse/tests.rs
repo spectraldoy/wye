@@ -1,6 +1,8 @@
 use super::*;
 use ordered_float::OrderedFloat;
 
+// Expressions
+
 #[test]
 fn test_parse_literal() {
     let parser = grammar::ExpressionParser::new();
@@ -122,11 +124,17 @@ fn test_parse_identifier_type_variant() {
     assert!(parser.parse("Ty6_Var68__iant_").unwrap() == ast::Expression::Identifier("Ty6_Var68__iant_"));
     assert!(parser.parse("___01").unwrap() == ast::Expression::Identifier("___01"));
     assert!(parser.parse("___").unwrap() == ast::Expression::Identifier("___"));
+    assert!(parser.parse("(<)").unwrap() == ast::Expression::BuiltinOp(ast::Operation::Lt));
+    assert!(parser.parse("(+)").unwrap() == ast::Expression::BuiltinOp(ast::Operation::Add));
+    assert!(parser.parse("(//)").unwrap() == ast::Expression::BuiltinOp(ast::Operation::FloorDiv));
     // Err identifier
     assert!(parser.parse("string").is_err());
     assert!(parser.parse("with").is_err());
     assert!(parser.parse("int").is_err());
     assert!(parser.parse("<").is_err());
+    assert!(parser.parse("(-").is_err());
+    assert!(parser.parse("a*").is_err());
+    assert!(parser.parse("//)").is_err());
     assert!(parser.parse("yel⏰o").is_err());
     assert!(parser.parse("31232abcd").is_err());
     assert!(parser.parse("Hel)lo").is_err());
@@ -169,7 +177,7 @@ fn test_parse_identifier_type_variant() {
     assert!(parser.parse("Some int").is_err());
     assert!(parser.parse("He)i with 4").is_err());
     assert!(parser.parse("(__9)with \"hi\"").is_err());
-    assert!(parser.parse("thingy with\"hi\"").is_err());
+    assert!(parser.parse("  thingy with\"hi\"").is_err());
 }
 
 #[test]
@@ -196,6 +204,30 @@ fn test_parse_function_application() {
         Box::new(ast::Expression::Identifier("g")),
         Box::new(ast::Expression::IntegerLiteral(5))
     ));
+    assert!(parser.parse("(g 4 \"hi\" (f 2))").unwrap() == ast::Expression::FuncApplication(
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::FuncApplication(
+                Box::new(ast::Expression::Identifier("g")),
+                Box::new(ast::Expression::IntegerLiteral(4))
+            )),
+            Box::new(ast::Expression::StringLiteral(String::from("hi")))
+        )),
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::Identifier("f")),
+            Box::new(ast::Expression::IntegerLiteral(2))
+        ))
+    ));
+    assert!(parser.parse("(+) 4").unwrap() == ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BuiltinOp(ast::Operation::Add)),
+        Box::new(ast::Expression::IntegerLiteral(4))
+    ));
+    assert!(parser.parse("a + b").unwrap() == ast::Expression::FuncApplication(
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::BuiltinOp(ast::Operation::Add)),
+            Box::new(ast::Expression::Identifier("a"))
+        )),
+        Box::new(ast::Expression::Identifier("b"))
+    ));
     assert!(parser.parse("func Some 4 g 6 \"hi\"").unwrap() == ast::Expression::FuncApplication(
         Box::new(ast::Expression::FuncApplication(
             Box::new(ast::Expression::FuncApplication(
@@ -212,26 +244,32 @@ fn test_parse_function_application() {
         )),
         Box::new(ast::Expression::StringLiteral(String::from("hi")))
     ));
-
-    // assert!(parser.parse("func (Some with 4) (g 5) \"hi\"").unwrap() == ast::Expression::FuncApplication(
-    //     Box::new(ast::Expression::FuncApplication(
-    //         Box::new(ast::Expression::FuncApplication(
-    //             Box::new(ast::Expression::Identifier("func")),
-    //             Box::new(ast::Expression::TypeVariant("Some", Box::new(
-    //                 ast::Expression::IntegerLiteral(4)
-    //             )))
-    //         )),
-    //         Box::new(ast::Expression::FuncApplication(
-    //             Box::new(ast::Expression::Identifier("g")),
-    //             Box::new(ast::Expression::IntegerLiteral(5))
-    //         ))
-    //     )),
-    //     Box::new(ast::Expression::StringLiteral(String::from("hi")))
-    // ));
+    assert!(parser.parse("func (Some with 4) (g 5) \"hi\"").unwrap() == ast::Expression::FuncApplication(
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::FuncApplication(
+                Box::new(ast::Expression::Identifier("func")),
+                Box::new(ast::Expression::TypeVariant("Some", Box::new(
+                    ast::Expression::IntegerLiteral(4)
+                )))
+            )),
+            Box::new(ast::Expression::FuncApplication(
+                Box::new(ast::Expression::Identifier("g")),
+                Box::new(ast::Expression::IntegerLiteral(5))
+            ))
+        )),
+        Box::new(ast::Expression::StringLiteral(String::from("hi")))
+    ));
     // as far as parsing is concerned, this is syntactically valid
     assert!(parser.parse("4 g").unwrap() == ast::Expression::FuncApplication(
         Box::new(ast::Expression::IntegerLiteral(4)),
         Box::new(ast::Expression::Identifier("g"))
+    ));
+    assert!(parser.parse("f (//) 2").unwrap() == ast::Expression::FuncApplication(
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::Identifier("f")),
+            Box::new(ast::Expression::BuiltinOp(ast::Operation::FloorDiv))
+        )),
+        Box::new(ast::Expression::IntegerLiteral(2))
     ));
     // Err function application
     assert!(parser.parse("f78").unwrap() != ast::Expression::FuncApplication(
@@ -242,10 +280,14 @@ fn test_parse_function_application() {
         Box::new(ast::Expression::Identifier("f")),
         Box::new(ast::Expression::Identifier("g"))
     ));
+    assert!(parser.parse("f(8)").is_err());
+    assert!(parser.parse("__f\"hi\" 5 2").is_err());
 }
 
+// Type Expressions
+
 #[test]
-fn test_parse_type_expr() {
+fn test_parse_type_lit_type_var() {
     let parser = grammar::TypeExpressionParser::new();
     // Ok literal type
     assert!(parser.parse("int").unwrap() == ast::TypeExpression::IntType);
@@ -254,6 +296,8 @@ fn test_parse_type_expr() {
     assert!(parser.parse("iNT").unwrap() == ast::TypeExpression::DeclaredType("iNT", vec![]));
     assert!(parser.parse("_x").unwrap() == ast::TypeExpression::DeclaredType("_x", vec![]));
     assert!(parser.parse("flot").unwrap() == ast::TypeExpression::DeclaredType("flot", vec![]));
+    assert!(parser.parse("(int)").unwrap() == ast::TypeExpression::IntType);
+    assert!(parser.parse("(xello)").unwrap() == ast::TypeExpression::DeclaredType("xello", vec![]));
     // Err literal type
     assert!(parser.parse("Un[").is_err());
     assert!(parser.parse("()").is_err());
@@ -269,6 +313,13 @@ fn test_parse_type_expr() {
     assert!(parser.parse("'hello'").is_err());
     assert!(parser.parse("'950abc").is_err());
     assert!(parser.parse("8").is_err());
+    assert!(parser.parse("\"hello\"").is_err());
+    assert!(parser.parse("x:int").is_err());
+}
+
+#[test]
+fn test_parse_list_tuple_type() {
+    let parser = grammar::TypeExpressionParser::new();
     // Ok list type
     assert!(parser.parse("[int]").unwrap() == ast::TypeExpression::ListType(Box::new(
         ast::TypeExpression::IntType
@@ -288,9 +339,15 @@ fn test_parse_type_expr() {
             ast::TypeExpression::DeclaredType("Option", vec![])
         ])
     )));
+    assert!(parser.parse("[Option int]").unwrap() == ast::TypeExpression::ListType(Box::new(
+        ast::TypeExpression::DeclaredType("Option", vec![
+            ast::TypeExpression::IntType
+        ])
+    )));
     // Err list type
     assert!(parser.parse("[int").is_err());
     assert!(parser.parse("[int, string]").is_err());
+    assert!(parser.parse("hel]o").is_err());
     // Ok tuple type
     assert!(parser.parse("('a, )").unwrap() == ast::TypeExpression::TupleType(vec![
         ast::TypeExpression::TypeVariable("a")
@@ -300,10 +357,26 @@ fn test_parse_type_expr() {
         ast::TypeExpression::StringType,
         ast::TypeExpression::FloatType
     ]));
+    assert!(parser.parse("(Option int float, int, Option, string)").unwrap() == ast::TypeExpression::TupleType(vec![
+        ast::TypeExpression::DeclaredType("Option", vec![
+            ast::TypeExpression::IntType,
+            ast::TypeExpression::FloatType
+        ]),
+        ast::TypeExpression::IntType,
+        ast::TypeExpression::DeclaredType("Option", vec![]),
+        ast::TypeExpression::StringType
+    ]));
     // Err tuple type
     assert!(parser.parse("()").is_err());
     assert!(parser.parse("int, string)").is_err());
     assert!(parser.parse("int, string, 'a").is_err());
+    assert!(parser.parse("hi(, there").is_err());
+    assert!(parser.parse("(xello, int, stri)ng, )").is_err());
+}
+
+#[test]
+fn test_parse_function_type() {
+    let parser = grammar::TypeExpressionParser::new();
     // Ok function type
     assert!(parser.parse("(int -> float)").unwrap() == ast::TypeExpression::FunctionType(vec![
         ast::TypeExpression::IntType,
@@ -326,8 +399,13 @@ fn test_parse_type_expr() {
     assert!(parser.parse("(int -> float").is_err());
     assert!(parser.parse("(int - > float)").is_err());
     assert!(parser.parse("(int -> 4)").is_err());
+}
+
+#[test]
+fn test_parse_declared_type() {
+    let parser = grammar::TypeExpressionParser::new();
     // Ok declared type
-    assert!(parser.parse("Bool").unwrap() == ast::TypeExpression::DeclaredType("Bool", vec![]));
+    assert!(parser.parse("bool").unwrap() == ast::TypeExpression::DeclaredType("bool", vec![]));
     assert!(parser.parse("Option int").unwrap() == ast::TypeExpression::DeclaredType(
         "Option", vec![ast::TypeExpression::IntType]
     ));
@@ -350,4 +428,10 @@ fn test_parse_type_expr() {
     assert!(parser.parse("Option \"hi\"").is_err());
     assert!(parser.parse("Tree Tree float").is_err());
     assert!(parser.parse("(Tree) float").is_err());
+    assert!(parser.parse("(Tree) 'a").is_err());
+    assert!(parser.parse("bool'a").is_err());
+    assert!(parser.parse("(yello").is_err());
+    assert!(parser.parse("bool [int,]").is_err());
+    assert!(parser.parse("(yello").is_err());
+    assert!(parser.parse("X with int").is_err());
 }

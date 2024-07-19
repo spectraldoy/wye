@@ -22,14 +22,13 @@ pub enum Expression<'a> {
     List(Vec<Expression<'a>>),
     Tuple(Vec<Expression<'a>>),
     Identifier(Identifier<'a>),
+    BuiltinOp(Operation),
     // { Statement* Expression }
     Block(Vec<Statement<'a>>, Box<Expression<'a>>),
     // <TypeId> ( with <Field> )?
     TypeVariant(Identifier<'a>, Box<Expression<'a>>),
     // <Expr> <Expr>
     FuncApplication(Box<Expression<'a>>, Box<Expression<'a>>),
-    // <Expr> <Op> <Expr>
-    BinaryOperation(Box<Expression<'a>>, Operation, Box<Expression<'a>>),
     // match <Expr> { <Pat> => <Expr>; ... ; <Pat> => <Expr> }
     MatchConstruct(Box<Expression<'a>>, Vec<Pattern<'a>>, Vec<Expression<'a>>),
     // if <Expr> then <Expr> else <Expr>
