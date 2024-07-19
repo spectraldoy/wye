@@ -172,6 +172,12 @@ fn test_parse_identifier_type_variant() {
     assert!(parser.parse("Bruh with (-5.2)").unwrap() == ast::Expression::TypeVariant(
         "Bruh", Box::new(ast::Expression::FloatLiteral(OrderedFloat(-5.2)))
     ));
+    assert!(parser.parse("Bruh with (-5.2,)").unwrap() == ast::Expression::TypeVariant(
+        "Bruh",
+        Box::new(ast::Expression::Tuple(vec![
+            ast::Expression::FloatLiteral(OrderedFloat(-5.2))
+        ]))
+    ));
     // Err type variant
     assert!(parser.parse("Yup with [8, 78").is_err());
     assert!(parser.parse("Some int").is_err());
@@ -341,6 +347,17 @@ fn test_parse_function_application() {
     assert!(parser.parse("(a + b + c)").is_err());
     assert!(parser.parse("a / b * c").is_err());
     assert!(parser.parse("a + (b - c - d)").is_err());
+}
+
+#[test]
+fn test_parse_match() {
+    let parser = grammar::ExpressionParser::new();
+    // Ok
+    assert!(parser.parse("match a { _ => 3 }").unwrap() == ast::Expression::MatchConstruct(
+        Box::new(ast::Expression::Identifier("a")),
+        vec![(ast::Pattern::Wildcard, ast::Expression::IntegerLiteral(3))]
+    ));
+    // Err
 }
 
 // Type Expressions

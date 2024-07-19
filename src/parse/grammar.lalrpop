@@ -104,6 +104,12 @@ pub AtomicExpr: ast::Expression<'input> = {
     "[" <v: SepListAtLeastOne<Expression, ",">> "]" => ast::Expression::List(v),
     <id: Identifier> => ast::Expression::Identifier(id),
     "(" <bop: BuiltinOp> ")" => ast::Expression::BuiltinOp(bop),
+    "(" <t: SepTuple<Expression, ",">> ")" => ast::Expression::Tuple(t),
+    "(" <e: Expression> ")" => e,
+}
+
+pub Expression: ast::Expression<'input> = {
+    AtomicExpr,
     <tid: Sp<Identifier>> <with: Sp<"with">> <field: Sp<AtomicExpr>> =>? {
         if tid.end == with.start {
             Err(ParseError::User {
@@ -117,12 +123,6 @@ pub AtomicExpr: ast::Expression<'input> = {
             Ok(ast::Expression::TypeVariant(tid.value, Box::new(field.value)))
         }
     },
-    "(" <t: SepTuple<AtomicExpr, ",">> ")" => ast::Expression::Tuple(t),
-    "(" <e: Expression> ")" => e,
-}
-
-pub Expression: ast::Expression<'input> = {
-    AtomicExpr,
     <func: Sp<AtomicExpr>> <args: Sp<AtomicExpr>+> =>? match util::collect_function_application(func, args) {
         Ok(v) => Ok(v),
         Err(e) => Err(ParseError::User { error: e })
@@ -134,12 +134,22 @@ pub Expression: ast::Expression<'input> = {
             Box::new(op1)
         )),
         Box::new(op2)
-    )
+    ),
+    "match" <matchand: AtomicExpr> "{" <arms: SepListAtLeastOne<(<Pattern> "=>" <Expression>), ",">> "}" => {
+        ast::Expression::MatchConstruct(
+            Box::new(matchand),
+            arms
+        )
+    }
     // TODO: pattern matching
     // TODO: finish statement parsing, then impl let block
 }
 
-TypeExprHelper: ast::TypeExpression<'input> = {
+Pattern: ast::Pattern<'input> = {
+    "_" => ast::Pattern::Wildcard,
+}
+
+AtomicTypeExpr: ast::TypeExpression<'input> = {
     "int" => ast::TypeExpression::IntType,
     "float" => ast::TypeExpression::FloatType,
     "string" => ast::TypeExpression::StringType,
@@ -147,13 +157,13 @@ TypeExprHelper: ast::TypeExpression<'input> = {
     "(" <te: TypeExpression> ")" => te,
     "(" <tes: SepTuple<TypeExpression, ",">> ")" => ast::TypeExpression::TupleType(tes),
     <tvar: TypeVar> => ast::TypeExpression::TypeVariable(tvar),
-    "(" <ftype: SepListAtLeastTwo<TypeExpression, "->" >> ")" => ast::TypeExpression::FunctionType(ftype),
+    "(" <ftype: SepListAtLeastTwo<TypeExpression, "->" >> ")" => ast::TypeExpression::FunctionType(ftype)
 }
 
 pub TypeExpression: ast::TypeExpression<'input> = {
-    <c: TypeExprHelper> => c,
+    AtomicTypeExpr,
     // <Declared TypeId> <TypeArgs>
-    <t: Sp<Identifier>> <targs: Sp<TypeExprHelper>*> =>? {
+    <t: Sp<Identifier>> <targs: Sp<AtomicTypeExpr>*> =>? {
         let mut texpr_spans = vec![(t.start, t.end)];
         let (targ_vals, mut targ_spans): (Vec<_>, Vec<_>) = targs.iter().map(|el| {
             (el.value.clone(), (el.start, el.end))
@@ -169,7 +179,7 @@ pub TypeExpression: ast::TypeExpression<'input> = {
             }
         }
         Ok(ast::TypeExpression::DeclaredType(t.value, targ_vals))
-    }
+    },
 }
 
 // Program

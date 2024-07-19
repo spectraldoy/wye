@@ -3,15 +3,21 @@ use ordered_float::OrderedFloat;
 pub type Identifier<'a> = &'a str;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Statement<'a> {
-    // let <Id> <Id>* = <Expr> ;
-    UntypedLet(Identifier<'a>, Vec<Identifier<'a>>, Box<Expression<'a>>),
-    // let <Id> ( <Id>: <Type> -> )* <Type> = <Expr>
-    // translated to [(identifier, TypeExpr)] Expression
-    TypedLet(Vec<(Identifier<'a>, TypeExpression<'a>)>, Box<Expression<'a>>),
-    // type <TypeId> <TypeArgs>? = ( <TypeId> (with <Type?)? )+
-    // translated into TypeId, TypeVars, VariantNames, VariantFields
-    TypeDeclaration(Identifier<'a>, Vec<Identifier<'a>>, Vec<(Identifier<'a>, Option<TypeExpression<'a>>)>)
+pub enum Operation {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    FloorDiv,
+
+    Lt,
+    Gt,
+    Leq,
+    Geq,
+    Eq,
+    Neq,
+
+    Cons,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,25 +36,13 @@ pub enum Expression<'a> {
     // <Expr> <Expr>
     FuncApplication(Box<Expression<'a>>, Box<Expression<'a>>),
     // match <Expr> { <Pat> => <Expr>; ... ; <Pat> => <Expr> }
-    MatchConstruct(Box<Expression<'a>>, Vec<Pattern<'a>>, Vec<Expression<'a>>),
+    MatchConstruct(Box<Expression<'a>>, Vec<(Pattern<'a>, Expression<'a>)>),
     // if <Expr> then <Expr> else <Expr>
     Conditional(Box<Expression<'a>>, Box<Expression<'a>>, Box<Expression<'a>>),
     // print <Expr>
     PrintExpression(Box<Expression<'a>>),
     // error <ErrorMessage>
     ErrorExpression(String)
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TypeExpression<'a> {
-    IntType,
-    FloatType,
-    StringType,
-    DeclaredType(Identifier<'a>, Vec<TypeExpression<'a>>),
-    ListType(Box<TypeExpression<'a>>),
-    TupleType(Vec<TypeExpression<'a>>),
-    TypeVariable(Identifier<'a>),
-    FunctionType(Vec<TypeExpression<'a>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,19 +58,25 @@ pub enum Pattern<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Operation {
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    FloorDiv,
+pub enum TypeExpression<'a> {
+    IntType,
+    FloatType,
+    StringType,
+    DeclaredType(Identifier<'a>, Vec<TypeExpression<'a>>),
+    ListType(Box<TypeExpression<'a>>),
+    TupleType(Vec<TypeExpression<'a>>),
+    TypeVariable(Identifier<'a>),
+    FunctionType(Vec<TypeExpression<'a>>),
+}
 
-    Lt,
-    Gt,
-    Leq,
-    Geq,
-    Eq,
-    Neq,
-
-    Cons,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Statement<'a> {
+    // let <Id> <Id>* = <Expr> ;
+    UntypedLet(Identifier<'a>, Vec<Identifier<'a>>, Box<Expression<'a>>),
+    // let <Id> ( <Id>: <Type> -> )* <Type> = <Expr>
+    // translated to [(identifier, TypeExpr)] Expression
+    TypedLet(Vec<(Identifier<'a>, TypeExpression<'a>)>, Box<Expression<'a>>),
+    // type <TypeId> <TypeArgs>? = ( <TypeId> (with <Type?)? )+
+    // translated into TypeId, TypeVars, VariantNames, VariantFields
+    TypeDeclaration(Identifier<'a>, Vec<Identifier<'a>>, Vec<(Identifier<'a>, Option<TypeExpression<'a>>)>)
 }
