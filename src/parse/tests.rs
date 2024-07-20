@@ -26,6 +26,7 @@ fn test_parse_literal() {
     assert!(parser.parse("12.888e").is_err());
     assert!(parser.parse("3.145r10").is_err());
     assert!(parser.parse("1.2.3.4").is_err());
+    assert!(parser.parse("5 .0").is_err());
     // Ok StringLiteral
     assert!(parser.parse("\"hello there\"").unwrap() == ast::Expression::StringLiteral(String::from("hello there")));
     assert!(parser.parse("\"µß£££ç∑ 😎\"").unwrap() == ast::Expression::StringLiteral(String::from("µß£££ç∑ 😎")));
@@ -515,6 +516,13 @@ fn test_parse_match() {
             ast::Expression::IntegerLiteral(7)
         )]
     ));
+    assert!(parser.parse("match (f g) { _ => x }").unwrap() == ast::Expression::MatchConstruct(
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::Identifier("f")),
+            Box::new(ast::Expression::Identifier("g"))
+        )),
+        vec![(ast::Pattern::Wildcard, ast::Expression::Identifier("x"))]
+    ));
     // Err
     assert!(parser.parse("match 4 {
         3 => 4
@@ -537,6 +545,9 @@ fn test_parse_match() {
     assert!(parser.parse("match 4 { }").is_err());
     assert!(parser.parse("match (f g)").is_err());
     assert!(parser.parse("match f g").is_err());
+    assert!(parser.parse("match(f g) { _ => x }").is_err());
+    assert!(parser.parse("match5 { _ => x }").is_err());
+    assert!(parser.parse("match-6.7 { _ => x }").is_err());
 }
 
 // Type Expressions
@@ -593,6 +604,11 @@ fn test_parse_list_tuple_type() {
             ast::TypeExpression::IntType,
             ast::TypeExpression::DeclaredType("Option", vec![])
         ])
+    )));
+    assert!(parser.parse("[[int]]").unwrap() == ast::TypeExpression::ListType(Box::new(
+        ast::TypeExpression::ListType(Box::new(
+            ast::TypeExpression::IntType
+        ))
     )));
     assert!(parser.parse("[Option int]").unwrap() == ast::TypeExpression::ListType(Box::new(
         ast::TypeExpression::DeclaredType("Option", vec![
@@ -702,11 +718,9 @@ fn test_parse_declared_type() {
     ));
     assert!(parser.parse("Tree (Tree float)").unwrap() == ast::TypeExpression::DeclaredType(
         "Tree",
-        vec![
-            ast::TypeExpression::DeclaredType("Tree", vec![
+        vec![ast::TypeExpression::DeclaredType("Tree", vec![
                 ast::TypeExpression::FloatType
-            ])
-        ]
+        ])]
     ));
     // Err declared type
     assert!(parser.parse("Option \"hi\"").is_err());
@@ -723,8 +737,174 @@ fn test_parse_declared_type() {
 // Patterns
 
 #[test]
-fn test_parse_pattern() {
-    
+fn test_parse_atomic_pattern() {
+    let parser = grammar::PatternParser::new();
+    // Ok atomic
+    assert!(parser.parse("_").unwrap() == ast::Pattern::Wildcard);
+    assert!(parser.parse("__").unwrap() == ast::Pattern::Identifier("__"));
+    assert!(parser.parse("-6789").unwrap() == ast::Pattern::IntegerLiteral(-6789));
+    assert!(parser.parse("9.8e3").unwrap() == ast::Pattern::FloatLiteral(OrderedFloat(9800.0)));
+    assert!(parser.parse("\"helloⓓⓕ\"").unwrap() == ast::Pattern::StringLiteral(String::from("helloⓓⓕ")));
+    assert!(parser.parse("x").unwrap() == ast::Pattern::Identifier("x"));
+    assert!(parser.parse("__o98").unwrap() == ast::Pattern::Identifier("__o98"));
+    assert!(parser.parse("Some with x").unwrap() == ast::Pattern::TypeVariant(
+        "Some", Box::new(ast::Pattern::Identifier("x"))
+    ));
+    assert!(parser.parse("Option with (Tree, 4)").unwrap() == ast::Pattern::TypeVariant(
+        "Option", Box::new(ast::Pattern::Tuple(vec![
+            ast::Pattern::Identifier("Tree"),
+            ast::Pattern::IntegerLiteral(4)
+        ]))
+    ));
+    assert!(parser.parse("Some with 4").unwrap() == ast::Pattern::TypeVariant(
+        "Some", Box::new(ast::Pattern::IntegerLiteral(4))
+    ));
+    assert!(parser.parse("[ ]").unwrap() == ast::Pattern::EmptyList);
+    assert!(parser.parse("bool with (List with [_, x :: xs])").unwrap() == ast::Pattern::TypeVariant(
+        "bool", Box::new(ast::Pattern::TypeVariant(
+            "List", Box::new(ast::Pattern::List(vec![
+                ast::Pattern::Wildcard,
+                ast::Pattern::ListConstruction("x", "xs")
+            ]))
+        ))
+    ));
+    assert!(parser.parse("Integer with (4)").unwrap() == ast::Pattern::TypeVariant(
+        "Integer", Box::new(ast::Pattern::IntegerLiteral(4))
+    ));
+    // Err atomic
+    assert!(parser.parse("=>").is_err());
+    assert!(parser.parse("ⓓⓕ").is_err());
+    assert!(parser.parse("- 5").is_err());
+    assert!(parser.parse("__ => _").is_err());
+    assert!(parser.parse("98x").is_err());
+    assert!(parser.parse("Some with int").is_err());
+    assert!(parser.parse("Option x").is_err());
+    assert!(parser.parse("Thingy with ([x, y])").is_err());
+}
+
+#[test]
+fn test_parse_compound_pattern() {
+    let parser = grammar::PatternParser::new();
+    // Ok compound
+    assert!(parser.parse("[4, _, _, []]").unwrap() == ast::Pattern::List(vec![
+        ast::Pattern::IntegerLiteral(4),
+        ast::Pattern::Wildcard,
+        ast::Pattern::Wildcard,
+        ast::Pattern::EmptyList
+    ]));
+    assert!(parser.parse("Integer with (Option with y, x :: xs)").unwrap() == ast::Pattern::TypeVariant(
+        "Integer", Box::new(ast::Pattern::Tuple(vec![
+            ast::Pattern::TypeVariant("Option", Box::new(ast::Pattern::Identifier("y"))),
+            ast::Pattern::ListConstruction("x", "xs")
+        ]))
+    ));
+    assert!(parser.parse("Float with (5.7,)").unwrap() == ast::Pattern::TypeVariant(
+        "Float",
+        Box::new(ast::Pattern::Tuple(vec![
+            ast::Pattern::FloatLiteral(OrderedFloat(5.7))
+        ]))
+    ));
+    assert!(parser.parse("(_, _, v)").unwrap() == ast::Pattern::Tuple(vec![
+        ast::Pattern::Wildcard,
+        ast::Pattern::Wildcard,
+        ast::Pattern::Identifier("v")
+    ]));
+    assert!(parser.parse("[4, -5.6, _]").unwrap() == ast::Pattern::List(vec![
+        ast::Pattern::IntegerLiteral(4),
+        ast::Pattern::FloatLiteral(OrderedFloat(-5.6)),
+        ast::Pattern::Wildcard
+    ]));
+    assert!(parser.parse("(7, )").unwrap() == ast::Pattern::Tuple(vec![ast::Pattern::IntegerLiteral(7)]));
+    // Err compound
+    assert!(parser.parse("(_, 4").is_err());
+    assert!(parser.parse("( )").is_err());
+    assert!(parser.parse("[x, y").is_err());
+    assert!(parser.parse("[4,]").is_err());
+    assert!(parser.parse("(x)with y").is_err());
+    assert!(parser.parse("with 4").is_err());
+    assert!(parser.parse("[[Some with x]]").is_err());
+    assert!(parser.parse("(x, _, (4, 5))").is_err());
+    assert!(parser.parse("([4, -5.6, _], (7, ), x, )").is_err());
+}
+
+#[test]
+fn test_parse_complex_pattern() {
+    let parser = grammar::PatternParser::new();
+    // Ok Pattern union
+    assert!(parser.parse("x | y").unwrap() == ast::Pattern::Union(vec![
+        ast::Pattern::Identifier("x"),
+        ast::Pattern::Identifier("y")
+    ]));
+    assert!(parser.parse("(4) | 5.0 | \"hello\"").unwrap() == ast::Pattern::Union(vec![
+        ast::Pattern::IntegerLiteral(4),
+        ast::Pattern::FloatLiteral(OrderedFloat(5.0)),
+        ast::Pattern::StringLiteral(String::from("hello"))
+    ]));
+    assert!(parser.parse("x|(y)").unwrap() == ast::Pattern::Union(vec![
+        ast::Pattern::Identifier("x"),
+        ast::Pattern::Identifier("y")
+    ]));
+    // Err pattern union
+    assert!(parser.parse("[a, b] | 4").is_err());
+    assert!(parser.parse("b|(x,)").is_err());
+    assert!(parser.parse("4 |").is_err());
+    assert!(parser.parse("|").is_err());
+    assert!(parser.parse("4 | 5 | ").is_err());
+    assert!(parser.parse("| 6.0 | 7").is_err());
+    assert!(parser.parse("([x, y]) | (4)").is_err());
+    // Ok Pattern complement
+    assert!(parser.parse("~4").unwrap() == ast::Pattern::Complement(
+        Box::new(ast::Pattern::IntegerLiteral(4))
+    ));
+    assert!(parser.parse("~[_, 4]").unwrap() == ast::Pattern::Complement(
+        Box::new(ast::Pattern::List(vec![
+            ast::Pattern::Wildcard,
+            ast::Pattern::IntegerLiteral(4)
+        ]))
+    ));
+    assert!(parser.parse("~Option with 4").unwrap() == ast::Pattern::Complement(
+        Box::new(ast::Pattern::TypeVariant(
+            "Option", Box::new(ast::Pattern::IntegerLiteral(4))
+        ))
+    ));
+    assert!(parser.parse("~(Option with (2, 3, x, ))").unwrap() == ast::Pattern::Complement(
+        Box::new(ast::Pattern::TypeVariant(
+            "Option", Box::new(ast::Pattern::Tuple(vec![
+                ast::Pattern::IntegerLiteral(2),
+                ast::Pattern::IntegerLiteral(3),
+                ast::Pattern::Identifier("x")
+            ]))
+        ))
+    ));
+    // Err Pattern complement
+    assert!(parser.parse("!").is_err());
+    assert!(parser.parse("~").is_err());
+    assert!(parser.parse("~~4").is_err());
+    assert!(parser.parse("~(~4)").is_err());
+    assert!(parser.parse("4~").is_err());
+    assert!(parser.parse("5 | ~6").is_err());
+    assert!(parser.parse("~ 5 | 4").is_err());
+    // Ok guarded pattern
+    assert!(parser.parse("x | y if true").unwrap() == ast::Pattern::Guarded(
+        Box::new(ast::Pattern::Union(vec![
+            ast::Pattern::Identifier("x"),
+            ast::Pattern::Identifier("y")
+        ])),
+        ast::Expression::Identifier("true")
+    ));
+    assert!(parser.parse("x :: xs if f x").unwrap() == ast::Pattern::Guarded(
+        Box::new(ast::Pattern::ListConstruction("x", "xs")),
+        ast::Expression::FuncApplication(
+            Box::new(ast::Expression::Identifier("f")),
+            Box::new(ast::Expression::Identifier("x"))
+        )
+    ));
+    // Err guarded pattern
+    assert!(parser.parse("if").is_err());
+    assert!(parser.parse("x | 4if true").is_err());
+    assert!(parser.parse("x | yif true").is_err());
+    assert!(parser.parse("4 | 5 if(f g)").is_err());
+    assert!(parser.parse("[a, b] if").is_err());
 }
 
 // Statements

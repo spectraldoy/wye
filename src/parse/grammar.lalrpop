@@ -180,7 +180,7 @@ AtomicPattern: ast::Pattern<'input> = {
     <f: FloatLiteral> => ast::Pattern::FloatLiteral(f),
     <s: StringLiteral> => ast::Pattern::StringLiteral(s),
     <id: Identifier> => ast::Pattern::Identifier(id),
-    <tid: Sp<Identifier>> <with: Sp<"with">> <field: Sp<Identifier>> =>? {
+    <tid: Sp<Identifier>> <with: Sp<"with">> <field: Sp<CompoundPattern>> =>? {
         if tid.end == with.start {
             Err(ParseError::User {
                 error: "Variant with argument requires space between TypeId and `with` token"
@@ -190,24 +190,45 @@ AtomicPattern: ast::Pattern<'input> = {
                 error: "Variant with argument requires space between `with` token and field identifier"
             })
         } else {
-            Ok(ast::Pattern::TypeVariant(tid.value, field.value))
+            Ok(ast::Pattern::TypeVariant(tid.value, Box::new(field.value)))
         }
-    }, 
+    },
     "[" "]" => ast::Pattern::EmptyList,
+    "(" <AtomicPattern> ")" => <>,
+}
+
+ScopablePattern: ast::Pattern<'input> = {
+    AtomicPattern,
+    <head: Identifier> "::" <tail: Identifier> => ast::Pattern::ListConstruction(head, tail),
+}
+
+CompoundPattern: ast::Pattern<'input> = {
+    ScopablePattern,
+    "[" <pats: SepListAtLeastOne<ScopablePattern, ",">> "]" => ast::Pattern::List(pats),
+    "(" <pats: SepTuple<ScopablePattern, ",">> ")" => ast::Pattern::Tuple(pats),
 }
 
 UnguardedPattern: ast::Pattern<'input> = {
-    AtomicPattern,
+    CompoundPattern,
     <pats: SepListAtLeastTwo<AtomicPattern, "|">> => ast::Pattern::Union(pats),
-    "~" <pat: AtomicPattern> => ast::Pattern::Complement(Box::new(pat)),
-    <head: Identifier> "::" <tail: Identifier> => ast::Pattern::ListConstruction(head, tail),
-    "[" <pats: SepListAtLeastOne<AtomicPattern, ",">> "]" => ast::Pattern::PatternList(pats),
-    "(" <pats: SepTuple<AtomicPattern, ",">> ")" => ast::Pattern::PatternTuple(pats),
+    "~" <pat: CompoundPattern> => ast::Pattern::Complement(Box::new(pat)),
 }
 
 pub Pattern: ast::Pattern<'input> = {
     UnguardedPattern,
-    <pat: UnguardedPattern> "if" <guard: Expression> => ast::Pattern::Guarded(Box::new(pat), guard),
+    <pat: Sp<UnguardedPattern>> <if_: Sp<"if">> <guard: Sp<Expression>> =>? {
+        if pat.end == if_.start {
+            Err(ParseError::User {
+                error: "Space required between pattern to guard and `if` token"
+            })
+        } else if if_.end == guard.start {
+            Err(ParseError::User {
+                error: "Space required between `if` token and guard expression"
+            })
+        } else {
+            Ok(ast::Pattern::Guarded(Box::new(pat.value), guard.value))
+        }
+    },
 }
 
 AtomicTypeExpr: ast::TypeExpression<'input> = {

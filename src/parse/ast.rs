@@ -53,15 +53,15 @@ pub enum Pattern<'a> {
     StringLiteral(String),
     Identifier(Identifier<'a>),
     // TypeId (with Identifier)?
-    TypeVariant(Identifier<'a>, Identifier<'a>),
+    TypeVariant(Identifier<'a>, Box<Pattern<'a>>),
     // x :: xs
     ListConstruction(Identifier<'a>, Identifier<'a>),
     // Union
     Union(Vec<Pattern<'a>>),
     Complement(Box<Pattern<'a>>),
     EmptyList,
-    PatternList(Vec<Pattern<'a>>),
-    PatternTuple(Vec<Pattern<'a>>),
+    List(Vec<Pattern<'a>>),
+    Tuple(Vec<Pattern<'a>>),
     // pat if guard - take this only if pat matches and guard(pat) is true
     Guarded(Box<Pattern<'a>>, Expression<'a>)
 }
