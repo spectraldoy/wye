@@ -365,6 +365,50 @@ fn test_parse_function_application() {
 }
 
 #[test]
+fn test_parse_lambda_expr() {
+    let parser = grammar::ExpressionParser::new();
+    // Ok
+    assert!(parser.parse("\\ x y -> 4").unwrap() == ast::Expression::Lambda(
+        vec!["x", "y"],
+        Box::new(ast::Expression::IntegerLiteral(4))
+    ));
+    assert!(parser.parse("\\x -> (+) x 5").unwrap() == ast::Expression::Lambda(
+        vec!["x"],
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::FuncApplication(
+                Box::new(ast::Expression::BuiltinOp(ast::Operation::Add)),
+                Box::new(ast::Expression::Identifier("x")),
+            )),
+            Box::new(ast::Expression::IntegerLiteral(5))
+        ))
+    ));
+    assert!(parser.parse("\\x y -> Option with (x, y)").unwrap() == ast::Expression::Lambda(
+        vec!["x", "y"],
+        Box::new(ast::Expression::TypeVariant(
+            "Option",
+            Box::new(ast::Expression::Tuple(vec![
+                ast::Expression::Identifier("x"),
+                ast::Expression::Identifier("y")
+            ]))
+        ))
+    ));
+    assert!(parser.parse("\\x->f x").unwrap() == ast::Expression::Lambda(
+        vec!["x"],
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::Identifier("f")),
+            Box::new(ast::Expression::Identifier("x"))
+        ))
+    ));
+    // Err
+    assert!(parser.parse("\\").is_err());
+    assert!(parser.parse("\\ ->").is_err());
+    assert!(parser.parse("\\ -> 5").is_err());
+    assert!(parser.parse("\\ x (y) -> 5").is_err());
+    assert!(parser.parse("x -> 5").is_err());
+    assert!(parser.parse("\\string -> 5").is_err());
+}
+
+#[test]
 fn test_parse_match() {
     let parser = grammar::ExpressionParser::new();
     // Ok
@@ -372,8 +416,127 @@ fn test_parse_match() {
         Box::new(ast::Expression::Identifier("a")),
         vec![(ast::Pattern::Wildcard, ast::Expression::IntegerLiteral(3))]
     ));
+    assert!(parser.parse("match f g {
+        7 | -8.6 => 5 - 6,
+        x :: xs if x == 4 => x *\"hi\",
+        _ => 4,
+    }").unwrap() == ast::Expression::MatchConstruct(
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::Identifier("f")),
+            Box::new(ast::Expression::Identifier("g"))
+        )),
+        vec![
+            (
+                ast::Pattern::Union(vec![
+                    ast::Pattern::IntegerLiteral(7),
+                    ast::Pattern::FloatLiteral(OrderedFloat(-8.6))
+                ]),
+                ast::Expression::FuncApplication(
+                    Box::new(ast::Expression::FuncApplication(
+                        Box::new(ast::Expression::BuiltinOp(ast::Operation::Subtract)),
+                        Box::new(ast::Expression::IntegerLiteral(5))
+                    )),
+                    Box::new(ast::Expression::IntegerLiteral(6))
+                )
+            ),
+            (
+                ast::Pattern::Guarded(
+                    Box::new(ast::Pattern::ListConstruction("x", "xs")),
+                    ast::Expression::FuncApplication(
+                        Box::new(ast::Expression::FuncApplication(
+                            Box::new(ast::Expression::BuiltinOp(ast::Operation::Eq)),
+                            Box::new(ast::Expression::Identifier("x"))
+                        )),
+                        Box::new(ast::Expression::IntegerLiteral(4))
+                    )
+                ),
+                ast::Expression::FuncApplication(
+                    Box::new(ast::Expression::FuncApplication(
+                        Box::new(ast::Expression::BuiltinOp(ast::Operation::Multiply)),
+                        Box::new(ast::Expression::Identifier("x"))
+                    )),
+                    Box::new(ast::Expression::StringLiteral(String::from("hi")))
+                )
+            ),
+            (
+                ast::Pattern::Wildcard,
+                ast::Expression::IntegerLiteral(4)
+            )
+        ]
+    ));
+    assert!(parser.parse("match f g {
+        x => y,
+    }").unwrap() == ast::Expression::MatchConstruct(
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::Identifier("f")),
+            Box::new(ast::Expression::Identifier("g"))
+        )),
+        vec![(
+            ast::Pattern::Identifier("x"),
+            ast::Expression::Identifier("y")
+        )]
+    ));
+    assert!(parser.parse("match f g {
+        x => y
+    }").unwrap() == ast::Expression::MatchConstruct(
+        Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::Identifier("f")),
+            Box::new(ast::Expression::Identifier("g"))
+        )),
+        vec![(
+            ast::Pattern::Identifier("x"),
+            ast::Expression::Identifier("y")
+        )]
+    ));
+
+    assert!(parser.parse("match 4 {
+        3 => 6,
+        _ => 7
+    }").unwrap() == ast::Expression::MatchConstruct(
+        Box::new(ast::Expression::IntegerLiteral(4)),
+        vec![(
+            ast::Pattern::IntegerLiteral(3),
+            ast::Expression::IntegerLiteral(6),
+        ), (
+            ast::Pattern::Wildcard,
+            ast::Expression::IntegerLiteral(7)
+        )]
+    ));
+    assert!(parser.parse("match 4 {
+        3 => 6,
+        _ => 7,
+    }").unwrap() == ast::Expression::MatchConstruct(
+        Box::new(ast::Expression::IntegerLiteral(4)),
+        vec![(
+            ast::Pattern::IntegerLiteral(3),
+            ast::Expression::IntegerLiteral(6),
+        ), (
+            ast::Pattern::Wildcard,
+            ast::Expression::IntegerLiteral(7)
+        )]
+    ));
     // Err
-    assert!(parser.parse("match (f g) { }").is_err());
+    assert!(parser.parse("match 4 {
+        3 => 4
+        5 => 6
+    }").is_err());
+    assert!(parser.parse("match 4 {
+        3 => 4 => 5
+    }").is_err());
+    assert!(parser.parse("match 4 {
+        3 =>
+    }").is_err());
+    assert!(parser.parse("match 4 {
+        3 => 6,
+        _ = > 7
+    }").is_err());
+    assert!(parser.parse("match 4 {
+        3 => 6,
+        _ = > 7
+    }").is_err());
+    assert!(parser.parse("match 4 { }").is_err());
+    assert!(parser.parse("match (f g)").is_err());
+    assert!(parser.parse("match f g").is_err());
 }
 
 // Type Expressions
@@ -555,6 +718,13 @@ fn test_parse_declared_type() {
     assert!(parser.parse("bool [int,]").is_err());
     assert!(parser.parse("(yello").is_err());
     assert!(parser.parse("X with int").is_err());
+}
+
+// Patterns
+
+#[test]
+fn test_parse_pattern() {
+    
 }
 
 // Statements

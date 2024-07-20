@@ -15,7 +15,7 @@ match {
     _
 }
 
-// TODO: null token and lambda
+// TODO: null token
 // TODO: custom error type and better error messages
 
 // Macros
@@ -45,6 +45,13 @@ SepTuple<T, Sep>: Vec<T> = {
     }
 }
 
+SepTupleAtLeastTwo<T, Sep>: Vec<T> = {
+    <prefix: T> <mut v: (Sep <T>)+> Sep? => {
+        let mut out = vec![prefix];
+        out.append(&mut v);
+        out
+    }
+}
 
 // Tokens
 Identifier: ast::Identifier<'input> = <r"[a-zA-Z_]\w*">;
@@ -141,7 +148,18 @@ pub Expression: ast::Expression<'input> = {
         )),
         Box::new(op2)
     ),
-    <match_: Sp<"match">> <matchand: Sp<AtomicExpr>> "{" <arms: SepListAtLeastOne<(<Pattern> "=>" <Expression>), ",">> "}" =>? {
+    <match_: Sp<"match">> <matchand: Sp<Expression>> "{" <arm: (<Pattern> "=>" <Expression> ","?)> "}" =>? {
+        if match_.end == matchand.start {
+            Err(ParseError::User {
+                error: "Space required between `match` keyword and matchand"
+            })
+        } else {
+            Ok(ast::Expression::MatchConstruct(
+                Box::new(matchand.value), vec![arm]
+            ))
+        }
+    },
+    <match_: Sp<"match">> <matchand: Sp<Expression>> "{" <arms: SepTupleAtLeastTwo<(<Pattern> "=>" <Expression>), ",">> "}" =>? {
         if match_.end == matchand.start {
             Err(ParseError::User {
                 error: "Space required between `match` keyword and matchand"
@@ -152,7 +170,7 @@ pub Expression: ast::Expression<'input> = {
             ))
         }
     },
-    r"\\" <ids: Identifier*> "->" <body: Expression> => ast::Expression::Lambda(ids, Box::new(body))
+    r"\\" <ids: Identifier+> "->" <body: Expression> => ast::Expression::Lambda(ids, Box::new(body))
     // TODO: finish statement parsing, then impl let block
 }
 
@@ -187,7 +205,7 @@ UnguardedPattern: ast::Pattern<'input> = {
     "(" <pats: SepTuple<AtomicPattern, ",">> ")" => ast::Pattern::PatternTuple(pats),
 }
 
-Pattern: ast::Pattern<'input> = {
+pub Pattern: ast::Pattern<'input> = {
     UnguardedPattern,
     <pat: UnguardedPattern> "if" <guard: Expression> => ast::Pattern::Guarded(Box::new(pat), guard),
 }
