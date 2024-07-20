@@ -39,8 +39,6 @@ pub enum Expression<'a> {
     MatchConstruct(Box<Expression<'a>>, Vec<(Pattern<'a>, Expression<'a>)>),
     // anonymous function created by \ <id*> -> expr
     Lambda(Vec<Identifier<'a>>, Box<Expression<'a>>),
-    // if <Expr> then <Expr> else <Expr>
-    Conditional(Box<Expression<'a>>, Box<Expression<'a>>, Box<Expression<'a>>),
     // { Statement* Expression }
     Block(Vec<Statement<'a>>, Box<Expression<'a>>)
 }
@@ -81,10 +79,10 @@ pub enum TypeExpression<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Statement<'a> {
     // let <Id> <Id>* = <Expr> ;
-    UntypedLet(Identifier<'a>, Vec<Identifier<'a>>, Box<Expression<'a>>),
+    UntypedLet(Vec<Identifier<'a>>, Expression<'a>),
     // let <Id> ( <Id>: <Type> -> )* <Type> = <Expr>
     // translated to [(identifier, TypeExpr)] Expression
-    TypedLet(Vec<(Identifier<'a>, TypeExpression<'a>)>, Box<Expression<'a>>),
+    TypedLet(Identifier<'a>, TypeExpression<'a>, Vec<(Identifier<'a>, TypeExpression<'a>)>, Expression<'a>),
     // type <TypeId> <TypeArgs>? = ( <TypeId> (with <Type?)? )+
     // translated into TypeId, TypeVars, VariantNames, VariantFields
     TypeDeclaration(Identifier<'a>, Vec<Identifier<'a>>, Vec<(Identifier<'a>, Option<TypeExpression<'a>>)>)

@@ -84,23 +84,6 @@ BuiltinOp: ast::Operation = {
     "::" => ast::Operation::Cons,
 }
 
-TypeVariantType: (ast::Identifier<'input>, Option<ast::TypeExpression<'input>>) = {
-    <tid: Identifier> => (tid, None),
-    <tid: Sp<Identifier>> <with: Sp<"with">> <field_t: Sp<TypeExpression>> =>? {
-        if tid.end == with.start {
-            Err(ParseError::User {
-                error: "Type of variant with argument requires space between TypeId and `with` token"
-            })
-        } else if with.end == field_t.start {
-            Err(ParseError::User {
-                error: "Type of variant with argument requires space between `with` token and field type"
-            })
-        } else {
-            Ok((tid.value, Some(field_t.value)))
-        }
-    }
-}
-
 // Expressions
 
 AtomicExpr: ast::Expression<'input> = {
@@ -170,8 +153,10 @@ pub Expression: ast::Expression<'input> = {
             ))
         }
     },
-    r"\\" <ids: Identifier+> "->" <body: Expression> => ast::Expression::Lambda(ids, Box::new(body))
-    // TODO: finish statement parsing, then impl let block
+    r"\\" <ids: Identifier+> "->" <body: Expression> => ast::Expression::Lambda(ids, Box::new(body)),
+    "{" <stmts: Statement*> <e: Expression> "}" => {
+        ast::Expression::Block(stmts, Box::new(e))
+    }
 }
 
 AtomicPattern: ast::Pattern<'input> = {
@@ -274,16 +259,88 @@ pub TypeExpression: ast::TypeExpression<'input> = {
 
 // Program
 
-Statement: ast::Statement<'input> = {
-    // "let" <ids: Identifier+> "=" <e: Expression> ";" => {
-    //     ast::Statement::UntypedLet(String::from(&ids[0]), ids[1..].to_vec(), Box::new(e))
-    // },
-    // "let" <typed_ids: SepListAtLeastOne<TypedIdentifier, "->">> "=" <e: Expression >";" => {
-    //     ast::Statement::TypedLet(typed_ids, Box::new(e))
-    // },
-    // "type" <tid: TypeId> <tvars: TypeVar*> "=" <variants: SepListAtLeastOne<TypeVariantType, "|">> ";" => {
-    //    ast::Statement::TypeDeclaration(tid, tvars, variants)
-    // }
+TypeVariantDeclType: (ast::Identifier<'input>, Option<ast::TypeExpression<'input>>) = {
+    <tid: Identifier> => (tid, None),
+    <tid: Sp<Identifier>> <with: Sp<"with">> <field_t: Sp<TypeExpression>> =>? {
+        if tid.end == with.start {
+            Err(ParseError::User {
+                error: "Type of variant with argument requires space between TypeId and `with` token"
+            })
+        } else if with.end == field_t.start {
+            Err(ParseError::User {
+                error: "Type of variant with argument requires space between `with` token and field type"
+            })
+        } else {
+            Ok((tid.value, Some(field_t.value)))
+        }
+    }
 }
 
-pub WyeProgram = <Statement+>;
+pub Statement: ast::Statement<'input> = {
+    <let_: Sp<"let">> <ids: Sp<Identifier>+> "=" <e: Expression> ";" =>? {
+        if let_.end == ids[0].start {
+            Err(ParseError::User {
+                error: "Space required between `let` token and first identifier in let statement"
+            })
+        } else if util::spans_overlap(&ids.iter().map(|x| (x.start, x.end)).collect::<Vec<_>>()) {
+            Err(ParseError::User {
+                error: "Identifiers in untyped let require space between them"
+            })
+        } else {
+            Ok(ast::Statement::UntypedLet(
+                ids.iter().map(|x| x.value).collect::<Vec<_>>(), e
+            ))
+        }
+    },
+    <let_: Sp<"let">> <typed_id: Sp<TypedIdentifier>> "=" <e: Expression> ";" =>? {
+        if let_.end == typed_id.start {
+            Err(ParseError::User {
+                error: "Space required between `let` token and first identifier in let statement"
+            })
+        } else {
+            Ok(ast::Statement::TypedLet(typed_id.value.0, typed_id.value.1, vec![], e))
+        }
+    },
+    <let_: Sp<"let">> <id: Sp<Identifier>> <typed_ids: ("(" <TypedIdentifier> ")" "->")+> <te: TypeExpression> "=" <e: Expression> ";" =>? {
+        if let_.end == id.start {
+            Err(ParseError::User {
+                error: "Space required between `let` token and first identifier"
+            })
+        } else {
+            Ok(ast::Statement::TypedLet(id.value, te, typed_ids, e)   )
+        }
+    },
+    <type_: Sp<"type">> <tid: Sp<Identifier>> <tvars: Sp<TypeVar>*> "=" <variants: SepListAtLeastOne<TypeVariantDeclType, "|">> ";" =>? {
+        if type_.end == tid.start {
+            Err(ParseError::User {
+                error: "Space required between `type` token and declared type name"
+            })
+        } else if tvars.len() != 0 && tid.end == tvars[0].start {
+            Err(ParseError::User {
+                error: "Space required between declared type name and type arguments"
+            })
+        } else if util::spans_overlap(&tvars.iter().map(|tv| (tv.start, tv.end)).collect::<Vec<_>>()) {
+            Err(ParseError::User {
+                error: "Type variables in type declaration require space between them"
+            })
+        } else {
+            Ok(ast::Statement::TypeDeclaration(
+                tid.value,
+                tvars.iter().map(|tv| tv.value).collect::<Vec<_>>(),
+                variants
+            ))
+        }
+    }
+}
+
+StatementList: Vec<ast::Statement<'input>> = <stmts: Sp<Statement>+> =>? {
+    if util::spans_overlap(&stmts.iter().map(|s| (s.start, s.end)).collect::<Vec<_>>()) {
+        Err(ParseError::User {
+            error: "Space required between adjacent statements"
+        })
+    } else {
+        Ok(stmts.iter().map(|s| s.value.clone()).collect::<Vec<_>>())
+    }
+};
+
+pub Program: Vec<ast::Statement<'input>> = StatementList;

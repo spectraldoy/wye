@@ -905,6 +905,27 @@ fn test_parse_complex_pattern() {
     assert!(parser.parse("x | yif true").is_err());
     assert!(parser.parse("4 | 5 if(f g)").is_err());
     assert!(parser.parse("[a, b] if").is_err());
+    assert!(parser.parse("(f g)").is_err());
 }
 
 // Statements
+
+#[test]
+fn test_parse_let() {
+    let parser = grammar::StatementParser::new();
+    // Ok untyped
+    // Err untyped
+    // Ok typed
+    // Err typed
+}
+
+// Program
+
+#[test]
+fn test_parse_program() {
+    let parser = grammar::ProgramParser::new();
+    // Ok
+    // Err
+    assert!(parser.parse("let x = 4let y = 5").is_err());
+    assert!(parser.parse("let x = ylet z = 4").is_err());
+}
