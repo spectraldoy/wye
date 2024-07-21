@@ -117,7 +117,7 @@ type Pair 'a 'b = ('a, 'b);
 \end{lstlisting}
 
 \section{Syntax}
-A Wye program is stored in a \texttt{.y} file and is, in its most abstract view, simply a sequence of Wye statements.
+A Wye program is stored in a \texttt{.wye} file and is, in its most abstract view, simply a sequence of Wye statements.
 
 Witten below in Backus-Naur form is roughly the Wye grammar. The start symbol is $Program$. Nonterminals start with a capital letter. Terminals are written in \texttt{this font}. $pat*$ denotes the Kleene star: zero or more repetitions of the pattern $pat$. $pat+$ is a shorthand for $pat\: pat*$. $pat?$ denotes that $pat$ may or may not occur. $( pat_1\:...\: pat_n )$ groups $pat_1, ..., pat_n$ into a new pattern in which each $pat_i$ is to occur in the specified sequence. $pat1 | pat2$ means that exactly one of $pat1$ or $pat2$ may occur. Beware that \texttt{|} and $|$ are different -- the first is a Wye token. $\langle$These brackets$\rangle$ are used to annotate certain grammar rules.
 

@@ -1,0 +1,25 @@
+{
+  "name": "wye-syntax-highlighter",
+  "displayName": "Wye Syntax Highlighter",
+  "description": "A syntax highlighter for the Wye language",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.91.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "wye",
+      "aliases": ["Wye", "wye"],
+      "extensions": [".wye"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "wye",
+      "scopeName": "source.wye",
+      "path": "./syntaxes/wye.tmLanguage.json"
+    }]
+  }
+}

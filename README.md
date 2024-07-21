@@ -36,7 +36,7 @@ let collatz_sequence (x: int) -> [int] = match x {
         let three_x_plus_1 = (3 * x) + 1;
         three_x_plus_1 :: (collatz_sequence three_x_plus_1)
     }
-}
+};
 
 let Main = print (collatz_sequence 81);
 ```

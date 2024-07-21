@@ -1,0 +1,110 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Wye",
+	"patterns": [
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#constants"
+		},
+		{
+			"include": "#storage"
+		},
+		{
+			"include": "#support"
+		},
+		{
+			"include": "#variables"
+		}
+	],
+	"repository": {
+		"keywords": {
+			"patterns": [
+				{
+					"name": "keyword.control.wye",
+					"match": "\\b(match|if|with|let)\\b"
+				},
+				{
+					"name": "keyword.other.wye",
+					"match": "\\b(Main)\\b"
+				}
+			]
+		},
+		"strings": {
+			"name": "string.quoted.double.wye",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.wye",
+					"match": "\\\\."
+				}
+			]
+		},
+		"comments": {
+			"patterns": [
+				{
+					"name": "comment.line.number-sign",
+					"match": "#.*"
+				},
+				{
+					"name": "comment.block",
+					"begin": "\\(\\*",
+					"end": "\\*\\)"
+				}
+			]
+		},
+		"constants": {
+			"patterns": [
+				{
+					"name": "constant.numeric.wye",
+					"match": "\\b(-?([0-9]|[1-9][0-9]*)|-?([0-9]|[1-9][0-9]*)\\.[0-9]+([eE]-?[0-9]+)?)\\b"
+				},
+				{
+					"name": "constant.language.wye",
+					"match": "\\b(true|false)\\b"
+				}
+			]
+		},
+		"storage": {
+			"patterns": [
+				{
+					"name": "storage.type.wye",
+					"match": "\\b(type|let)\\b"
+				},
+				{
+					"name": "storage.modifier.wye",
+					"match": "'|\\+|-|\\*|/|//|<|>|<=|>=|==|!=|::|->|=>|int|float|string|bool"
+				}
+			]
+		},
+		"support": {
+			"patterns": [
+				{
+					"name": "support.type",
+					"match": "\\b(int|float|string|bool)\\b"
+				},
+				{
+					"name": "support.function",
+					"match": "\\b(print|error)\\b"
+				}
+			]
+		},
+		"variables": {
+			"patterns": [
+				{
+					"name": "variable.name",
+					"match": "\\b[a-zA-Z_]\\w*\\b"
+				}
+			]
+		}
+	},
+	"scopeName": "source.wye"
+}
