@@ -1,6 +1,10 @@
 use super::span::Spanned;
 
 pub fn spans_overlap(spans: &Vec<(usize, usize)>) -> bool {
+    if spans.len() == 0 {
+        return false;
+    }
+
     for i in 0..(spans.len() - 1) {
         let (_, cur_end) = spans[i];
         let (nxt_start, _) = spans[i + 1];

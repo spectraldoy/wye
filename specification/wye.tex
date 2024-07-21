@@ -183,7 +183,7 @@ let x = 4;
 let y: int = 4;
 
 # function
-let plus_4 x = (+ x 4);
+let plus_4 = (+) 4;
 # type-annotated functions
 let plus_4 (x: int) -> int = (+ x 4);
 let id: (x: 'a) -> 'a = x;
@@ -347,9 +347,9 @@ If $v$ matches the pattern, then the \textit{new variable} \texttt{x} will be se
 \begin{lstlisting}{wye}
 type Option 'a = None | Some with 'a;
 let print_optional (opt: Option string) -> string = match opt {
-	None => print "nothing!";
+	None => print "nothing!",
 	# assume that cat concatenates two strings
-	Some with x => print (cat "some with" x);
+	Some with x => print (cat "some with" x),
 }
 \end{lstlisting}
 This $Id$ will shadow over a variable with the same name from the outer scope. On the other hand, if the $Pat$ after the \texttt{with} is a integer, float, or string literal, $v$ is checked not only to be of the specified variant type, but to have a field that is exactly the specified literal. Similarly, 

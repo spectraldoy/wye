@@ -362,7 +362,8 @@ fn test_parse_function_application() {
     assert!(parser.parse("(a + b + c)").is_err());
     assert!(parser.parse("a / b * c").is_err());
     assert!(parser.parse("a + (b - c - d)").is_err());
-    assert!(parser.parse("\"hi\" / ").is_err())
+    assert!(parser.parse("\"hi\" / ").is_err());
+    assert!(parser.parse("x + sum xs").is_err());
 }
 
 #[test]
@@ -914,9 +915,246 @@ fn test_parse_complex_pattern() {
 fn test_parse_let() {
     let parser = grammar::StatementParser::new();
     // Ok untyped
+    assert!(parser.parse("let x = 4;").unwrap() == ast::Statement::UntypedLet(
+        vec!["x"],
+        ast::Expression::IntegerLiteral(4)
+    ));
+    assert!(parser.parse("let x y = (\\ x -> x) y;").unwrap() == ast::Statement::UntypedLet(
+        vec!["x", "y"],
+        ast::Expression::FuncApplication(
+            Box::new(ast::Expression::Lambda(vec!["x"], Box::new(ast::Expression::Identifier("x")))),
+            Box::new(ast::Expression::Identifier("y"))
+        )
+    ));
+    assert!(parser.parse("let plus_4 x = (+) 4;").unwrap() == ast::Statement::UntypedLet(
+        vec!["plus_4", "x"],
+        ast::Expression::FuncApplication(
+            Box::new(ast::Expression::BuiltinOp(ast::Operation::Add)),
+            Box::new(ast::Expression::IntegerLiteral(4))
+        ))
+    );
+    assert!(parser.parse("let j x y z w = match plus_4 x {
+        4 | 5 => [1, 2, y],
+        w => 2,
+        x :: xs => x // 4,
+        _ => 8.6 * z
+    };").unwrap() == ast::Statement::UntypedLet(
+        vec!["j", "x", "y", "z", "w"],
+        ast::Expression::MatchConstruct(
+            Box::new(ast::Expression::FuncApplication(
+                Box::new(ast::Expression::Identifier("plus_4")),
+                Box::new(ast::Expression::Identifier("x"))
+            )),
+            vec![(
+                ast::Pattern::Union(vec![
+                    ast::Pattern::IntegerLiteral(4),
+                    ast::Pattern::IntegerLiteral(5)
+                ]),
+                ast::Expression::List(vec![
+                    ast::Expression::IntegerLiteral(1),
+                    ast::Expression::IntegerLiteral(2),
+                    ast::Expression::Identifier("y")
+                ])
+            ), (
+                ast::Pattern::Identifier("w"),
+                ast::Expression::IntegerLiteral(2)
+            ), (
+                ast::Pattern::ListConstruction("x", "xs"),
+                ast::Expression::FuncApplication(
+                    Box::new(ast::Expression::FuncApplication(
+                        Box::new(ast::Expression::BuiltinOp(ast::Operation::FloorDiv)),
+                        Box::new(ast::Expression::Identifier("x"))
+                    )),
+                    Box::new(ast::Expression::IntegerLiteral(4))
+                )
+            ), (
+                ast::Pattern::Wildcard,
+                ast::Expression::FuncApplication(
+                    Box::new(ast::Expression::FuncApplication(
+                        Box::new(ast::Expression::BuiltinOp(ast::Operation::Multiply)),
+                        Box::new(ast::Expression::FloatLiteral(OrderedFloat(8.6)))
+                    )),
+                    Box::new(ast::Expression::Identifier("z"))
+                )
+            )]
+        )
+    ));
+    assert!(parser.parse("let y = { 5 };").unwrap() == ast::Statement::UntypedLet(
+        vec!["y"],
+        ast::Expression::Block(vec![], Box::new(ast::Expression::IntegerLiteral(5)))
+    ));
+    assert!(parser.parse("let doublesum lst = {
+        let sum lst = match lst {
+            [] => 0,
+            x::xs => x + (sum xs)
+        };
+        (*) 2 (sum lst)
+    };").unwrap() == ast::Statement::UntypedLet(
+        vec!["doublesum", "lst"],
+        ast::Expression::Block(
+            vec![ast::Statement::UntypedLet(
+                vec!["sum", "lst"],
+                ast::Expression::MatchConstruct(
+                    Box::new(ast::Expression::Identifier("lst")),
+                    vec![(
+                        ast::Pattern::EmptyList,
+                        ast::Expression::IntegerLiteral(0)
+                    ), (
+                        ast::Pattern::ListConstruction("x", "xs"),
+                        ast::Expression::FuncApplication(
+                            Box::new(ast::Expression::FuncApplication(
+                                Box::new(ast::Expression::BuiltinOp(ast::Operation::Add)),
+                                Box::new(ast::Expression::Identifier("x"))
+                            )),
+                            Box::new(ast::Expression::FuncApplication(
+                                Box::new(ast::Expression::Identifier("sum")),
+                                Box::new(ast::Expression::Identifier("xs"))
+                            ))
+                        )
+                    )]
+                )
+            )],
+            Box::new(ast::Expression::FuncApplication(
+                Box::new(ast::Expression::FuncApplication(
+                    Box::new(ast::Expression::BuiltinOp(ast::Operation::Multiply)),
+                    Box::new(ast::Expression::IntegerLiteral(2))
+                )),
+                Box::new(ast::Expression::FuncApplication(
+                    Box::new(ast::Expression::Identifier("sum")),
+                    Box::new(ast::Expression::Identifier("lst"))
+                ))
+            ))
+        )
+    ));
+    assert!(parser.parse("let Main = print (f g);").unwrap() == ast::Statement::UntypedLet(
+        vec!["Main"], ast::Expression::FuncApplication(
+            Box::new(ast::Expression::Print),
+            Box::new(ast::Expression::FuncApplication(
+                Box::new(ast::Expression::Identifier("f")),
+                Box::new(ast::Expression::Identifier("g"))
+            ))
+        )
+    ));
     // Err untyped
+    assert!(parser.parse("let x = 4").is_err());
+    assert!(parser.parse("let x = ;").is_err());
+    assert!(parser.parse("let x -> y = 4").is_err());
+    assert!(parser.parse("let  = 4;").is_err());
+    assert!(parser.parse("let func (x) y = x + y").is_err());
     // Ok typed
+    assert!(parser.parse("let z: 'a = \"hi\";").unwrap() == ast::Statement::TypedLet(
+        "z", ast::TypeExpression::TypeVariable("a"), vec![], ast::Expression::StringLiteral(String::from("hi"))
+    ));
+    assert!(parser.parse("let y: float = 5.68;").unwrap() == ast::Statement::TypedLet(
+        "y", ast::TypeExpression::FloatType, vec![], ast::Expression::FloatLiteral(OrderedFloat(5.68))
+    ));
+    assert!(parser.parse("let x: (int) = 4;").unwrap() == ast::Statement::TypedLet(
+        "x", ast::TypeExpression::IntType, vec![], ast::Expression::IntegerLiteral(4)
+    ));
+    assert!(parser.parse("let x: Option int = Some with 4;").unwrap() == ast::Statement::TypedLet(
+        "x", ast::TypeExpression::DeclaredType("Option", vec![ast::TypeExpression::IntType]),
+        vec![], ast::Expression::TypeVariant("Some", Box::new(ast::Expression::IntegerLiteral(4)))
+    ));
+    // unfortunate, but it's not worth editing the parser to prevent this
+    assert!(parser.parse("let func(x:int)->(y:int)->int=4;").unwrap() == ast::Statement::TypedLet(
+        "func", ast::TypeExpression::IntType,
+        vec![
+            ("x", ast::TypeExpression::IntType),
+            ("y", ast::TypeExpression::IntType)
+        ],
+        ast::Expression::IntegerLiteral(4)
+    ));
+    assert!(parser.parse("let func (x: bool) -> int -> Option 'a = \\ y -> (+) x y;").unwrap() == ast::Statement::TypedLet(
+        "func",
+        ast::TypeExpression::FunctionType(
+            Box::new(ast::TypeExpression::IntType),
+            Box::new(ast::TypeExpression::DeclaredType("Option", vec![ast::TypeExpression::TypeVariable("a")]))
+        ),
+        vec![("x", ast::TypeExpression::DeclaredType("bool", vec![]))],
+        ast::Expression::Lambda(
+            vec!["y"],
+            Box::new(ast::Expression::FuncApplication(
+                Box::new(ast::Expression::FuncApplication(
+                    Box::new(ast::Expression::BuiltinOp(ast::Operation::Add)),
+                    Box::new(ast::Expression::Identifier("x"))
+                )),
+                Box::new(ast::Expression::Identifier("y"))
+            ))
+        )
+    ));
+    assert!(parser.parse("let func: int -> bool = \\ x -> (<=) 3 x;").unwrap() == ast::Statement::TypedLet(
+        "func", ast::TypeExpression::FunctionType(
+            Box::new(ast::TypeExpression::IntType),
+            Box::new(ast::TypeExpression::DeclaredType("bool", vec![]))
+        ),
+        vec![], ast::Expression::Lambda(vec!["x"], Box::new(ast::Expression::FuncApplication(
+            Box::new(ast::Expression::FuncApplication(
+                Box::new(ast::Expression::BuiltinOp(ast::Operation::Leq)),
+                Box::new(ast::Expression::IntegerLiteral(3))
+            )),
+            Box::new(ast::Expression::Identifier("x"))
+        )))
+    ));
     // Err typed
+    assert!(parser.parse("let x y: int -> int = y").is_err());
+    assert!(parser.parse("let x = int;").is_err());
+    assert!(parser.parse("let x: int;").is_err());
+    assert!(parser.parse("let func: 'a -> 'a;").is_err());
+    assert!(parser.parse("let x: 4 = 5;").is_err());
+    assert!(parser.parse("let func (x: 8) -> (y: 9) = 8 + 9;").is_err());
+    assert!(parser.parse("let func (x: int) - > int = 4 + x;").is_err());
+    assert!(parser.parse("let func(x: int) -> (y: int) = 4;").is_err());
+}
+
+#[test]
+fn test_parse_type_decl() {
+    let parser = grammar::StatementParser::new();
+    // Ok
+    assert!(parser.parse("type bool = false | true;").unwrap() == ast::Statement::TypeDeclaration(
+        "bool", vec![], vec![("false", None), ("true", None)]
+    ));
+    assert!(parser.parse("type Option 'a = None | Some with 'a;").unwrap() == ast::Statement::TypeDeclaration(
+        "Option", vec!["a"], vec![("None", None), ("Some", Some(ast::TypeExpression::TypeVariable("a")))]
+    ));
+    assert!(parser.parse("type Thingy = Var1
+        | Var2 with int
+        | Var3 with string
+        | Var4 with [int]
+        |Var5 with (int, string, Thingy)
+    ;").unwrap() == ast::Statement::TypeDeclaration(
+        "Thingy", vec![], vec![
+            ("Var1", None),
+            ("Var2", Some(ast::TypeExpression::IntType)),
+            ("Var3", Some(ast::TypeExpression::StringType)),
+            ("Var4", Some(ast::TypeExpression::ListType(Box::new(ast::TypeExpression::IntType)))),
+            ("Var5", Some(ast::TypeExpression::TupleType(vec![
+                ast::TypeExpression::IntType,
+                ast::TypeExpression::StringType,
+                ast::TypeExpression::DeclaredType("Thingy", vec![])
+            ])))
+        ]
+    ));
+    assert!(parser.parse("
+    type binary_tree 'a = Leaf
+        | Node with ('a, binary_tree 'a, binary_tree 'a);").unwrap() == ast::Statement::TypeDeclaration(
+        "binary_tree", vec!["a"], vec![
+            ("Leaf", None),
+            ("Node", Some(ast::TypeExpression::TupleType(vec![
+                ast::TypeExpression::TypeVariable("a"),
+                ast::TypeExpression::DeclaredType("binary_tree", vec![ast::TypeExpression::TypeVariable("a")]),
+                ast::TypeExpression::DeclaredType("binary_tree", vec![ast::TypeExpression::TypeVariable("a")])
+            ])))
+        ]
+    ));
+    assert!(parser.parse("type Onevar = Onevar;").unwrap() == ast::Statement::TypeDeclaration(
+        "Onevar", vec![], vec![("Onevar", None)]
+    ));
+    // Err
+    assert!(parser.parse("type tvar = X with [int, string] | Y;").is_err());
+    assert!(parser.parse("type Option 'a -> 'b = None | Some with ('a, 'b)").is_err());
+    assert!(parser.parse("type Tree 'a = Leaf | Node + 'a;").is_err());
+    assert!(parser.parse("typebool = false | true;").is_err());
+    assert!(parser.parse("type bool 'a = match 'a { true => true, false => false };").is_err());
 }
 
 // Program
@@ -925,7 +1163,104 @@ fn test_parse_let() {
 fn test_parse_program() {
     let parser = grammar::ProgramParser::new();
     // Ok
+    assert!(parser.parse("
+        let f (g: 'a -> 'a) -> (x: 'a) -> 'a = g x;
+        let double x = (*) 2 x;
+        let z = f double 4; 
+    ").unwrap() == vec![
+        ast::Statement::TypedLet(
+            "f", ast::TypeExpression::TypeVariable("a"), vec![(
+                "g", ast::TypeExpression::FunctionType(
+                    Box::new(ast::TypeExpression::TypeVariable("a")),
+                    Box::new(ast::TypeExpression::TypeVariable("a"))
+                )
+            ), (
+                "x", ast::TypeExpression::TypeVariable("a")
+            )], ast::Expression::FuncApplication(
+                Box::new(ast::Expression::Identifier("g")),
+                Box::new(ast::Expression::Identifier("x"))
+            )
+        ),
+        ast::Statement::UntypedLet(
+            vec!["double", "x"], ast::Expression::FuncApplication(
+                Box::new(ast::Expression::FuncApplication(
+                    Box::new(ast::Expression::BuiltinOp(ast::Operation::Multiply)),
+                    Box::new(ast::Expression::IntegerLiteral(2))
+                )),
+                Box::new(ast::Expression::Identifier("x"))
+            )
+        ),
+        ast::Statement::UntypedLet(
+            vec!["z"], ast::Expression::FuncApplication(
+                Box::new(ast::Expression::FuncApplication(
+                    Box::new(ast::Expression::Identifier("f")),
+                    Box::new(ast::Expression::Identifier("double"))
+                )),
+                Box::new(ast::Expression::IntegerLiteral(4))
+            )
+        )
+    ]);
+    assert!(parser.parse("
+        type Option 'a = None | Some with 'a;
+        let print_optional (x: Option 'a) -> string = match x {
+            None => print \"nothing!\",
+            Some with x => print (\"something: \" + x) 
+        };
+    ").unwrap() == vec![
+        ast::Statement::TypeDeclaration("Option", vec!["a"], vec![
+            ("None", None), ("Some", Some(ast::TypeExpression::TypeVariable("a")))
+        ]),
+        ast::Statement::TypedLet(
+            "print_optional", ast::TypeExpression::StringType,
+            vec![("x", ast::TypeExpression::DeclaredType("Option", vec![ast::TypeExpression::TypeVariable("a")]))],
+            ast::Expression::MatchConstruct(
+                Box::new(ast::Expression::Identifier("x")),
+                vec![(
+                    ast::Pattern::Identifier("None"),
+                    ast::Expression::FuncApplication(
+                        Box::new(ast::Expression::Print),
+                        Box::new(ast::Expression::StringLiteral(String::from("nothing!")))
+                    )
+                ), (
+                    ast::Pattern::TypeVariant("Some", Box::new(ast::Pattern::Identifier("x"))),
+                    ast::Expression::FuncApplication(
+                        Box::new(ast::Expression::Print),
+                        Box::new(ast::Expression::FuncApplication(
+                            Box::new(ast::Expression::FuncApplication(
+                                Box::new(ast::Expression::BuiltinOp(ast::Operation::Add)),
+                                Box::new(ast::Expression::StringLiteral(String::from("something: ")))
+                            )),
+                            Box::new(ast::Expression::Identifier("x"))
+                        ))
+                    )
+                )]
+            )
+        )
+    ]);
+    assert!(parser.parse("
+        type OptionalTuple 'a 'b = None | Some with ('a, 'b);
+        let f (x: 'a) -> (y: 'b) -> OptionalTuple 'a 'b = Some with (x, y);
+    ").unwrap() == vec![
+        ast::Statement::TypeDeclaration("OptionalTuple", vec!["a", "b"], vec![
+            ("None", None),
+            ("Some", Some(ast::TypeExpression::TupleType(vec![
+                ast::TypeExpression::TypeVariable("a"),
+                ast::TypeExpression::TypeVariable("b")
+            ])))
+        ]),
+        ast::Statement::TypedLet("f", ast::TypeExpression::DeclaredType("OptionalTuple", vec![
+            ast::TypeExpression::TypeVariable("a"),
+            ast::TypeExpression::TypeVariable("b")
+        ]), vec![
+            ("x", ast::TypeExpression::TypeVariable("a")),
+            ("y", ast::TypeExpression::TypeVariable("b"))
+        ],
+        ast::Expression::TypeVariant("Some", Box::new(ast::Expression::Tuple(vec![
+            ast::Expression::Identifier("x"),
+            ast::Expression::Identifier("y")
+        ])))
+    )]);
     // Err
-    assert!(parser.parse("let x = 4let y = 5").is_err());
+    assert!(parser.parse("let x = 4 let y = 5").is_err());
     assert!(parser.parse("let x = ylet z = 4").is_err());
 }
