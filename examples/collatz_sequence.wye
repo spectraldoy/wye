@@ -11,7 +11,7 @@ let collatz_sequence (x: int) -> [int] = match x {
     _ if (rem x 2) == 0 => x :: (collatz_sequence (x // 2)),
     # if we reach here, x is odd, so we multiply by 3 and add 1
     _ => x :: (collatz_sequence ((3 * x) + 1))
-}
+};
 
 # currently Wye does not take user input, so we specify the input manually
 let Main = print (collatz_sequence 97);
