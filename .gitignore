@@ -4,3 +4,5 @@
 !/specification/*.bib
 !/specification/*.tex
 .DS_Store
+.pat*
+*.vsix
