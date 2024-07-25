@@ -1,7 +1,5 @@
 use ordered_float::OrderedFloat;
 
-pub type Identifier<'a> = &'a str;
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operation {
     Add,
@@ -21,69 +19,69 @@ pub enum Operation {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Expression<'a> {
+pub enum Expression {
     IntegerLiteral(i64),
     FloatLiteral(OrderedFloat<f64>),
     StringLiteral(String),
-    List(Vec<Expression<'a>>),
-    Tuple(Vec<Expression<'a>>),
-    Identifier(Identifier<'a>),
+    List(Vec<Expression>),
+    Tuple(Vec<Expression>),
+    Identifier(String),
     BuiltinOp(Operation),
     Print,
     Error,
     // <TypeId> ( with <Field> )?
-    TypeVariant(Identifier<'a>, Box<Expression<'a>>),
+    TypeVariant(String, Box<Expression>),
     // <Expr> <Expr>
-    FuncApplication(Box<Expression<'a>>, Box<Expression<'a>>),
+    FuncApplication(Box<Expression>, Box<Expression>),
     // match <Expr> { <Pat> => <Expr>; ... ; <Pat> => <Expr> }
-    MatchConstruct(Box<Expression<'a>>, Vec<(Pattern<'a>, Expression<'a>)>),
+    MatchConstruct(Box<Expression>, Vec<(Pattern, Expression)>),
     // anonymous function created by \ <id*> -> expr
-    Lambda(Vec<Identifier<'a>>, Box<Expression<'a>>),
+    Lambda(Vec<String>, Box<Expression>),
     // { Statement* Expression }
-    Block(Vec<Statement<'a>>, Box<Expression<'a>>)
+    Block(Vec<Statement>, Box<Expression>)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Pattern<'a> {
+pub enum Pattern {
     Wildcard,
     IntegerLiteral(i64),
     FloatLiteral(OrderedFloat<f64>),
     StringLiteral(String),
-    Identifier(Identifier<'a>),
+    Identifier(String),
     // TypeId (with Identifier)?
-    TypeVariant(Identifier<'a>, Box<Pattern<'a>>),
+    TypeVariant(String, Box<Pattern>),
     // x :: xs
-    ListConstruction(Identifier<'a>, Identifier<'a>),
+    ListConstruction(String, String),
     // Union
-    Union(Vec<Pattern<'a>>),
-    Complement(Box<Pattern<'a>>),
+    Union(Vec<Pattern>),
+    Complement(Box<Pattern>),
     EmptyList,
-    List(Vec<Pattern<'a>>),
-    Tuple(Vec<Pattern<'a>>),
+    List(Vec<Pattern>),
+    Tuple(Vec<Pattern>),
     // pat if guard - take this only if pat matches and guard(pat) is true
-    Guarded(Box<Pattern<'a>>, Expression<'a>)
+    Guarded(Box<Pattern>, Expression)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TypeExpression<'a> {
+pub enum TypeExpression {
     IntType,
     FloatType,
     StringType,
-    DeclaredType(Identifier<'a>, Vec<TypeExpression<'a>>),
-    ListType(Box<TypeExpression<'a>>),
-    TupleType(Vec<TypeExpression<'a>>),
-    TypeVariable(Identifier<'a>),
-    FunctionType(Box<TypeExpression<'a>>, Box<TypeExpression<'a>>)
+    DeclaredType(String, Vec<TypeExpression>),
+    ListType(Box<TypeExpression>),
+    TupleType(Vec<TypeExpression>),
+    TypeVariable(String),
+    FunctionType(Box<TypeExpression>, Box<TypeExpression>)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Statement<'a> {
+pub enum Statement {
     // let <Id> <Id>* = <Expr> ;
-    UntypedLet(Vec<Identifier<'a>>, Expression<'a>),
+    UntypedLet(Vec<String>, Expression),
     // let <Id> ( <Id>: <Type> -> )* <Type> = <Expr>
     // translated to [(identifier, TypeExpr)] Expression
-    TypedLet(Identifier<'a>, TypeExpression<'a>, Vec<(Identifier<'a>, TypeExpression<'a>)>, Expression<'a>),
+    TypedLet(String, TypeExpression, Vec<(String, TypeExpression)>, Expression),
     // type <TypeId> <TypeArgs>? = ( <TypeId> (with <Type?)? )+
     // translated into TypeId, TypeVars, VariantNames, VariantFields
-    TypeDeclaration(Identifier<'a>, Vec<Identifier<'a>>, Vec<(Identifier<'a>, Option<TypeExpression<'a>>)>)
+    TypeDeclaration(String, Vec<String>, Vec<(String, Option<TypeExpression>)>)
 }

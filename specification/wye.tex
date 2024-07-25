@@ -173,7 +173,7 @@ In Wye, the application of functions is always written in postfix notation, exce
 There are two types of statements in Wye -- let statements and type declarations. The following are valid examples of Wye statements:
 
 \subsubsection{Let Statements}
-Wye \texttt{let} statements declare constants (referred to throughout this document as variables for consistency with common notions of \texttt{let}) at the top-level, or within blocks. In Wye, functions are first-class -- that is, they occupy the same status as ``regular" types of values such as \texttt{int}s. They can be declared as variables, passed as function arguments, and so on.
+Wye \texttt{let} statements declare constants (referred to throughout this document as variables for consistency with common notions of \texttt{let}) at the top-level, or within blocks. In Wye, functions are first-class -- that is, they occupy the same status as ``regular'' types of values such as \texttt{int}s. They can be declared as variables, passed as function arguments, and so on.
 
 Variables declared using \texttt{let} statements are visible throughout their entire scope, both backwards and forwards. Blocks create nested scopes. The variables declared in such nested scopes are not visible in outer scopes. Function arguments shadow over the outer scope. Here are some examples:
 \begin{lstlisting}{wye}
@@ -216,7 +216,7 @@ type Option 'a = None | Some with 'a;
 type binary_tree 'a = Leaf
 	| Node with ('a, binary_tree 'a, binary_tree 'a);
 \end{lstlisting}
-One can think of polymorphic user-defined types as ``type functions" that take in a type parameter and output an instance of a type. In the above example \texttt{Some with 4} would take in the type \texttt{int} of the expression \texttt{4} and output an instance of \texttt{Option int}.
+One can think of polymorphic user-defined types as ``type functions'' that take in a type parameter and output an instance of a type. In the above example \texttt{Some with 4} would take in the type \texttt{int} of the expression \texttt{4} and output an instance of \texttt{Option int}.
 
 \subsection{Expressions}
 The right hand side of every let statement in Wye must be an expression. Wye version \version{} supports only a few expressions. Most of them exist in other languages and are fairly self-explanatory. This section will go over the less familiar ones.
@@ -269,7 +269,7 @@ let z = f (double 4);
 as the parentheses make it clear that \texttt{double 4} is one expression intended to be supplied to \texttt{f}.
 
 \subsubsection{List Construction}\label{expr:cons}
-Just like Lisp, OCaml, Haskell, and many other functional languages, lists are an important part of Wye. As such, Wye provides list construction via the ``cons" operator \texttt{::}. Wye also supports pattern matching of lists using cons notation, which is talked about in \ref{expr:pat}.
+Just like Lisp, OCaml, Haskell, and many other functional languages, lists are an important part of Wye. As such, Wye provides list construction via the ``cons'' operator \texttt{::}. Wye also supports pattern matching of lists using cons notation, which is talked about in \ref{expr:pat}.
 
 The cons operator operates as follows: if $x$ is a value of type $t$ and $l$ is a list of type $\texttt{[}t\texttt{]}$, with value $\texttt{[}a_1, a_2, ..., a_n\texttt{]}$ where $n\geq 0$, then \texttt{x :: l} denotes the list $\texttt{[}x, a_1, ..., a_n\texttt{]}$.
 
@@ -310,7 +310,7 @@ MatchExpression \substo& \texttt{match}\: Expr \: \texttt{\{} \: Pat_1 \: \textt
 \end{align*}
 where $n \geq 1$. 
 
-The operation of the \texttt{match} construct is as follows: the $Expr$ following \texttt{match} is first evaluated to a value $v$. Wye then checks at runtime whether $v$ matches each of $Pat_1$ to $Pat_n$ in order. Let $i$ be the smallest number from $1$ to $n$ such that $v$ matches $Pat_i$ (what it means to ``match" a pattern will be discussed later). This branch will be taken, and only $Expr_i$ will be evaluated. The value to which $Expr_i$ evaluates is then the value of the entire \texttt{match} construct. If $v$ matches \textit{none} of the patterns $Pat_1, ..., Pat_n$, Wye will throw a runtime error. 
+The operation of the \texttt{match} construct is as follows: the $Expr$ following \texttt{match} is first evaluated to a value $v$. Wye then checks at runtime whether $v$ matches each of $Pat_1$ to $Pat_n$ in order. Let $i$ be the smallest number from $1$ to $n$ such that $v$ matches $Pat_i$ (what it means to ``match'' a pattern will be discussed later). This branch will be taken, and only $Expr_i$ will be evaluated. The value to which $Expr_i$ evaluates is then the value of the entire \texttt{match} construct. If $v$ matches \textit{none} of the patterns $Pat_1, ..., Pat_n$, Wye will throw a runtime error. 
 
 Each of $Expr_1, ..., Expr_n$ must evaluate to a value of the same type under all possible executions. Thus, the \texttt{match} expression will evaluate to something of exactly one type, under all possible executions. Note that Wye does not check for exhaustiveness of the patterns.
 
@@ -342,7 +342,7 @@ Suppose the expression \texttt{e1} evaluates to the value $v$. Then $v$ matches 
 \item $v$ is of some list type $\texttt{[}t\texttt{]}$
 \item $v$ has at least one element
 \end{enumerate}
-If $v$ matches the pattern, then the \textit{new variable} \texttt{x} will be set to the first element of $v$ (the ``head" of $v$) and the \textit{new variable} \texttt{s} will be set to the list containing the remaining elements of $v$, in the original order (that is, \texttt{s} will be set to the ``tail" of $v$). \texttt{x} and \texttt{s} will be available for use in the scope of \texttt{e2} ONLY, and will shadow over variables with the same name from the outer scope. $v$ will always fail to match such a ``list-construction" pattern if it is a list of 0 elements. Note that if $v$ is a list of 1 element, \texttt{x} will always be set to that element, and \texttt{s} will be an empty list.
+If $v$ matches the pattern, then the \textit{new variable} \texttt{x} will be set to the first element of $v$ (the ``head'' of $v$) and the \textit{new variable} \texttt{s} will be set to the list containing the remaining elements of $v$, in the original order (that is, \texttt{s} will be set to the ``tail'' of $v$). \texttt{x} and \texttt{s} will be available for use in the scope of \texttt{e2} ONLY, and will shadow over variables with the same name from the outer scope. $v$ will always fail to match such a ``list-construction'' pattern if it is a list of 0 elements. Note that if $v$ is a list of 1 element, \texttt{x} will always be set to that element, and \texttt{s} will be an empty list.
 \item if $Pat \to TypeId\:\texttt{with}\: Pat$, then $b$ must evaluate to a variant of a type defined in a $TypeDeclaration$ statement \textit{that has a field}. Now, if the $Pat$ after the \texttt{with} is an identifier $Id$, the semantics are similar to the list destructuring pattern \texttt{x :: s}. That is, if the $Id$ that occurs is \texttt{x}, then \texttt{x} is a new variable visible in the scope of only the expression of that \texttt{match} arm. For example:
 \begin{lstlisting}{wye}
 type Option 'a = None | Some with 'a;
@@ -436,7 +436,7 @@ the function \texttt{cons} type checks to the functional type \texttt{'a -> ['a]
 \newpage
 \section{Type Checking}
 
-In order to verify at compile-time that a program accomplishes the author's intention, it is helpful to type-check the program at compile-time. Type checking is the process of verifying that all operations in the program are performed on values of appropriate types. Type checking can be performed at compile-time only if the types of every Wye expression are known at compile-time. Thus, if the Wye compiler cannot figure out the type of a Wye expression, the compiler will refuse to compile the input program. Type checking is achieved via deductive reasoning on the input program based on certain deductive rules. In version \version{} of Wye's compiler, type checking is implemented via a depth-first traversal of the Abstract Syntax Tree of an input Wye program.
+In order to verify at compile-time that a program accomplishes the author's intention, it is helpful to type-check the program. Type checking is the process of verifying that all operations in the program are performed on values of appropriate types. Type checking can be performed at compile-time only if the types of every Wye expression are known at compile-time. Thus, if the Wye compiler cannot figure out the type of a Wye expression, the compiler will refuse to compile the input program. Type checking is achieved via deductive reasoning on the input program based on certain typing rules. In version \version{} of Wye's compiler, type checking is implemented via a depth-first traversal of the Abstract Syntax Tree of an input Wye program.
 
 \subsection{Notation}
 
@@ -445,21 +445,19 @@ The rules by which Wye performs type checking are written in the following form:
 \frac{hypothesis_1, ..., hypothesis_n}{conclusion}
 \end{align*}
 
-In order to perform typing, a context is necessary. For example, if a function \texttt{f} is applied in an expression, then \texttt{f} must be defined somewhere. The set of variables, functions, and types available in scope for use in an expression is referred to as the \textit{context} and notated as $\Gamma$.
+In order to perform typing, a context is necessary. For example, if a function \texttt{f} is applied in an expression, then \texttt{f} must be defined somewhere, and its type must be known. The set of variables, functions, their types, and the set of types declared in scope for use in an expression is referred to as the \textit{context} and notated as $\Gamma$.
 
-The symbol $\vdash$ means ``entails" or ``proves." We say $\Gamma\vdash e: \tau$ if the context $\Gamma$ and the deductive rules of Wye's type system prove that the expression $e$ has type $\tau$. If interested in the origins of this symbol, the reader should look into soundness and completeness in mathematical logic.
+The symbol $\vdash$ means ``entails'' or ``proves.'' We say $\Gamma\vdash e: \tau$ if the context $\Gamma$ and the deductive rules of Wye's type system prove that the expression $e$ has type $\tau$. If interested in the origins of this symbol, the reader should look up the notions of soundness and completeness in mathematical logic.
 
 A comma between hypotheses indicates a logical and. That is, $hypothesis_1, hypothesis_2$ is logically equivalent to $hypothesis_1 \wedge hypothesis_2$. Moreover, $\Gamma$ can be considered a hypothesis itself, an assertion that all declared variables and functions have their specific types, along with assertions about the available types. Thus, the notation $\Gamma, hypothesis \vdash e: \tau$ may be used to express that $\Gamma \wedge hypothesis$ proves that $e: \tau$.
 
-In general, $\tau$ will be used to indicate a monomorphic type (i.e., a ``concrete" type like \texttt{int}), and $\sigma$ will be used to indicate a polymorphic type. Any type with a type variable, i.e., with an implicit quantifier over a type parameter, is a polymorphic type.
+In general, $\tau$ will be used to indicate a monomorphic type (i.e., a ``concrete'' type like \texttt{int}), and $\sigma$ will be used to indicate a polymorphic type. Any type with a type variable, i.e., with an implicit quantifier over a type parameter, is a polymorphic type.
 
 Also important to consider are the free type variables in a type expression. For example in the identity function:
 \begin{lstlisting}{wye}
 let f x: 'a -> 'a = x;
 \end{lstlisting}
-within the expression on the right hand side of the \texttt{=} (namely, \texttt{x}), the type of the parameter $x$ is free. It is equal to some \texttt{a} which is only concretized when \texttt{f} is applied to some parameter.
-
-On the other hand, there are no free variables in \texttt{f}'s type. \texttt{f} has the type $\forall a\: a\to a$ -- all the type variables in this function definition have been fully quantified over.
+within the expression on the right hand side of the \texttt{=} (namely, \texttt{x}), the type of the parameter $x$ is free. It is equal to some \texttt{a} which is only concretized when \texttt{f} is applied to some parameter. On the other hand, there are no free variables in \texttt{f}'s type. \texttt{f} has the type $\forall a\: a\to a$ -- all the type variables in this function definition have been fully quantified.
 
 The set of free variables in an expression or set of expressions $S$ is notated as $\free(S)$. free is defined as follows:
 \begin{enumerate}
@@ -472,11 +470,14 @@ The set of free variables in an expression or set of expressions $S$ is notated 
 
 \subsection{Type order}
 
-Before we give the rules for type inference, it is important to define an ordering on types. This allows Wye to infer the most general type possible for an expression (the ``least" potential type in this type ordering), which creates a highly flexible yet still strict type system.
+Before we give the rules for type inference, it is important to define an ordering on types. This allows Wye to infer the most general type possible for an expression (the ``least'' potential type in this type ordering), which creates a highly flexible yet still strict type system.
 
-\subsection{Typing expressions}
+\subsection{Typing rules}
 
+\begin{align*}
+\end{align*}
 
+Note: arguments to a lambda expression are NOT GENERALIZABLE. In what sense? In the sense that they are assumed to be concrete types, and not forallable types like functions that use type variables.
 
 
 \pagebreak

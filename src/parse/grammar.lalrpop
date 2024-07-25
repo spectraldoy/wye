@@ -53,12 +53,12 @@ SepTupleAtLeastTwo<T, Sep>: Vec<T> = {
 }
 
 // Tokens
-Identifier: ast::Identifier<'input> = <r"[a-zA-Z_]\w*">;
+Identifier: String = <r"[a-zA-Z_]\w*"> => String::from(<>);
 
-TypedIdentifier: (ast::Identifier<'input>, ast::TypeExpression<'input>) =
+TypedIdentifier: (String, ast::TypeExpression) =
     <id: Identifier> ":" <te: TypeExpression> => (id, te);
 
-TypeVar: ast::Identifier<'input> = <s: r"'[a-zA-Z_]\w*"> => &s[1..];
+TypeVar: String = <s: r"'[a-zA-Z_]\w*"> => String::from(&s[1..]);
 
 IntegerLiteral: i64 = <r"-?([0-9]|[1-9][0-9]*)"> => <>.parse::<i64>().unwrap();
 
@@ -85,7 +85,7 @@ BuiltinOp: ast::Operation = {
 
 // Expressions
 
-AtomicExpr: ast::Expression<'input> = {
+AtomicExpr: ast::Expression = {
     <i: IntegerLiteral> => ast::Expression::IntegerLiteral(i),
     <f: FloatLiteral> => ast::Expression::FloatLiteral(f),
     <s: StringLiteral> => ast::Expression::StringLiteral(s),
@@ -99,7 +99,7 @@ AtomicExpr: ast::Expression<'input> = {
     "(" <e: Expression> ")" => e,
 }
 
-pub Expression: ast::Expression<'input> = {
+pub Expression: ast::Expression = {
     AtomicExpr,
     <tid: Sp<Identifier>> <with: Sp<"with">> <field: Sp<AtomicExpr>> =>? {
         if tid.end == with.start {
@@ -158,7 +158,7 @@ pub Expression: ast::Expression<'input> = {
     }
 }
 
-AtomicPattern: ast::Pattern<'input> = {
+AtomicPattern: ast::Pattern = {
     "_" => ast::Pattern::Wildcard,
     <i: IntegerLiteral> => ast::Pattern::IntegerLiteral(i),
     <f: FloatLiteral> => ast::Pattern::FloatLiteral(f),
@@ -181,24 +181,24 @@ AtomicPattern: ast::Pattern<'input> = {
     "(" <AtomicPattern> ")" => <>,
 }
 
-ScopablePattern: ast::Pattern<'input> = {
+ScopablePattern: ast::Pattern = {
     AtomicPattern,
     <head: Identifier> "::" <tail: Identifier> => ast::Pattern::ListConstruction(head, tail),
 }
 
-CompoundPattern: ast::Pattern<'input> = {
+CompoundPattern: ast::Pattern = {
     ScopablePattern,
     "[" <pats: SepListAtLeastOne<ScopablePattern, ",">> "]" => ast::Pattern::List(pats),
     "(" <pats: SepTuple<ScopablePattern, ",">> ")" => ast::Pattern::Tuple(pats),
 }
 
-UnguardedPattern: ast::Pattern<'input> = {
+UnguardedPattern: ast::Pattern = {
     CompoundPattern,
     <pats: SepListAtLeastTwo<AtomicPattern, "|">> => ast::Pattern::Union(pats),
     "~" <pat: CompoundPattern> => ast::Pattern::Complement(Box::new(pat)),
 }
 
-pub Pattern: ast::Pattern<'input> = {
+pub Pattern: ast::Pattern = {
     UnguardedPattern,
     <pat: Sp<UnguardedPattern>> <if_: Sp<"if">> <guard: Sp<Expression>> =>? {
         if pat.end == if_.start {
@@ -215,7 +215,7 @@ pub Pattern: ast::Pattern<'input> = {
     },
 }
 
-AtomicTypeExpr: ast::TypeExpression<'input> = {
+AtomicTypeExpr: ast::TypeExpression = {
     "int" => ast::TypeExpression::IntType,
     "float" => ast::TypeExpression::FloatType,
     "string" => ast::TypeExpression::StringType,
@@ -225,7 +225,7 @@ AtomicTypeExpr: ast::TypeExpression<'input> = {
     <tvar: TypeVar> => ast::TypeExpression::TypeVariable(tvar),
 }
 
-NonFuncTypeExpr: ast::TypeExpression<'input> = {
+NonFuncTypeExpr: ast::TypeExpression = {
     AtomicTypeExpr,
     // <Declared TypeId> <TypeArgs>
     <t: Sp<Identifier>> <targs: Sp<AtomicTypeExpr>*> =>? {
@@ -244,7 +244,7 @@ NonFuncTypeExpr: ast::TypeExpression<'input> = {
     },
 }
 
-pub TypeExpression: ast::TypeExpression<'input> = {
+pub TypeExpression: ast::TypeExpression = {
     NonFuncTypeExpr,
     <ftype: SepListAtLeastTwo<Sp<NonFuncTypeExpr>, "->" >> =>? match util::collect_function::<ast::TypeExpression>(
         ftype[0].clone(),
@@ -258,7 +258,7 @@ pub TypeExpression: ast::TypeExpression<'input> = {
 
 // Program
 
-TypeVariantDeclType: (ast::Identifier<'input>, Option<ast::TypeExpression<'input>>) = {
+TypeVariantDeclType: (String, Option<ast::TypeExpression>) = {
     <tid: Identifier> => (tid, None),
     <tid: Sp<Identifier>> <with: Sp<"with">> <field_t: Sp<TypeExpression>> =>? {
         if tid.end == with.start {
@@ -275,7 +275,7 @@ TypeVariantDeclType: (ast::Identifier<'input>, Option<ast::TypeExpression<'input
     }
 }
 
-pub Statement: ast::Statement<'input> = {
+pub Statement: ast::Statement = {
     <let_: Sp<"let">> <ids: Sp<Identifier>+> "=" <e: Expression> ";" =>? {
         if let_.end == ids[0].start {
             Err(ParseError::User {
@@ -287,7 +287,7 @@ pub Statement: ast::Statement<'input> = {
             })
         } else {
             Ok(ast::Statement::UntypedLet(
-                ids.iter().map(|x| x.value).collect::<Vec<_>>(), e
+                ids.iter().map(|x| x.value.clone()).collect::<Vec<_>>(), e
             ))
         }
     },
@@ -325,14 +325,14 @@ pub Statement: ast::Statement<'input> = {
         } else {
             Ok(ast::Statement::TypeDeclaration(
                 tid.value,
-                tvars.iter().map(|tv| tv.value).collect::<Vec<_>>(),
+                tvars.iter().map(|tv| tv.value.clone()).collect::<Vec<_>>(),
                 variants
             ))
         }
     }
 }
 
-pub Program: Vec<ast::Statement<'input>> = <stmts: Sp<Statement>+> =>? {
+pub Program: Vec<ast::Statement> = <stmts: Sp<Statement>+> =>? {
     if util::spans_overlap(&stmts.iter().map(|s| (s.start, s.end)).collect::<Vec<_>>()) {
         Err(ParseError::User {
             error: "Space required between adjacent statements"

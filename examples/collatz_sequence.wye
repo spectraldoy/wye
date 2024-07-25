@@ -1,6 +1,9 @@
 (*
 Generate the Collatz sequence starting at the input x
 *)
+# return remainder of dividing x by y
+let rem (x: int) -> (y: int) -> int = x - ((x // y) * y);
+
 let collatz_sequence (x: int) -> [int] = match x {
     # ignore negative numbers
     _ if x < 0 => [],

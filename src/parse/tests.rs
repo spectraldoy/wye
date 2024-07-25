@@ -72,7 +72,7 @@ fn test_parse_list() {
         ast::Expression::Tuple(vec![ast::Expression::IntegerLiteral(-52)])
     ]));
     assert!(parser.parse("[x, 4]").unwrap() == ast::Expression::List(vec![
-        ast::Expression::Identifier("x"),
+        ast::Expression::Identifier(String::from("x")),
         ast::Expression::IntegerLiteral(4)
     ]));
 
@@ -116,15 +116,15 @@ fn test_parse_tuple() {
 fn test_parse_identifier_type_variant() {
     let parser = grammar::ExpressionParser::new();
     // Ok identifier
-    assert!(parser.parse("x").unwrap() == ast::Expression::Identifier("x"));
-    assert!(parser.parse("identif").unwrap() == ast::Expression::Identifier("identif"));
-    assert!(parser.parse("hElO_").unwrap() == ast::Expression::Identifier("hElO_"));
-    assert!(parser.parse("_a0001").unwrap() == ast::Expression::Identifier("_a0001"));
-    assert!(parser.parse("Hello").unwrap() == ast::Expression::Identifier("Hello"));
-    assert!(parser.parse("__Option").unwrap() == ast::Expression::Identifier("__Option"));
-    assert!(parser.parse("Ty6_Var68__iant_").unwrap() == ast::Expression::Identifier("Ty6_Var68__iant_"));
-    assert!(parser.parse("___01").unwrap() == ast::Expression::Identifier("___01"));
-    assert!(parser.parse("___").unwrap() == ast::Expression::Identifier("___"));
+    assert!(parser.parse("x").unwrap() == ast::Expression::Identifier(String::from("x")));
+    assert!(parser.parse("identif").unwrap() == ast::Expression::Identifier(String::from("identif")));
+    assert!(parser.parse("hElO_").unwrap() == ast::Expression::Identifier(String::from("hElO_")));
+    assert!(parser.parse("_a0001").unwrap() == ast::Expression::Identifier(String::from("_a0001")));
+    assert!(parser.parse("Hello").unwrap() == ast::Expression::Identifier(String::from("Hello")));
+    assert!(parser.parse("__Option").unwrap() == ast::Expression::Identifier(String::from("__Option")));
+    assert!(parser.parse("Ty6_Var68__iant_").unwrap() == ast::Expression::Identifier(String::from("Ty6_Var68__iant_")));
+    assert!(parser.parse("___01").unwrap() == ast::Expression::Identifier(String::from("___01")));
+    assert!(parser.parse("___").unwrap() == ast::Expression::Identifier(String::from("___")));
     assert!(parser.parse("(<)").unwrap() == ast::Expression::BuiltinOp(ast::Operation::Lt));
     assert!(parser.parse("(+)").unwrap() == ast::Expression::BuiltinOp(ast::Operation::Add));
     assert!(parser.parse("(//)").unwrap() == ast::Expression::BuiltinOp(ast::Operation::FloorDiv));
@@ -143,10 +143,10 @@ fn test_parse_identifier_type_variant() {
     assert!(parser.parse("_Yel⏰o").is_err());
     // Ok type variant
     assert!(parser.parse("Some with 4").unwrap() == ast::Expression::TypeVariant(
-        "Some", Box::new(ast::Expression::IntegerLiteral(4))
+        String::from("Some"), Box::new(ast::Expression::IntegerLiteral(4))
     ));
     assert!(parser.parse("(Thing with 4)").unwrap() == ast::Expression::TypeVariant(
-        "Thing", Box::new(ast::Expression::IntegerLiteral(4))
+        String::from("Thing"), Box::new(ast::Expression::IntegerLiteral(4))
     ));
     assert!(parser.parse("
         Node with (
@@ -154,27 +154,27 @@ fn test_parse_identifier_type_variant() {
             Leaf,
             7
         )").unwrap() == 
-        ast::Expression::TypeVariant("Node", Box::new(ast::Expression::Tuple(vec![
-            ast::Expression::TypeVariant("Node", Box::new(ast::Expression::Tuple(vec![
-                ast::Expression::Identifier("Leaf"),
-                ast::Expression::Identifier("Leaf"),
+        ast::Expression::TypeVariant(String::from("Node"), Box::new(ast::Expression::Tuple(vec![
+            ast::Expression::TypeVariant(String::from("Node"), Box::new(ast::Expression::Tuple(vec![
+                ast::Expression::Identifier(String::from("Leaf")),
+                ast::Expression::Identifier(String::from("Leaf")),
                 ast::Expression::IntegerLiteral(4)
             ]))),
-            ast::Expression::Identifier("Leaf"),
+            ast::Expression::Identifier(String::from("Leaf")),
             ast::Expression::IntegerLiteral(7)
         ])))
     );
-    assert!(parser.parse("Listy with [1, \"hell⏰\"]").unwrap() == ast::Expression::TypeVariant("Listy", Box::new(
+    assert!(parser.parse("Listy with [1, \"hell⏰\"]").unwrap() == ast::Expression::TypeVariant(String::from("Listy"), Box::new(
         ast::Expression::List(vec![
             ast::Expression::IntegerLiteral(1),
             ast::Expression::StringLiteral(String::from("hell⏰"))
         ])
     )));
     assert!(parser.parse("Bruh with (-5.2)").unwrap() == ast::Expression::TypeVariant(
-        "Bruh", Box::new(ast::Expression::FloatLiteral(OrderedFloat(-5.2)))
+        String::from("Bruh"), Box::new(ast::Expression::FloatLiteral(OrderedFloat(-5.2)))
     ));
     assert!(parser.parse("Bruh with (-5.2,)").unwrap() == ast::Expression::TypeVariant(
-        "Bruh",
+        String::from("Bruh"),
         Box::new(ast::Expression::Tuple(vec![
             ast::Expression::FloatLiteral(OrderedFloat(-5.2))
         ]))
@@ -193,34 +193,34 @@ fn test_parse_function_application() {
 
     // Ok function application
     assert!(parser.parse("f g").unwrap() == ast::Expression::FuncApplication(
-        Box::new(ast::Expression::Identifier("f")),
-        Box::new(ast::Expression::Identifier("g"))
+        Box::new(ast::Expression::Identifier(String::from("f"))),
+        Box::new(ast::Expression::Identifier(String::from("g")))
     ));
     assert!(parser.parse("f -7.9").unwrap() == ast::Expression::FuncApplication(
-        Box::new(ast::Expression::Identifier("f")),
+        Box::new(ast::Expression::Identifier(String::from("f"))),
         Box::new(ast::Expression::FloatLiteral(OrderedFloat(-7.9)))
     ));
     assert!(parser.parse("f 4 2").unwrap() == ast::Expression::FuncApplication(
         Box::new(ast::Expression::FuncApplication(
-            Box::new(ast::Expression::Identifier("f")),
+            Box::new(ast::Expression::Identifier(String::from("f"))),
             Box::new(ast::Expression::IntegerLiteral(4))
         )),
         Box::new(ast::Expression::IntegerLiteral(2))
     ));
     assert!(parser.parse("(g 5)").unwrap() == ast::Expression::FuncApplication(
-        Box::new(ast::Expression::Identifier("g")),
+        Box::new(ast::Expression::Identifier(String::from("g"))),
         Box::new(ast::Expression::IntegerLiteral(5))
     ));
     assert!(parser.parse("(g 4 \"hi\" (f 2))").unwrap() == ast::Expression::FuncApplication(
         Box::new(ast::Expression::FuncApplication(
             Box::new(ast::Expression::FuncApplication(
-                Box::new(ast::Expression::Identifier("g")),
+                Box::new(ast::Expression::Identifier(String::from("g"))),
                 Box::new(ast::Expression::IntegerLiteral(4))
             )),
             Box::new(ast::Expression::StringLiteral(String::from("hi")))
         )),
         Box::new(ast::Expression::FuncApplication(
-            Box::new(ast::Expression::Identifier("f")),
+            Box::new(ast::Expression::Identifier(String::from("f"))),
             Box::new(ast::Expression::IntegerLiteral(2))
         ))
     ));
@@ -254,19 +254,19 @@ fn test_parse_function_application() {
     assert!(parser.parse("a + b").unwrap() == ast::Expression::FuncApplication(
         Box::new(ast::Expression::FuncApplication(
             Box::new(ast::Expression::BuiltinOp(ast::Operation::Add)),
-            Box::new(ast::Expression::Identifier("a"))
+            Box::new(ast::Expression::Identifier(String::from("a")))
         )),
-        Box::new(ast::Expression::Identifier("b"))
+        Box::new(ast::Expression::Identifier(String::from("b")))
     ));
     assert!(parser.parse("a//(b *6)").unwrap() == ast::Expression::FuncApplication(
         Box::new(ast::Expression::FuncApplication(
             Box::new(ast::Expression::BuiltinOp(ast::Operation::FloorDiv)),
-            Box::new(ast::Expression::Identifier("a"))
+            Box::new(ast::Expression::Identifier(String::from("a")))
         )),
         Box::new(ast::Expression::FuncApplication(
             Box::new(ast::Expression::FuncApplication(
                 Box::new(ast::Expression::BuiltinOp(ast::Operation::Multiply)),
-                Box::new(ast::Expression::Identifier("b"))
+                Box::new(ast::Expression::Identifier(String::from("b")))
             )),
             Box::new(ast::Expression::IntegerLiteral(6))
         ))
@@ -277,38 +277,38 @@ fn test_parse_function_application() {
             Box::new(ast::Expression::FuncApplication(
                 Box::new(ast::Expression::FuncApplication(
                     Box::new(ast::Expression::BuiltinOp(ast::Operation::Lt)),
-                    Box::new(ast::Expression::Identifier("a"))
+                    Box::new(ast::Expression::Identifier(String::from("a")))
                 )),
-                Box::new(ast::Expression::Identifier("b"))
+                Box::new(ast::Expression::Identifier(String::from("b")))
             ))
         )),
-        Box::new(ast::Expression::Identifier("c"))
+        Box::new(ast::Expression::Identifier(String::from("c")))
     ));
     assert!(parser.parse("[f g, a + [], Option with 4]").unwrap() == ast::Expression::List(vec![
         ast::Expression::FuncApplication(
-            Box::new(ast::Expression::Identifier("f")),
-            Box::new(ast::Expression::Identifier("g"))
+            Box::new(ast::Expression::Identifier(String::from("f"))),
+            Box::new(ast::Expression::Identifier(String::from("g")))
         ),
         ast::Expression::FuncApplication(
             Box::new(ast::Expression::FuncApplication(
                 Box::new(ast::Expression::BuiltinOp(ast::Operation::Add)),
-                Box::new(ast::Expression::Identifier("a"))
+                Box::new(ast::Expression::Identifier(String::from("a")))
             )),
             Box::new(ast::Expression::List(vec![]))
         ),
-        ast::Expression::TypeVariant("Option", Box::new(ast::Expression::IntegerLiteral(4)))
+        ast::Expression::TypeVariant(String::from("Option"), Box::new(ast::Expression::IntegerLiteral(4)))
     ]));
     assert!(parser.parse("func Some 4 g 6 \"hi\"").unwrap() == ast::Expression::FuncApplication(
         Box::new(ast::Expression::FuncApplication(
             Box::new(ast::Expression::FuncApplication(
                 Box::new(ast::Expression::FuncApplication(
                     Box::new(ast::Expression::FuncApplication(
-                        Box::new(ast::Expression::Identifier("func")),
-                        Box::new(ast::Expression::Identifier("Some")),
+                        Box::new(ast::Expression::Identifier(String::from("func"))),
+                        Box::new(ast::Expression::Identifier(String::from("Some"))),
                     )),
                     Box::new(ast::Expression::IntegerLiteral(4))
                 )),
-                Box::new(ast::Expression::Identifier("g"))
+                Box::new(ast::Expression::Identifier(String::from("g")))
             )),
             Box::new(ast::Expression::IntegerLiteral(6))
         )),
@@ -317,13 +317,13 @@ fn test_parse_function_application() {
     assert!(parser.parse("func (Some with 4) (g 5) \"hi\"").unwrap() == ast::Expression::FuncApplication(
         Box::new(ast::Expression::FuncApplication(
             Box::new(ast::Expression::FuncApplication(
-                Box::new(ast::Expression::Identifier("func")),
-                Box::new(ast::Expression::TypeVariant("Some", Box::new(
+                Box::new(ast::Expression::Identifier(String::from("func"))),
+                Box::new(ast::Expression::TypeVariant(String::from("Some"), Box::new(
                     ast::Expression::IntegerLiteral(4)
                 )))
             )),
             Box::new(ast::Expression::FuncApplication(
-                Box::new(ast::Expression::Identifier("g")),
+                Box::new(ast::Expression::Identifier(String::from("g"))),
                 Box::new(ast::Expression::IntegerLiteral(5))
             ))
         )),
@@ -332,11 +332,11 @@ fn test_parse_function_application() {
     // as far as parsing is concerned, this is syntactically valid
     assert!(parser.parse("4 g").unwrap() == ast::Expression::FuncApplication(
         Box::new(ast::Expression::IntegerLiteral(4)),
-        Box::new(ast::Expression::Identifier("g"))
+        Box::new(ast::Expression::Identifier(String::from("g")))
     ));
     assert!(parser.parse("f (//) 2").unwrap() == ast::Expression::FuncApplication(
         Box::new(ast::Expression::FuncApplication(
-            Box::new(ast::Expression::Identifier("f")),
+            Box::new(ast::Expression::Identifier(String::from("f"))),
             Box::new(ast::Expression::BuiltinOp(ast::Operation::FloorDiv))
         )),
         Box::new(ast::Expression::IntegerLiteral(2))
@@ -344,18 +344,18 @@ fn test_parse_function_application() {
     assert!(parser.parse("f // 2").unwrap() == ast::Expression::FuncApplication(
         Box::new(ast::Expression::FuncApplication(
             Box::new(ast::Expression::BuiltinOp(ast::Operation::FloorDiv)),
-            Box::new(ast::Expression::Identifier("f"))
+            Box::new(ast::Expression::Identifier(String::from("f")))
         )),
         Box::new(ast::Expression::IntegerLiteral(2))
     ));
     // Err function application
     assert!(parser.parse("f78").unwrap() != ast::Expression::FuncApplication(
-        Box::new(ast::Expression::Identifier("f")),
+        Box::new(ast::Expression::Identifier(String::from("f"))),
         Box::new(ast::Expression::IntegerLiteral(78))
     ));
     assert!(parser.parse("fg").unwrap() != ast::Expression::FuncApplication(
-        Box::new(ast::Expression::Identifier("f")),
-        Box::new(ast::Expression::Identifier("g"))
+        Box::new(ast::Expression::Identifier(String::from("f"))),
+        Box::new(ast::Expression::Identifier(String::from("g")))
     ));
     assert!(parser.parse("f(8)").is_err());
     assert!(parser.parse("__f\"hi\" 5 2").is_err());
@@ -371,34 +371,34 @@ fn test_parse_lambda_expr() {
     let parser = grammar::ExpressionParser::new();
     // Ok
     assert!(parser.parse("\\ x y -> 4").unwrap() == ast::Expression::Lambda(
-        vec!["x", "y"],
+        vec![String::from("x"), String::from("y")],
         Box::new(ast::Expression::IntegerLiteral(4))
     ));
     assert!(parser.parse("\\x -> (+) x 5").unwrap() == ast::Expression::Lambda(
-        vec!["x"],
+        vec![String::from("x")],
         Box::new(ast::Expression::FuncApplication(
             Box::new(ast::Expression::FuncApplication(
                 Box::new(ast::Expression::BuiltinOp(ast::Operation::Add)),
-                Box::new(ast::Expression::Identifier("x")),
+                Box::new(ast::Expression::Identifier(String::from("x"))),
             )),
             Box::new(ast::Expression::IntegerLiteral(5))
         ))
     ));
     assert!(parser.parse("\\x y -> Option with (x, y)").unwrap() == ast::Expression::Lambda(
-        vec!["x", "y"],
+        vec![String::from("x"), String::from("y")],
         Box::new(ast::Expression::TypeVariant(
-            "Option",
+            String::from("Option"),
             Box::new(ast::Expression::Tuple(vec![
-                ast::Expression::Identifier("x"),
-                ast::Expression::Identifier("y")
+                ast::Expression::Identifier(String::from("x")),
+                ast::Expression::Identifier(String::from("y"))
             ]))
         ))
     ));
     assert!(parser.parse("\\x->f x").unwrap() == ast::Expression::Lambda(
-        vec!["x"],
+        vec![String::from("x")],
         Box::new(ast::Expression::FuncApplication(
-            Box::new(ast::Expression::Identifier("f")),
-            Box::new(ast::Expression::Identifier("x"))
+            Box::new(ast::Expression::Identifier(String::from("f"))),
+            Box::new(ast::Expression::Identifier(String::from("x")))
         ))
     ));
     // Err
@@ -415,7 +415,7 @@ fn test_parse_match() {
     let parser = grammar::ExpressionParser::new();
     // Ok
     assert!(parser.parse("match a { _ => 3 }").unwrap() == ast::Expression::MatchConstruct(
-        Box::new(ast::Expression::Identifier("a")),
+        Box::new(ast::Expression::Identifier(String::from("a"))),
         vec![(ast::Pattern::Wildcard, ast::Expression::IntegerLiteral(3))]
     ));
     assert!(parser.parse("match f g {
@@ -424,8 +424,8 @@ fn test_parse_match() {
         _ => 4,
     }").unwrap() == ast::Expression::MatchConstruct(
         Box::new(ast::Expression::FuncApplication(
-            Box::new(ast::Expression::Identifier("f")),
-            Box::new(ast::Expression::Identifier("g"))
+            Box::new(ast::Expression::Identifier(String::from("f"))),
+            Box::new(ast::Expression::Identifier(String::from("g")))
         )),
         vec![
             (
@@ -443,11 +443,11 @@ fn test_parse_match() {
             ),
             (
                 ast::Pattern::Guarded(
-                    Box::new(ast::Pattern::ListConstruction("x", "xs")),
+                    Box::new(ast::Pattern::ListConstruction(String::from("x"), String::from("xs"))),
                     ast::Expression::FuncApplication(
                         Box::new(ast::Expression::FuncApplication(
                             Box::new(ast::Expression::BuiltinOp(ast::Operation::Eq)),
-                            Box::new(ast::Expression::Identifier("x"))
+                            Box::new(ast::Expression::Identifier(String::from("x")))
                         )),
                         Box::new(ast::Expression::IntegerLiteral(4))
                     )
@@ -455,7 +455,7 @@ fn test_parse_match() {
                 ast::Expression::FuncApplication(
                     Box::new(ast::Expression::FuncApplication(
                         Box::new(ast::Expression::BuiltinOp(ast::Operation::Multiply)),
-                        Box::new(ast::Expression::Identifier("x"))
+                        Box::new(ast::Expression::Identifier(String::from("x")))
                     )),
                     Box::new(ast::Expression::StringLiteral(String::from("hi")))
                 )
@@ -470,24 +470,24 @@ fn test_parse_match() {
         x => y,
     }").unwrap() == ast::Expression::MatchConstruct(
         Box::new(ast::Expression::FuncApplication(
-            Box::new(ast::Expression::Identifier("f")),
-            Box::new(ast::Expression::Identifier("g"))
+            Box::new(ast::Expression::Identifier(String::from("f"))),
+            Box::new(ast::Expression::Identifier(String::from("g")))
         )),
         vec![(
-            ast::Pattern::Identifier("x"),
-            ast::Expression::Identifier("y")
+            ast::Pattern::Identifier(String::from("x")),
+            ast::Expression::Identifier(String::from("y"))
         )]
     ));
     assert!(parser.parse("match f g {
         x => y
     }").unwrap() == ast::Expression::MatchConstruct(
         Box::new(ast::Expression::FuncApplication(
-            Box::new(ast::Expression::Identifier("f")),
-            Box::new(ast::Expression::Identifier("g"))
+            Box::new(ast::Expression::Identifier(String::from("f"))),
+            Box::new(ast::Expression::Identifier(String::from("g")))
         )),
         vec![(
-            ast::Pattern::Identifier("x"),
-            ast::Expression::Identifier("y")
+            ast::Pattern::Identifier(String::from("x")),
+            ast::Expression::Identifier(String::from("y"))
         )]
     ));
 
@@ -519,10 +519,10 @@ fn test_parse_match() {
     ));
     assert!(parser.parse("match (f g) { _ => x }").unwrap() == ast::Expression::MatchConstruct(
         Box::new(ast::Expression::FuncApplication(
-            Box::new(ast::Expression::Identifier("f")),
-            Box::new(ast::Expression::Identifier("g"))
+            Box::new(ast::Expression::Identifier(String::from("f"))),
+            Box::new(ast::Expression::Identifier(String::from("g")))
         )),
-        vec![(ast::Pattern::Wildcard, ast::Expression::Identifier("x"))]
+        vec![(ast::Pattern::Wildcard, ast::Expression::Identifier(String::from("x")))]
     ));
     // Err
     assert!(parser.parse("match 4 {
@@ -560,21 +560,21 @@ fn test_parse_type_lit_type_var() {
     assert!(parser.parse("int").unwrap() == ast::TypeExpression::IntType);
     assert!(parser.parse("float").unwrap() == ast::TypeExpression::FloatType);
     assert!(parser.parse("string").unwrap() == ast::TypeExpression::StringType);
-    assert!(parser.parse("iNT").unwrap() == ast::TypeExpression::DeclaredType("iNT", vec![]));
-    assert!(parser.parse("_x").unwrap() == ast::TypeExpression::DeclaredType("_x", vec![]));
-    assert!(parser.parse("flot").unwrap() == ast::TypeExpression::DeclaredType("flot", vec![]));
+    assert!(parser.parse("iNT").unwrap() == ast::TypeExpression::DeclaredType(String::from("iNT"), vec![]));
+    assert!(parser.parse("_x").unwrap() == ast::TypeExpression::DeclaredType(String::from("_x"), vec![]));
+    assert!(parser.parse("flot").unwrap() == ast::TypeExpression::DeclaredType(String::from("flot"), vec![]));
     assert!(parser.parse("(int)").unwrap() == ast::TypeExpression::IntType);
-    assert!(parser.parse("(xello)").unwrap() == ast::TypeExpression::DeclaredType("xello", vec![]));
+    assert!(parser.parse("(xello)").unwrap() == ast::TypeExpression::DeclaredType(String::from("xello"), vec![]));
     // Err literal type
     assert!(parser.parse("Un[").is_err());
     assert!(parser.parse("()").is_err());
     // Ok type variable
-    assert!(parser.parse("'a").unwrap() == ast::TypeExpression::TypeVariable("a"));
-    assert!(parser.parse("'_yusdf").unwrap() == ast::TypeExpression::TypeVariable("_yusdf"));
-    assert!(parser.parse("'aAbABBB").unwrap() == ast::TypeExpression::TypeVariable("aAbABBB"));
-    assert!(parser.parse("'v1").unwrap() == ast::TypeExpression::TypeVariable("v1"));
-    assert!(parser.parse("'Type").unwrap() == ast::TypeExpression::TypeVariable("Type"));
-    assert!(parser.parse("'___Type").unwrap() == ast::TypeExpression::TypeVariable("___Type"));
+    assert!(parser.parse("'a").unwrap() == ast::TypeExpression::TypeVariable(String::from("a")));
+    assert!(parser.parse("'_yusdf").unwrap() == ast::TypeExpression::TypeVariable(String::from("_yusdf")));
+    assert!(parser.parse("'aAbABBB").unwrap() == ast::TypeExpression::TypeVariable(String::from("aAbABBB")));
+    assert!(parser.parse("'v1").unwrap() == ast::TypeExpression::TypeVariable(String::from("v1")));
+    assert!(parser.parse("'Type").unwrap() == ast::TypeExpression::TypeVariable(String::from("Type")));
+    assert!(parser.parse("'___Type").unwrap() == ast::TypeExpression::TypeVariable(String::from("___Type")));
     // Err type variable
     assert!(parser.parse("''").is_err());
     assert!(parser.parse("'hello'").is_err());
@@ -592,10 +592,10 @@ fn test_parse_list_tuple_type() {
         ast::TypeExpression::IntType
     )));
     assert!(parser.parse("[Option]").unwrap() == ast::TypeExpression::ListType(Box::new(
-        ast::TypeExpression::DeclaredType("Option", vec![])
+        ast::TypeExpression::DeclaredType(String::from("Option"), vec![])
     )));
     assert!(parser.parse("['a]").unwrap() == ast::TypeExpression::ListType(Box::new(
-        ast::TypeExpression::TypeVariable("a")
+        ast::TypeExpression::TypeVariable(String::from("a"))
     )));
     assert!(parser.parse("[(int)]").unwrap() == ast::TypeExpression::ListType(Box::new(
         ast::TypeExpression::IntType
@@ -603,7 +603,7 @@ fn test_parse_list_tuple_type() {
     assert!(parser.parse("[(int, Option)]").unwrap() == ast::TypeExpression::ListType(Box::new(
         ast::TypeExpression::TupleType(vec![
             ast::TypeExpression::IntType,
-            ast::TypeExpression::DeclaredType("Option", vec![])
+            ast::TypeExpression::DeclaredType(String::from("Option"), vec![])
         ])
     )));
     assert!(parser.parse("[[int]]").unwrap() == ast::TypeExpression::ListType(Box::new(
@@ -612,7 +612,7 @@ fn test_parse_list_tuple_type() {
         ))
     )));
     assert!(parser.parse("[Option int]").unwrap() == ast::TypeExpression::ListType(Box::new(
-        ast::TypeExpression::DeclaredType("Option", vec![
+        ast::TypeExpression::DeclaredType(String::from("Option"), vec![
             ast::TypeExpression::IntType
         ])
     )));
@@ -622,7 +622,7 @@ fn test_parse_list_tuple_type() {
     assert!(parser.parse("hel]o").is_err());
     // Ok tuple type
     assert!(parser.parse("('a, )").unwrap() == ast::TypeExpression::TupleType(vec![
-        ast::TypeExpression::TypeVariable("a")
+        ast::TypeExpression::TypeVariable(String::from("a"))
     ]));
     assert!(parser.parse("(int, string, float)").unwrap() == ast::TypeExpression::TupleType(vec![
         ast::TypeExpression::IntType,
@@ -630,12 +630,12 @@ fn test_parse_list_tuple_type() {
         ast::TypeExpression::FloatType
     ]));
     assert!(parser.parse("(Option int float, int, Option, string)").unwrap() == ast::TypeExpression::TupleType(vec![
-        ast::TypeExpression::DeclaredType("Option", vec![
+        ast::TypeExpression::DeclaredType(String::from("Option"), vec![
             ast::TypeExpression::IntType,
             ast::TypeExpression::FloatType
         ]),
         ast::TypeExpression::IntType,
-        ast::TypeExpression::DeclaredType("Option", vec![]),
+        ast::TypeExpression::DeclaredType(String::from("Option"), vec![]),
         ast::TypeExpression::StringType
     ]));
     // Err tuple type
@@ -666,31 +666,31 @@ fn test_parse_function_type() {
             )),
             Box::new(ast::TypeExpression::StringType)
         )),
-        Box::new(ast::TypeExpression::DeclaredType("Option", vec![]))
+        Box::new(ast::TypeExpression::DeclaredType(String::from("Option"), vec![]))
     ));
     assert!(parser.parse("'a -> 'b -> (int)").unwrap() == ast::TypeExpression::FunctionType(
         Box::new(ast::TypeExpression::FunctionType(
-            Box::new(ast::TypeExpression::TypeVariable("a")),
-            Box::new(ast::TypeExpression::TypeVariable("b"))
+            Box::new(ast::TypeExpression::TypeVariable(String::from("a"))),
+            Box::new(ast::TypeExpression::TypeVariable(String::from("b")))
         )),
         Box::new(ast::TypeExpression::IntType)
     ));
     assert!(parser.parse("string -> Option int -> float").unwrap() == ast::TypeExpression::FunctionType(
         Box::new(ast::TypeExpression::FunctionType(
             Box::new(ast::TypeExpression::StringType),
-            Box::new(ast::TypeExpression::DeclaredType("Option", vec![ast::TypeExpression::IntType]))
+            Box::new(ast::TypeExpression::DeclaredType(String::from("Option"), vec![ast::TypeExpression::IntType]))
         )),
         Box::new(ast::TypeExpression::FloatType)
     ));
     assert!(parser.parse("'a -> ('a -> int) -> 'a").unwrap() == ast::TypeExpression::FunctionType(
         Box::new(ast::TypeExpression::FunctionType(
-            Box::new(ast::TypeExpression::TypeVariable("a")),
+            Box::new(ast::TypeExpression::TypeVariable(String::from("a"))),
             Box::new(ast::TypeExpression::FunctionType(
-                Box::new(ast::TypeExpression::TypeVariable("a")),
+                Box::new(ast::TypeExpression::TypeVariable(String::from("a"))),
                 Box::new(ast::TypeExpression::IntType)
             ))
         )),
-        Box::new(ast::TypeExpression::TypeVariable("a"))
+        Box::new(ast::TypeExpression::TypeVariable(String::from("a")))
     ));
     // Err function type
     assert!(parser.parse("int ->").is_err());
@@ -706,20 +706,20 @@ fn test_parse_function_type() {
 fn test_parse_declared_type() {
     let parser = grammar::TypeExpressionParser::new();
     // Ok declared type
-    assert!(parser.parse("bool").unwrap() == ast::TypeExpression::DeclaredType("bool", vec![]));
+    assert!(parser.parse("bool").unwrap() == ast::TypeExpression::DeclaredType(String::from("bool"), vec![]));
     assert!(parser.parse("Option int").unwrap() == ast::TypeExpression::DeclaredType(
-        "Option", vec![ast::TypeExpression::IntType]
+        String::from("Option"), vec![ast::TypeExpression::IntType]
     ));
     assert!(parser.parse("Tree (Tree) float").unwrap() == ast::TypeExpression::DeclaredType(
-        "Tree",
+        String::from("Tree"),
         vec![
-            ast::TypeExpression::DeclaredType("Tree", vec![]),
+            ast::TypeExpression::DeclaredType(String::from("Tree"), vec![]),
             ast::TypeExpression::FloatType
         ]
     ));
     assert!(parser.parse("Tree (Tree float)").unwrap() == ast::TypeExpression::DeclaredType(
-        "Tree",
-        vec![ast::TypeExpression::DeclaredType("Tree", vec![
+        String::from("Tree"),
+        vec![ast::TypeExpression::DeclaredType(String::from("Tree"), vec![
                 ast::TypeExpression::FloatType
         ])]
     ));
@@ -742,35 +742,35 @@ fn test_parse_atomic_pattern() {
     let parser = grammar::PatternParser::new();
     // Ok atomic
     assert!(parser.parse("_").unwrap() == ast::Pattern::Wildcard);
-    assert!(parser.parse("__").unwrap() == ast::Pattern::Identifier("__"));
+    assert!(parser.parse("__").unwrap() == ast::Pattern::Identifier(String::from("__")));
     assert!(parser.parse("-6789").unwrap() == ast::Pattern::IntegerLiteral(-6789));
     assert!(parser.parse("9.8e3").unwrap() == ast::Pattern::FloatLiteral(OrderedFloat(9800.0)));
     assert!(parser.parse("\"helloⓓⓕ\"").unwrap() == ast::Pattern::StringLiteral(String::from("helloⓓⓕ")));
-    assert!(parser.parse("x").unwrap() == ast::Pattern::Identifier("x"));
-    assert!(parser.parse("__o98").unwrap() == ast::Pattern::Identifier("__o98"));
+    assert!(parser.parse("x").unwrap() == ast::Pattern::Identifier(String::from("x")));
+    assert!(parser.parse("__o98").unwrap() == ast::Pattern::Identifier(String::from("__o98")));
     assert!(parser.parse("Some with x").unwrap() == ast::Pattern::TypeVariant(
-        "Some", Box::new(ast::Pattern::Identifier("x"))
+        String::from("Some"), Box::new(ast::Pattern::Identifier(String::from("x")))
     ));
     assert!(parser.parse("Option with (Tree, 4)").unwrap() == ast::Pattern::TypeVariant(
-        "Option", Box::new(ast::Pattern::Tuple(vec![
-            ast::Pattern::Identifier("Tree"),
+        String::from("Option"), Box::new(ast::Pattern::Tuple(vec![
+            ast::Pattern::Identifier(String::from("Tree")),
             ast::Pattern::IntegerLiteral(4)
         ]))
     ));
     assert!(parser.parse("Some with 4").unwrap() == ast::Pattern::TypeVariant(
-        "Some", Box::new(ast::Pattern::IntegerLiteral(4))
+        String::from("Some"), Box::new(ast::Pattern::IntegerLiteral(4))
     ));
     assert!(parser.parse("[ ]").unwrap() == ast::Pattern::EmptyList);
     assert!(parser.parse("bool with (List with [_, x :: xs])").unwrap() == ast::Pattern::TypeVariant(
-        "bool", Box::new(ast::Pattern::TypeVariant(
-            "List", Box::new(ast::Pattern::List(vec![
+        String::from("bool"), Box::new(ast::Pattern::TypeVariant(
+            String::from("List"), Box::new(ast::Pattern::List(vec![
                 ast::Pattern::Wildcard,
-                ast::Pattern::ListConstruction("x", "xs")
+                ast::Pattern::ListConstruction(String::from("x"), String::from("xs"))
             ]))
         ))
     ));
     assert!(parser.parse("Integer with (4)").unwrap() == ast::Pattern::TypeVariant(
-        "Integer", Box::new(ast::Pattern::IntegerLiteral(4))
+        String::from("Integer"), Box::new(ast::Pattern::IntegerLiteral(4))
     ));
     // Err atomic
     assert!(parser.parse("=>").is_err());
@@ -794,13 +794,13 @@ fn test_parse_compound_pattern() {
         ast::Pattern::EmptyList
     ]));
     assert!(parser.parse("Integer with (Option with y, x :: xs)").unwrap() == ast::Pattern::TypeVariant(
-        "Integer", Box::new(ast::Pattern::Tuple(vec![
-            ast::Pattern::TypeVariant("Option", Box::new(ast::Pattern::Identifier("y"))),
-            ast::Pattern::ListConstruction("x", "xs")
+        String::from("Integer"), Box::new(ast::Pattern::Tuple(vec![
+            ast::Pattern::TypeVariant(String::from("Option"), Box::new(ast::Pattern::Identifier(String::from("y")))),
+            ast::Pattern::ListConstruction(String::from("x"), String::from("xs"))
         ]))
     ));
     assert!(parser.parse("Float with (5.7,)").unwrap() == ast::Pattern::TypeVariant(
-        "Float",
+        String::from("Float"),
         Box::new(ast::Pattern::Tuple(vec![
             ast::Pattern::FloatLiteral(OrderedFloat(5.7))
         ]))
@@ -808,7 +808,7 @@ fn test_parse_compound_pattern() {
     assert!(parser.parse("(_, _, v)").unwrap() == ast::Pattern::Tuple(vec![
         ast::Pattern::Wildcard,
         ast::Pattern::Wildcard,
-        ast::Pattern::Identifier("v")
+        ast::Pattern::Identifier(String::from("v"))
     ]));
     assert!(parser.parse("[4, -5.6, _]").unwrap() == ast::Pattern::List(vec![
         ast::Pattern::IntegerLiteral(4),
@@ -833,8 +833,8 @@ fn test_parse_complex_pattern() {
     let parser = grammar::PatternParser::new();
     // Ok Pattern union
     assert!(parser.parse("x | y").unwrap() == ast::Pattern::Union(vec![
-        ast::Pattern::Identifier("x"),
-        ast::Pattern::Identifier("y")
+        ast::Pattern::Identifier(String::from("x")),
+        ast::Pattern::Identifier(String::from("y"))
     ]));
     assert!(parser.parse("(4) | 5.0 | \"hello\"").unwrap() == ast::Pattern::Union(vec![
         ast::Pattern::IntegerLiteral(4),
@@ -842,8 +842,8 @@ fn test_parse_complex_pattern() {
         ast::Pattern::StringLiteral(String::from("hello"))
     ]));
     assert!(parser.parse("x|(y)").unwrap() == ast::Pattern::Union(vec![
-        ast::Pattern::Identifier("x"),
-        ast::Pattern::Identifier("y")
+        ast::Pattern::Identifier(String::from("x")),
+        ast::Pattern::Identifier(String::from("y"))
     ]));
     // Err pattern union
     assert!(parser.parse("[a, b] | 4").is_err());
@@ -865,15 +865,15 @@ fn test_parse_complex_pattern() {
     ));
     assert!(parser.parse("~Option with 4").unwrap() == ast::Pattern::Complement(
         Box::new(ast::Pattern::TypeVariant(
-            "Option", Box::new(ast::Pattern::IntegerLiteral(4))
+            String::from("Option"), Box::new(ast::Pattern::IntegerLiteral(4))
         ))
     ));
     assert!(parser.parse("~(Option with (2, 3, x, ))").unwrap() == ast::Pattern::Complement(
         Box::new(ast::Pattern::TypeVariant(
-            "Option", Box::new(ast::Pattern::Tuple(vec![
+            String::from("Option"), Box::new(ast::Pattern::Tuple(vec![
                 ast::Pattern::IntegerLiteral(2),
                 ast::Pattern::IntegerLiteral(3),
-                ast::Pattern::Identifier("x")
+                ast::Pattern::Identifier(String::from("x"))
             ]))
         ))
     ));
@@ -888,16 +888,16 @@ fn test_parse_complex_pattern() {
     // Ok guarded pattern
     assert!(parser.parse("x | y if true").unwrap() == ast::Pattern::Guarded(
         Box::new(ast::Pattern::Union(vec![
-            ast::Pattern::Identifier("x"),
-            ast::Pattern::Identifier("y")
+            ast::Pattern::Identifier(String::from("x")),
+            ast::Pattern::Identifier(String::from("y"))
         ])),
-        ast::Expression::Identifier("true")
+        ast::Expression::Identifier(String::from("true"))
     ));
     assert!(parser.parse("x :: xs if f x").unwrap() == ast::Pattern::Guarded(
-        Box::new(ast::Pattern::ListConstruction("x", "xs")),
+        Box::new(ast::Pattern::ListConstruction(String::from("x"), String::from("xs"))),
         ast::Expression::FuncApplication(
-            Box::new(ast::Expression::Identifier("f")),
-            Box::new(ast::Expression::Identifier("x"))
+            Box::new(ast::Expression::Identifier(String::from("f"))),
+            Box::new(ast::Expression::Identifier(String::from("x")))
         )
     ));
     // Err guarded pattern
@@ -916,18 +916,18 @@ fn test_parse_let() {
     let parser = grammar::StatementParser::new();
     // Ok untyped
     assert!(parser.parse("let x = 4;").unwrap() == ast::Statement::UntypedLet(
-        vec!["x"],
+        vec![String::from("x")],
         ast::Expression::IntegerLiteral(4)
     ));
     assert!(parser.parse("let x y = (\\ x -> x) y;").unwrap() == ast::Statement::UntypedLet(
-        vec!["x", "y"],
+        vec![String::from("x"), String::from("y")],
         ast::Expression::FuncApplication(
-            Box::new(ast::Expression::Lambda(vec!["x"], Box::new(ast::Expression::Identifier("x")))),
-            Box::new(ast::Expression::Identifier("y"))
+            Box::new(ast::Expression::Lambda(vec![String::from("x")], Box::new(ast::Expression::Identifier(String::from("x"))))),
+            Box::new(ast::Expression::Identifier(String::from("y")))
         )
     ));
     assert!(parser.parse("let plus_4 x = (+) 4;").unwrap() == ast::Statement::UntypedLet(
-        vec!["plus_4", "x"],
+        vec![String::from("plus_4"), String::from("x")],
         ast::Expression::FuncApplication(
             Box::new(ast::Expression::BuiltinOp(ast::Operation::Add)),
             Box::new(ast::Expression::IntegerLiteral(4))
@@ -939,11 +939,11 @@ fn test_parse_let() {
         x :: xs => x // 4,
         _ => 8.6 * z
     };").unwrap() == ast::Statement::UntypedLet(
-        vec!["j", "x", "y", "z", "w"],
+        vec![String::from("j"), String::from("x"), String::from("y"), String::from("z"), String::from("w")],
         ast::Expression::MatchConstruct(
             Box::new(ast::Expression::FuncApplication(
-                Box::new(ast::Expression::Identifier("plus_4")),
-                Box::new(ast::Expression::Identifier("x"))
+                Box::new(ast::Expression::Identifier(String::from("plus_4"))),
+                Box::new(ast::Expression::Identifier(String::from("x")))
             )),
             vec![(
                 ast::Pattern::Union(vec![
@@ -953,17 +953,17 @@ fn test_parse_let() {
                 ast::Expression::List(vec![
                     ast::Expression::IntegerLiteral(1),
                     ast::Expression::IntegerLiteral(2),
-                    ast::Expression::Identifier("y")
+                    ast::Expression::Identifier(String::from("y"))
                 ])
             ), (
-                ast::Pattern::Identifier("w"),
+                ast::Pattern::Identifier(String::from("w")),
                 ast::Expression::IntegerLiteral(2)
             ), (
-                ast::Pattern::ListConstruction("x", "xs"),
+                ast::Pattern::ListConstruction(String::from("x"), String::from("xs")),
                 ast::Expression::FuncApplication(
                     Box::new(ast::Expression::FuncApplication(
                         Box::new(ast::Expression::BuiltinOp(ast::Operation::FloorDiv)),
-                        Box::new(ast::Expression::Identifier("x"))
+                        Box::new(ast::Expression::Identifier(String::from("x")))
                     )),
                     Box::new(ast::Expression::IntegerLiteral(4))
                 )
@@ -974,13 +974,13 @@ fn test_parse_let() {
                         Box::new(ast::Expression::BuiltinOp(ast::Operation::Multiply)),
                         Box::new(ast::Expression::FloatLiteral(OrderedFloat(8.6)))
                     )),
-                    Box::new(ast::Expression::Identifier("z"))
+                    Box::new(ast::Expression::Identifier(String::from("z")))
                 )
             )]
         )
     ));
     assert!(parser.parse("let y = { 5 };").unwrap() == ast::Statement::UntypedLet(
-        vec!["y"],
+        vec![String::from("y")],
         ast::Expression::Block(vec![], Box::new(ast::Expression::IntegerLiteral(5)))
     ));
     assert!(parser.parse("let doublesum lst = {
@@ -990,25 +990,25 @@ fn test_parse_let() {
         };
         (*) 2 (sum lst)
     };").unwrap() == ast::Statement::UntypedLet(
-        vec!["doublesum", "lst"],
+        vec![String::from("doublesum"), String::from("lst")],
         ast::Expression::Block(
             vec![ast::Statement::UntypedLet(
-                vec!["sum", "lst"],
+                vec![String::from("sum"), String::from("lst")],
                 ast::Expression::MatchConstruct(
-                    Box::new(ast::Expression::Identifier("lst")),
+                    Box::new(ast::Expression::Identifier(String::from("lst"))),
                     vec![(
                         ast::Pattern::EmptyList,
                         ast::Expression::IntegerLiteral(0)
                     ), (
-                        ast::Pattern::ListConstruction("x", "xs"),
+                        ast::Pattern::ListConstruction(String::from("x"), String::from("xs")),
                         ast::Expression::FuncApplication(
                             Box::new(ast::Expression::FuncApplication(
                                 Box::new(ast::Expression::BuiltinOp(ast::Operation::Add)),
-                                Box::new(ast::Expression::Identifier("x"))
+                                Box::new(ast::Expression::Identifier(String::from("x")))
                             )),
                             Box::new(ast::Expression::FuncApplication(
-                                Box::new(ast::Expression::Identifier("sum")),
-                                Box::new(ast::Expression::Identifier("xs"))
+                                Box::new(ast::Expression::Identifier(String::from("sum"))),
+                                Box::new(ast::Expression::Identifier(String::from("xs")))
                             ))
                         )
                     )]
@@ -1020,18 +1020,18 @@ fn test_parse_let() {
                     Box::new(ast::Expression::IntegerLiteral(2))
                 )),
                 Box::new(ast::Expression::FuncApplication(
-                    Box::new(ast::Expression::Identifier("sum")),
-                    Box::new(ast::Expression::Identifier("lst"))
+                    Box::new(ast::Expression::Identifier(String::from("sum"))),
+                    Box::new(ast::Expression::Identifier(String::from("lst")))
                 ))
             ))
         )
     ));
     assert!(parser.parse("let Main = print (f g);").unwrap() == ast::Statement::UntypedLet(
-        vec!["Main"], ast::Expression::FuncApplication(
+        vec![String::from("Main")], ast::Expression::FuncApplication(
             Box::new(ast::Expression::Print),
             Box::new(ast::Expression::FuncApplication(
-                Box::new(ast::Expression::Identifier("f")),
-                Box::new(ast::Expression::Identifier("g"))
+                Box::new(ast::Expression::Identifier(String::from("f"))),
+                Box::new(ast::Expression::Identifier(String::from("g")))
             ))
         )
     ));
@@ -1043,56 +1043,56 @@ fn test_parse_let() {
     assert!(parser.parse("let func (x) y = x + y").is_err());
     // Ok typed
     assert!(parser.parse("let z: 'a = \"hi\";").unwrap() == ast::Statement::TypedLet(
-        "z", ast::TypeExpression::TypeVariable("a"), vec![], ast::Expression::StringLiteral(String::from("hi"))
+        String::from("z"), ast::TypeExpression::TypeVariable(String::from("a")), vec![], ast::Expression::StringLiteral(String::from("hi"))
     ));
     assert!(parser.parse("let y: float = 5.68;").unwrap() == ast::Statement::TypedLet(
-        "y", ast::TypeExpression::FloatType, vec![], ast::Expression::FloatLiteral(OrderedFloat(5.68))
+        String::from("y"), ast::TypeExpression::FloatType, vec![], ast::Expression::FloatLiteral(OrderedFloat(5.68))
     ));
     assert!(parser.parse("let x: (int) = 4;").unwrap() == ast::Statement::TypedLet(
-        "x", ast::TypeExpression::IntType, vec![], ast::Expression::IntegerLiteral(4)
+        String::from("x"), ast::TypeExpression::IntType, vec![], ast::Expression::IntegerLiteral(4)
     ));
     assert!(parser.parse("let x: Option int = Some with 4;").unwrap() == ast::Statement::TypedLet(
-        "x", ast::TypeExpression::DeclaredType("Option", vec![ast::TypeExpression::IntType]),
-        vec![], ast::Expression::TypeVariant("Some", Box::new(ast::Expression::IntegerLiteral(4)))
+        String::from("x"), ast::TypeExpression::DeclaredType(String::from("Option"), vec![ast::TypeExpression::IntType]),
+        vec![], ast::Expression::TypeVariant(String::from("Some"), Box::new(ast::Expression::IntegerLiteral(4)))
     ));
     // unfortunate, but it's not worth editing the parser to prevent this
     assert!(parser.parse("let func(x:int)->(y:int)->int=4;").unwrap() == ast::Statement::TypedLet(
-        "func", ast::TypeExpression::IntType,
+        String::from("func"), ast::TypeExpression::IntType,
         vec![
-            ("x", ast::TypeExpression::IntType),
-            ("y", ast::TypeExpression::IntType)
+            (String::from("x"), ast::TypeExpression::IntType),
+            (String::from("y"), ast::TypeExpression::IntType)
         ],
         ast::Expression::IntegerLiteral(4)
     ));
     assert!(parser.parse("let func (x: bool) -> int -> Option 'a = \\ y -> (+) x y;").unwrap() == ast::Statement::TypedLet(
-        "func",
+        String::from("func"),
         ast::TypeExpression::FunctionType(
             Box::new(ast::TypeExpression::IntType),
-            Box::new(ast::TypeExpression::DeclaredType("Option", vec![ast::TypeExpression::TypeVariable("a")]))
+            Box::new(ast::TypeExpression::DeclaredType(String::from("Option"), vec![ast::TypeExpression::TypeVariable(String::from("a"))]))
         ),
-        vec![("x", ast::TypeExpression::DeclaredType("bool", vec![]))],
+        vec![(String::from("x"), ast::TypeExpression::DeclaredType(String::from("bool"), vec![]))],
         ast::Expression::Lambda(
-            vec!["y"],
+            vec![String::from("y")],
             Box::new(ast::Expression::FuncApplication(
                 Box::new(ast::Expression::FuncApplication(
                     Box::new(ast::Expression::BuiltinOp(ast::Operation::Add)),
-                    Box::new(ast::Expression::Identifier("x"))
+                    Box::new(ast::Expression::Identifier(String::from("x")))
                 )),
-                Box::new(ast::Expression::Identifier("y"))
+                Box::new(ast::Expression::Identifier(String::from("y")))
             ))
         )
     ));
     assert!(parser.parse("let func: int -> bool = \\ x -> (<=) 3 x;").unwrap() == ast::Statement::TypedLet(
-        "func", ast::TypeExpression::FunctionType(
+        String::from("func"), ast::TypeExpression::FunctionType(
             Box::new(ast::TypeExpression::IntType),
-            Box::new(ast::TypeExpression::DeclaredType("bool", vec![]))
+            Box::new(ast::TypeExpression::DeclaredType(String::from("bool"), vec![]))
         ),
-        vec![], ast::Expression::Lambda(vec!["x"], Box::new(ast::Expression::FuncApplication(
+        vec![], ast::Expression::Lambda(vec![String::from("x")], Box::new(ast::Expression::FuncApplication(
             Box::new(ast::Expression::FuncApplication(
                 Box::new(ast::Expression::BuiltinOp(ast::Operation::Leq)),
                 Box::new(ast::Expression::IntegerLiteral(3))
             )),
-            Box::new(ast::Expression::Identifier("x"))
+            Box::new(ast::Expression::Identifier(String::from("x")))
         )))
     ));
     // Err typed
@@ -1111,10 +1111,13 @@ fn test_parse_type_decl() {
     let parser = grammar::StatementParser::new();
     // Ok
     assert!(parser.parse("type bool = false | true;").unwrap() == ast::Statement::TypeDeclaration(
-        "bool", vec![], vec![("false", None), ("true", None)]
+        String::from("bool"), vec![], vec![(String::from("false"), None), (String::from("true"), None)]
     ));
     assert!(parser.parse("type Option 'a = None | Some with 'a;").unwrap() == ast::Statement::TypeDeclaration(
-        "Option", vec!["a"], vec![("None", None), ("Some", Some(ast::TypeExpression::TypeVariable("a")))]
+        String::from("Option"), vec![String::from("a")], vec![
+            (String::from("None"), None),
+            (String::from("Some"), Some(ast::TypeExpression::TypeVariable(String::from("a"))))
+        ]
     ));
     assert!(parser.parse("type Thingy = Var1
         | Var2 with int
@@ -1122,32 +1125,32 @@ fn test_parse_type_decl() {
         | Var4 with [int]
         |Var5 with (int, string, Thingy)
     ;").unwrap() == ast::Statement::TypeDeclaration(
-        "Thingy", vec![], vec![
-            ("Var1", None),
-            ("Var2", Some(ast::TypeExpression::IntType)),
-            ("Var3", Some(ast::TypeExpression::StringType)),
-            ("Var4", Some(ast::TypeExpression::ListType(Box::new(ast::TypeExpression::IntType)))),
-            ("Var5", Some(ast::TypeExpression::TupleType(vec![
+        String::from("Thingy"), vec![], vec![
+            (String::from("Var1"), None),
+            (String::from("Var2"), Some(ast::TypeExpression::IntType)),
+            (String::from("Var3"), Some(ast::TypeExpression::StringType)),
+            (String::from("Var4"), Some(ast::TypeExpression::ListType(Box::new(ast::TypeExpression::IntType)))),
+            (String::from("Var5"), Some(ast::TypeExpression::TupleType(vec![
                 ast::TypeExpression::IntType,
                 ast::TypeExpression::StringType,
-                ast::TypeExpression::DeclaredType("Thingy", vec![])
+                ast::TypeExpression::DeclaredType(String::from("Thingy"), vec![])
             ])))
         ]
     ));
     assert!(parser.parse("
     type binary_tree 'a = Leaf
         | Node with ('a, binary_tree 'a, binary_tree 'a);").unwrap() == ast::Statement::TypeDeclaration(
-        "binary_tree", vec!["a"], vec![
-            ("Leaf", None),
-            ("Node", Some(ast::TypeExpression::TupleType(vec![
-                ast::TypeExpression::TypeVariable("a"),
-                ast::TypeExpression::DeclaredType("binary_tree", vec![ast::TypeExpression::TypeVariable("a")]),
-                ast::TypeExpression::DeclaredType("binary_tree", vec![ast::TypeExpression::TypeVariable("a")])
+        String::from("binary_tree"), vec![String::from("a")], vec![
+            (String::from("Leaf"), None),
+            (String::from("Node"), Some(ast::TypeExpression::TupleType(vec![
+                ast::TypeExpression::TypeVariable(String::from("a")),
+                ast::TypeExpression::DeclaredType(String::from("binary_tree"), vec![ast::TypeExpression::TypeVariable(String::from("a"))]),
+                ast::TypeExpression::DeclaredType(String::from("binary_tree"), vec![ast::TypeExpression::TypeVariable(String::from("a"))])
             ])))
         ]
     ));
     assert!(parser.parse("type Onevar = Onevar;").unwrap() == ast::Statement::TypeDeclaration(
-        "Onevar", vec![], vec![("Onevar", None)]
+        String::from("Onevar"), vec![], vec![(String::from("Onevar"), None)]
     ));
     // Err
     assert!(parser.parse("type tvar = X with [int, string] | Y;").is_err());
@@ -1169,32 +1172,32 @@ fn test_parse_program() {
         let z = f double 4; 
     ").unwrap() == vec![
         ast::Statement::TypedLet(
-            "f", ast::TypeExpression::TypeVariable("a"), vec![(
-                "g", ast::TypeExpression::FunctionType(
-                    Box::new(ast::TypeExpression::TypeVariable("a")),
-                    Box::new(ast::TypeExpression::TypeVariable("a"))
+            String::from("f"), ast::TypeExpression::TypeVariable(String::from("a")), vec![(
+                String::from("g"), ast::TypeExpression::FunctionType(
+                    Box::new(ast::TypeExpression::TypeVariable(String::from("a"))),
+                    Box::new(ast::TypeExpression::TypeVariable(String::from("a")))
                 )
             ), (
-                "x", ast::TypeExpression::TypeVariable("a")
+                String::from("x"), ast::TypeExpression::TypeVariable(String::from("a"))
             )], ast::Expression::FuncApplication(
-                Box::new(ast::Expression::Identifier("g")),
-                Box::new(ast::Expression::Identifier("x"))
+                Box::new(ast::Expression::Identifier(String::from("g"))),
+                Box::new(ast::Expression::Identifier(String::from("x")))
             )
         ),
         ast::Statement::UntypedLet(
-            vec!["double", "x"], ast::Expression::FuncApplication(
+            vec![String::from("double"), String::from("x")], ast::Expression::FuncApplication(
                 Box::new(ast::Expression::FuncApplication(
                     Box::new(ast::Expression::BuiltinOp(ast::Operation::Multiply)),
                     Box::new(ast::Expression::IntegerLiteral(2))
                 )),
-                Box::new(ast::Expression::Identifier("x"))
+                Box::new(ast::Expression::Identifier(String::from("x")))
             )
         ),
         ast::Statement::UntypedLet(
-            vec!["z"], ast::Expression::FuncApplication(
+            vec![String::from("z")], ast::Expression::FuncApplication(
                 Box::new(ast::Expression::FuncApplication(
-                    Box::new(ast::Expression::Identifier("f")),
-                    Box::new(ast::Expression::Identifier("double"))
+                    Box::new(ast::Expression::Identifier(String::from("f"))),
+                    Box::new(ast::Expression::Identifier(String::from("double")))
                 )),
                 Box::new(ast::Expression::IntegerLiteral(4))
             )
@@ -1207,22 +1210,22 @@ fn test_parse_program() {
             Some with x => print (\"something: \" + x) 
         };
     ").unwrap() == vec![
-        ast::Statement::TypeDeclaration("Option", vec!["a"], vec![
-            ("None", None), ("Some", Some(ast::TypeExpression::TypeVariable("a")))
+        ast::Statement::TypeDeclaration(String::from("Option"), vec![String::from("a")], vec![
+            (String::from("None"), None), (String::from("Some"), Some(ast::TypeExpression::TypeVariable(String::from("a"))))
         ]),
         ast::Statement::TypedLet(
-            "print_optional", ast::TypeExpression::StringType,
-            vec![("x", ast::TypeExpression::DeclaredType("Option", vec![ast::TypeExpression::TypeVariable("a")]))],
+            String::from("print_optional"), ast::TypeExpression::StringType,
+            vec![(String::from("x"), ast::TypeExpression::DeclaredType(String::from("Option"), vec![ast::TypeExpression::TypeVariable(String::from("a"))]))],
             ast::Expression::MatchConstruct(
-                Box::new(ast::Expression::Identifier("x")),
+                Box::new(ast::Expression::Identifier(String::from("x"))),
                 vec![(
-                    ast::Pattern::Identifier("None"),
+                    ast::Pattern::Identifier(String::from("None")),
                     ast::Expression::FuncApplication(
                         Box::new(ast::Expression::Print),
                         Box::new(ast::Expression::StringLiteral(String::from("nothing!")))
                     )
                 ), (
-                    ast::Pattern::TypeVariant("Some", Box::new(ast::Pattern::Identifier("x"))),
+                    ast::Pattern::TypeVariant(String::from("Some"), Box::new(ast::Pattern::Identifier(String::from("x")))),
                     ast::Expression::FuncApplication(
                         Box::new(ast::Expression::Print),
                         Box::new(ast::Expression::FuncApplication(
@@ -1230,7 +1233,7 @@ fn test_parse_program() {
                                 Box::new(ast::Expression::BuiltinOp(ast::Operation::Add)),
                                 Box::new(ast::Expression::StringLiteral(String::from("something: ")))
                             )),
-                            Box::new(ast::Expression::Identifier("x"))
+                            Box::new(ast::Expression::Identifier(String::from("x")))
                         ))
                     )
                 )]
@@ -1241,23 +1244,23 @@ fn test_parse_program() {
         type OptionalTuple 'a 'b = None | Some with ('a, 'b);
         let f (x: 'a) -> (y: 'b) -> OptionalTuple 'a 'b = Some with (x, y);
     ").unwrap() == vec![
-        ast::Statement::TypeDeclaration("OptionalTuple", vec!["a", "b"], vec![
-            ("None", None),
-            ("Some", Some(ast::TypeExpression::TupleType(vec![
-                ast::TypeExpression::TypeVariable("a"),
-                ast::TypeExpression::TypeVariable("b")
+        ast::Statement::TypeDeclaration(String::from("OptionalTuple"), vec![String::from("a"), String::from("b")], vec![
+            (String::from("None"), None),
+            (String::from("Some"), Some(ast::TypeExpression::TupleType(vec![
+                ast::TypeExpression::TypeVariable(String::from("a")),
+                ast::TypeExpression::TypeVariable(String::from("b"))
             ])))
         ]),
-        ast::Statement::TypedLet("f", ast::TypeExpression::DeclaredType("OptionalTuple", vec![
-            ast::TypeExpression::TypeVariable("a"),
-            ast::TypeExpression::TypeVariable("b")
+        ast::Statement::TypedLet(String::from("f"), ast::TypeExpression::DeclaredType(String::from("OptionalTuple"), vec![
+            ast::TypeExpression::TypeVariable(String::from("a")),
+            ast::TypeExpression::TypeVariable(String::from("b"))
         ]), vec![
-            ("x", ast::TypeExpression::TypeVariable("a")),
-            ("y", ast::TypeExpression::TypeVariable("b"))
+            (String::from("x"), ast::TypeExpression::TypeVariable(String::from("a"))),
+            (String::from("y"), ast::TypeExpression::TypeVariable(String::from("b")))
         ],
-        ast::Expression::TypeVariant("Some", Box::new(ast::Expression::Tuple(vec![
-            ast::Expression::Identifier("x"),
-            ast::Expression::Identifier("y")
+        ast::Expression::TypeVariant(String::from("Some"), Box::new(ast::Expression::Tuple(vec![
+            ast::Expression::Identifier(String::from("x")),
+            ast::Expression::Identifier(String::from("y"))
         ])))
     )]);
     // Err

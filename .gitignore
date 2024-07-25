@@ -1,5 +1,6 @@
 /target
 /specification/*
+/research
 !/specification/*.pdf
 !/specification/*.bib
 !/specification/*.tex
