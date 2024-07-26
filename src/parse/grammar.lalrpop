@@ -15,8 +15,6 @@ match {
     _
 }
 
-// TODO: custom error type and better error messages
-
 // Macros
 Sp<Rule>: Spanned<Rule> = <l: @L> <rule: Rule> <r: @R> => Spanned::new(l, r, rule);
 
@@ -53,12 +51,12 @@ SepTupleAtLeastTwo<T, Sep>: Vec<T> = {
 }
 
 // Tokens
-Identifier: String = <r"[a-zA-Z_]\w*"> => String::from(<>);
+Identifier: String = <r"[a-zA-Z_][a-zA-Z0-9_]*"> => String::from(<>);
 
 TypedIdentifier: (String, ast::TypeExpression) =
     <id: Identifier> ":" <te: TypeExpression> => (id, te);
 
-TypeVar: String = <s: r"'[a-zA-Z_]\w*"> => String::from(&s[1..]);
+TypeVar: String = <s: r"'[a-zA-Z_][a-zA-Z0-9_]*"> => String::from(&s[1..]);
 
 IntegerLiteral: i64 = <r"-?([0-9]|[1-9][0-9]*)"> => <>.parse::<i64>().unwrap();
 

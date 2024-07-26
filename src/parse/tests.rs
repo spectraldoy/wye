@@ -141,6 +141,7 @@ fn test_parse_identifier_type_variant() {
     assert!(parser.parse("Hel)lo").is_err());
     assert!(parser.parse("31232_AA").is_err());
     assert!(parser.parse("_Yel⏰o").is_err());
+    assert!(parser.parse("aபாதை").is_err());
     // Ok type variant
     assert!(parser.parse("Some with 4").unwrap() == ast::Expression::TypeVariant(
         String::from("Some"), Box::new(ast::Expression::IntegerLiteral(4))
@@ -582,6 +583,7 @@ fn test_parse_type_lit_type_var() {
     assert!(parser.parse("8").is_err());
     assert!(parser.parse("\"hello\"").is_err());
     assert!(parser.parse("x:int").is_err());
+    assert!(parser.parse("'aபாதை").is_err());
 }
 
 #[test]

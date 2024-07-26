@@ -39,7 +39,7 @@ currently Wye does not take user input, so we specify the input manually
 let Main = print (collatz_sequence 97);
 ```
 
-To see examples of wye, check out the [examples/](/examples) folder.
+To see more examples of wye, check out the [examples/](/examples) folder.
 
 # Next Steps
 
