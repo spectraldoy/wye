@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 pub struct TypeChecker<'a> {
     // program to type check
     program: &'a Vec<Statement>,
-    // declared variable -> (type_variables, type)
+    // declared variable -> (universally quantified types, type)
     context: HashMap<String, (HashSet<String>, TypeExpression)>,
     // map of declared typename to type variables
     declared_typenames: HashMap<String, HashSet<String>>,
@@ -16,6 +16,7 @@ pub struct TypeChecker<'a> {
     next_k: usize
 }
 
+// Construction impl
 impl<'a> TypeChecker<'a> {
     pub fn new(program: &'a Vec<Statement>) -> Result<Self, String> {        
         // first we gather the declared types and assign initial types
@@ -43,17 +44,17 @@ impl<'a> TypeChecker<'a> {
                     let types: Vec<TypeExpression> = ids
                         .iter()
                         .map(|_| {
-                            let inftype_name = util::typevar_name(next_k);
+                            let inftype_name = util::inftype_name(next_k);
                             next_k += 1;
-                            TypeExpression::InferredType(inftype_name)
+                            TypeExpression::InferableType(inftype_name)
                         })
                         .collect::<_>();
                     
                     let id_type = util::collect_functype(&types[..]);
                     
                     // we don't actually yet know which argument types are forall types
-                    let type_variables: HashSet<String> = HashSet::new();
-                    context.insert(varname.clone(), (type_variables, id_type));
+                    let univ_types: HashSet<String> = HashSet::new();
+                    context.insert(varname.clone(), (univ_types, id_type));
                 },
                 Statement::TypedLet(varname, out_type, args, _) => {
                     if context.contains_key(varname) {
@@ -67,12 +68,14 @@ impl<'a> TypeChecker<'a> {
                     }
                     // the types are already specified, we just need to collect them properly
                     let mut types: Vec<TypeExpression> = vec![];
-                    let type_variables: HashSet<String> = args
+                    // This map filters out the universal types, and pushes all types into
+                    // the above types vector
+                    let univ_types: HashSet<String> = args
                         .iter()
                         .filter_map(|(_, typ)| {
                             types.push(typ.clone());
                             match typ {
-                                TypeExpression::TypeVariable(typevar) => Some(typevar.clone()),
+                                TypeExpression::UniversalType(univ_type) => Some(univ_type.clone()),
                                 _ => None
                             }
                         })
@@ -80,9 +83,9 @@ impl<'a> TypeChecker<'a> {
 
                     types.push(out_type.clone());
                     let id_type = util::collect_functype(&types[..]);
-                    context.insert(varname.clone(), (type_variables, id_type));
+                    context.insert(varname.clone(), (univ_types, id_type));
                 },
-                Statement::TypeDeclaration(typename, typevars, variants) => {
+                Statement::TypeDeclaration(typename, univ_types, variants) => {
                     if declared_typenames.contains_key(typename) {
                         return Err(format!("Redefinition of type {}", typename));
                     }
@@ -101,20 +104,20 @@ impl<'a> TypeChecker<'a> {
                         type_variants.insert(variant_name.clone(), (typename.clone(), field.clone()));
                     }
 
-                    let mut typevarset: HashSet<String> = HashSet::new();
-                    for typevarname in typevars {
-                        if typevarset.contains(typevarname) {
+                    let mut univ_type_set: HashSet<String> = HashSet::new();
+                    for univ_typename in univ_types {
+                        if univ_type_set.contains(univ_typename) {
                             return Err(format!(
                                 "Duplicate type variable {} in definition of type {}",
-                                typevarname,
+                                univ_typename,
                                 typename
                             ));
                         }
-                        typevarset.insert(typevarname.clone());
+                        univ_type_set.insert(univ_typename.clone());
                     }
 
                     // add the new typename to declared typenames
-                    declared_typenames.insert(typename.clone(), typevarset);
+                    declared_typenames.insert(typename.clone(), univ_type_set);
                 }
             }
         }
@@ -126,8 +129,8 @@ impl<'a> TypeChecker<'a> {
             match field_type {
                 None => {},
                 Some(te) => {
-                    let type_vars_in_scope = declared_typenames.get(typename).unwrap();
-                    let res = TypeChecker::vet_type_expr_makes_sense(te, type_vars_in_scope, &declared_typenames);
+                    let univ_types_in_scope = declared_typenames.get(typename).unwrap();
+                    let res = TypeChecker::check_type_expr_in_context(te, univ_types_in_scope, &declared_typenames);
                     if let Err(e) = res {
                         return Err(e);
                     }
@@ -137,8 +140,8 @@ impl<'a> TypeChecker<'a> {
 
         // also for every typed let in the context, we can ensure that the specified types
         // have the correct number of type arguments, and otherwise make sense
-        for (_, (type_vars_in_scope, out_type)) in context.iter() {
-            let res = TypeChecker::vet_type_expr_makes_sense(out_type, type_vars_in_scope, &declared_typenames);
+        for (_, (univ_types_in_scope, out_type)) in context.iter() {
+            let res = TypeChecker::check_type_expr_in_context(out_type, univ_types_in_scope, &declared_typenames);
             if res.is_err() {
                 return Err(res.err().unwrap());
             }
@@ -154,9 +157,9 @@ impl<'a> TypeChecker<'a> {
     }
     
     // Ensure that variant fields have reasonable arguments
-    fn vet_type_expr_makes_sense(
+    fn check_type_expr_in_context(
         type_expression: &TypeExpression,
-        type_vars_in_scope: &HashSet<String>,
+        univ_types_in_scope: &HashSet<String>,
         declared_typenames: &HashMap<String, HashSet<String>>
     ) -> Result<(), String> {
         match type_expression {
@@ -165,48 +168,54 @@ impl<'a> TypeChecker<'a> {
                     return Err(format!("Type {} is not declared", decl_type));
                 }
 
-                let expected_num_type_vars = declared_typenames.get(decl_type).unwrap().len();
-                let actual_num_type_vars = type_args.len();
-                if expected_num_type_vars != actual_num_type_vars {
+                let expected_num_uvars = declared_typenames.get(decl_type).unwrap().len();
+                let actual_num_uvars = type_args.len();
+                if expected_num_uvars != actual_num_uvars {
                     Err(format!(
                         "Expected {} type arguments to declared type {}, got {}",
-                        expected_num_type_vars,
+                        expected_num_uvars,
                         decl_type,
-                        actual_num_type_vars
+                        actual_num_uvars
                     ))
                 } else {
                     type_args
                     .iter()
-                    .map(|ta| TypeChecker::vet_type_expr_makes_sense(ta, type_vars_in_scope, declared_typenames))
+                    .map(|ta| TypeChecker::check_type_expr_in_context(ta, univ_types_in_scope, declared_typenames))
                     .fold(Ok(()), |acc, el| acc.and(el))
                 }
             },
             TypeExpression::ListType(te) => {
-                TypeChecker::vet_type_expr_makes_sense(te, type_vars_in_scope, declared_typenames)
+                TypeChecker::check_type_expr_in_context(te, univ_types_in_scope, declared_typenames)
             },
             TypeExpression::TupleType(tup_types) => {
                 tup_types
                 .iter()
-                .map(|t| TypeChecker::vet_type_expr_makes_sense(t, type_vars_in_scope, declared_typenames))
+                .map(|t| TypeChecker::check_type_expr_in_context(t, univ_types_in_scope, declared_typenames))
                 .fold(Ok(()), |acc, el| acc.and(el))
             },
-            TypeExpression::TypeVariable(tv) => {
-                if type_vars_in_scope.contains(tv) {
+            TypeExpression::UniversalType(tv) => {
+                if univ_types_in_scope.contains(tv) {
                     Ok(())
                 } else {
                     Err(format!("Type variable {} not in scope", tv))
                 }
             },
             TypeExpression::FunctionType(te_func, te_arg) => {
-                TypeChecker::vet_type_expr_makes_sense(te_func, type_vars_in_scope, declared_typenames)
-                .and(TypeChecker::vet_type_expr_makes_sense(te_arg, type_vars_in_scope, declared_typenames))
+                TypeChecker::check_type_expr_in_context(te_func, univ_types_in_scope, declared_typenames)
+                .and(TypeChecker::check_type_expr_in_context(te_arg, univ_types_in_scope, declared_typenames))
             },
-            // int, float, string, inferred type (because we don't yet know what to do with it) are all ok
+            // int, float, string, inferable type (because we don't yet know what to do with it) are all ok
             _ => Ok(())
         }
     }
 }
 
+// Type inference impl
+impl<'a> TypeChecker<'a> {
+    
+}
+
+// Type checking impl
 impl<'a> TypeChecker<'a> {
     pub fn type_check_program(&self) -> Result<(), String> {
         for stmt in self.program {
@@ -216,7 +225,7 @@ impl<'a> TypeChecker<'a> {
                 Statement::TypedLet(id, typ, args, expr) => {
                     Ok(())
                 },
-                Statement::TypeDeclaration(type_id, type_vars, variants) => {
+                Statement::TypeDeclaration(type_id, univ_types, variants) => {
                     Ok(())
                 }
             }?
@@ -227,7 +236,7 @@ impl<'a> TypeChecker<'a> {
     fn type_check_untyped_let(&self, id: &Vec<String>, expr: &Expression) -> Result<(), String> {
         // need to generate a new type variable
         // also we have a function type for every identifier we have as an argument
-        let initial_type = TypeExpression::TypeVariable(String::from("a"));
+        let initial_type = TypeExpression::UniversalType(String::from("a"));
         // but in order for this to happen, the arguments to the function need to be added
         // to the context available in which to type check the expression
         // so we need to create a new context here and pass that into the expression type checker

@@ -570,12 +570,12 @@ fn test_parse_type_lit_type_var() {
     assert!(parser.parse("Un[").is_err());
     assert!(parser.parse("()").is_err());
     // Ok type variable
-    assert!(parser.parse("'a").unwrap() == ast::TypeExpression::TypeVariable(String::from("a")));
-    assert!(parser.parse("'_yusdf").unwrap() == ast::TypeExpression::TypeVariable(String::from("_yusdf")));
-    assert!(parser.parse("'aAbABBB").unwrap() == ast::TypeExpression::TypeVariable(String::from("aAbABBB")));
-    assert!(parser.parse("'v1").unwrap() == ast::TypeExpression::TypeVariable(String::from("v1")));
-    assert!(parser.parse("'Type").unwrap() == ast::TypeExpression::TypeVariable(String::from("Type")));
-    assert!(parser.parse("'___Type").unwrap() == ast::TypeExpression::TypeVariable(String::from("___Type")));
+    assert!(parser.parse("'a").unwrap() == ast::TypeExpression::UniversalType(String::from("a")));
+    assert!(parser.parse("'_yusdf").unwrap() == ast::TypeExpression::UniversalType(String::from("_yusdf")));
+    assert!(parser.parse("'aAbABBB").unwrap() == ast::TypeExpression::UniversalType(String::from("aAbABBB")));
+    assert!(parser.parse("'v1").unwrap() == ast::TypeExpression::UniversalType(String::from("v1")));
+    assert!(parser.parse("'Type").unwrap() == ast::TypeExpression::UniversalType(String::from("Type")));
+    assert!(parser.parse("'___Type").unwrap() == ast::TypeExpression::UniversalType(String::from("___Type")));
     // Err type variable
     assert!(parser.parse("''").is_err());
     assert!(parser.parse("'hello'").is_err());
@@ -597,7 +597,7 @@ fn test_parse_list_tuple_type() {
         ast::TypeExpression::DeclaredType(String::from("Option"), vec![])
     )));
     assert!(parser.parse("['a]").unwrap() == ast::TypeExpression::ListType(Box::new(
-        ast::TypeExpression::TypeVariable(String::from("a"))
+        ast::TypeExpression::UniversalType(String::from("a"))
     )));
     assert!(parser.parse("[(int)]").unwrap() == ast::TypeExpression::ListType(Box::new(
         ast::TypeExpression::IntType
@@ -624,7 +624,7 @@ fn test_parse_list_tuple_type() {
     assert!(parser.parse("hel]o").is_err());
     // Ok tuple type
     assert!(parser.parse("('a, )").unwrap() == ast::TypeExpression::TupleType(vec![
-        ast::TypeExpression::TypeVariable(String::from("a"))
+        ast::TypeExpression::UniversalType(String::from("a"))
     ]));
     assert!(parser.parse("(int, string, float)").unwrap() == ast::TypeExpression::TupleType(vec![
         ast::TypeExpression::IntType,
@@ -672,8 +672,8 @@ fn test_parse_function_type() {
     ));
     assert!(parser.parse("'a -> 'b -> (int)").unwrap() == ast::TypeExpression::FunctionType(
         Box::new(ast::TypeExpression::FunctionType(
-            Box::new(ast::TypeExpression::TypeVariable(String::from("a"))),
-            Box::new(ast::TypeExpression::TypeVariable(String::from("b")))
+            Box::new(ast::TypeExpression::UniversalType(String::from("a"))),
+            Box::new(ast::TypeExpression::UniversalType(String::from("b")))
         )),
         Box::new(ast::TypeExpression::IntType)
     ));
@@ -686,13 +686,13 @@ fn test_parse_function_type() {
     ));
     assert!(parser.parse("'a -> ('a -> int) -> 'a").unwrap() == ast::TypeExpression::FunctionType(
         Box::new(ast::TypeExpression::FunctionType(
-            Box::new(ast::TypeExpression::TypeVariable(String::from("a"))),
+            Box::new(ast::TypeExpression::UniversalType(String::from("a"))),
             Box::new(ast::TypeExpression::FunctionType(
-                Box::new(ast::TypeExpression::TypeVariable(String::from("a"))),
+                Box::new(ast::TypeExpression::UniversalType(String::from("a"))),
                 Box::new(ast::TypeExpression::IntType)
             ))
         )),
-        Box::new(ast::TypeExpression::TypeVariable(String::from("a")))
+        Box::new(ast::TypeExpression::UniversalType(String::from("a")))
     ));
     // Err function type
     assert!(parser.parse("int ->").is_err());
@@ -1045,7 +1045,7 @@ fn test_parse_let() {
     assert!(parser.parse("let func (x) y = x + y").is_err());
     // Ok typed
     assert!(parser.parse("let z: 'a = \"hi\";").unwrap() == ast::Statement::TypedLet(
-        String::from("z"), ast::TypeExpression::TypeVariable(String::from("a")), vec![], ast::Expression::StringLiteral(String::from("hi"))
+        String::from("z"), ast::TypeExpression::UniversalType(String::from("a")), vec![], ast::Expression::StringLiteral(String::from("hi"))
     ));
     assert!(parser.parse("let y: float = 5.68;").unwrap() == ast::Statement::TypedLet(
         String::from("y"), ast::TypeExpression::FloatType, vec![], ast::Expression::FloatLiteral(OrderedFloat(5.68))
@@ -1070,7 +1070,7 @@ fn test_parse_let() {
         String::from("func"),
         ast::TypeExpression::FunctionType(
             Box::new(ast::TypeExpression::IntType),
-            Box::new(ast::TypeExpression::DeclaredType(String::from("Option"), vec![ast::TypeExpression::TypeVariable(String::from("a"))]))
+            Box::new(ast::TypeExpression::DeclaredType(String::from("Option"), vec![ast::TypeExpression::UniversalType(String::from("a"))]))
         ),
         vec![(String::from("x"), ast::TypeExpression::DeclaredType(String::from("bool"), vec![]))],
         ast::Expression::Lambda(
@@ -1118,7 +1118,7 @@ fn test_parse_type_decl() {
     assert!(parser.parse("type Option 'a = None | Some with 'a;").unwrap() == ast::Statement::TypeDeclaration(
         String::from("Option"), vec![String::from("a")], vec![
             (String::from("None"), None),
-            (String::from("Some"), Some(ast::TypeExpression::TypeVariable(String::from("a"))))
+            (String::from("Some"), Some(ast::TypeExpression::UniversalType(String::from("a"))))
         ]
     ));
     assert!(parser.parse("type Thingy = Var1
@@ -1145,9 +1145,9 @@ fn test_parse_type_decl() {
         String::from("binary_tree"), vec![String::from("a")], vec![
             (String::from("Leaf"), None),
             (String::from("Node"), Some(ast::TypeExpression::TupleType(vec![
-                ast::TypeExpression::TypeVariable(String::from("a")),
-                ast::TypeExpression::DeclaredType(String::from("binary_tree"), vec![ast::TypeExpression::TypeVariable(String::from("a"))]),
-                ast::TypeExpression::DeclaredType(String::from("binary_tree"), vec![ast::TypeExpression::TypeVariable(String::from("a"))])
+                ast::TypeExpression::UniversalType(String::from("a")),
+                ast::TypeExpression::DeclaredType(String::from("binary_tree"), vec![ast::TypeExpression::UniversalType(String::from("a"))]),
+                ast::TypeExpression::DeclaredType(String::from("binary_tree"), vec![ast::TypeExpression::UniversalType(String::from("a"))])
             ])))
         ]
     ));
@@ -1174,13 +1174,13 @@ fn test_parse_program() {
         let z = f double 4; 
     ").unwrap() == vec![
         ast::Statement::TypedLet(
-            String::from("f"), ast::TypeExpression::TypeVariable(String::from("a")), vec![(
+            String::from("f"), ast::TypeExpression::UniversalType(String::from("a")), vec![(
                 String::from("g"), ast::TypeExpression::FunctionType(
-                    Box::new(ast::TypeExpression::TypeVariable(String::from("a"))),
-                    Box::new(ast::TypeExpression::TypeVariable(String::from("a")))
+                    Box::new(ast::TypeExpression::UniversalType(String::from("a"))),
+                    Box::new(ast::TypeExpression::UniversalType(String::from("a")))
                 )
             ), (
-                String::from("x"), ast::TypeExpression::TypeVariable(String::from("a"))
+                String::from("x"), ast::TypeExpression::UniversalType(String::from("a"))
             )], ast::Expression::FuncApplication(
                 Box::new(ast::Expression::Identifier(String::from("g"))),
                 Box::new(ast::Expression::Identifier(String::from("x")))
@@ -1213,11 +1213,11 @@ fn test_parse_program() {
         };
     ").unwrap() == vec![
         ast::Statement::TypeDeclaration(String::from("Option"), vec![String::from("a")], vec![
-            (String::from("None"), None), (String::from("Some"), Some(ast::TypeExpression::TypeVariable(String::from("a"))))
+            (String::from("None"), None), (String::from("Some"), Some(ast::TypeExpression::UniversalType(String::from("a"))))
         ]),
         ast::Statement::TypedLet(
             String::from("print_optional"), ast::TypeExpression::StringType,
-            vec![(String::from("x"), ast::TypeExpression::DeclaredType(String::from("Option"), vec![ast::TypeExpression::TypeVariable(String::from("a"))]))],
+            vec![(String::from("x"), ast::TypeExpression::DeclaredType(String::from("Option"), vec![ast::TypeExpression::UniversalType(String::from("a"))]))],
             ast::Expression::MatchConstruct(
                 Box::new(ast::Expression::Identifier(String::from("x"))),
                 vec![(
@@ -1249,16 +1249,16 @@ fn test_parse_program() {
         ast::Statement::TypeDeclaration(String::from("OptionalTuple"), vec![String::from("a"), String::from("b")], vec![
             (String::from("None"), None),
             (String::from("Some"), Some(ast::TypeExpression::TupleType(vec![
-                ast::TypeExpression::TypeVariable(String::from("a")),
-                ast::TypeExpression::TypeVariable(String::from("b"))
+                ast::TypeExpression::UniversalType(String::from("a")),
+                ast::TypeExpression::UniversalType(String::from("b"))
             ])))
         ]),
         ast::Statement::TypedLet(String::from("f"), ast::TypeExpression::DeclaredType(String::from("OptionalTuple"), vec![
-            ast::TypeExpression::TypeVariable(String::from("a")),
-            ast::TypeExpression::TypeVariable(String::from("b"))
+            ast::TypeExpression::UniversalType(String::from("a")),
+            ast::TypeExpression::UniversalType(String::from("b"))
         ]), vec![
-            (String::from("x"), ast::TypeExpression::TypeVariable(String::from("a"))),
-            (String::from("y"), ast::TypeExpression::TypeVariable(String::from("b")))
+            (String::from("x"), ast::TypeExpression::UniversalType(String::from("a"))),
+            (String::from("y"), ast::TypeExpression::UniversalType(String::from("b")))
         ],
         ast::Expression::TypeVariant(String::from("Some"), Box::new(ast::Expression::Tuple(vec![
             ast::Expression::Identifier(String::from("x")),

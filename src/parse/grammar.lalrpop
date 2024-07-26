@@ -220,7 +220,7 @@ AtomicTypeExpr: ast::TypeExpression = {
     "[" <te: TypeExpression> "]" => ast::TypeExpression::ListType(Box::new(te)),
     "(" <te: TypeExpression> ")" => te,
     "(" <tes: SepTuple<TypeExpression, ",">> ")" => ast::TypeExpression::TupleType(tes),
-    <tvar: TypeVar> => ast::TypeExpression::TypeVariable(tvar),
+    <tvar: TypeVar> => ast::TypeExpression::UniversalType(tvar),
 }
 
 NonFuncTypeExpr: ast::TypeExpression = {

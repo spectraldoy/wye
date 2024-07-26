@@ -1,0 +1,30 @@
+(*
+For every i <= n, print Fizz if i is divisible by 3, 
+print Buzz if i is divisble by 5,
+print FizzBuzz if i is divisible by both 3 and 5
+*)
+
+let n = 24;
+
+# return remainder of dividing x by y
+let rem x y = x - ((x // y) * y);
+
+# int -> string
+let fizzbuzz x = match x <= 0 {
+    true => "",
+    false => {
+        let prefix = fizzbuzz (x - 1);
+        let fizz = match (rem x 3) {
+            0 => "Fizz",
+            _ => ""
+        };
+        let buzz = match (rem x 5) {
+            0 => "Buzz\n",
+            _ if fizz != "" => "\n",
+            _ => ""
+        };
+        (prefix + fizz) + buzz
+    }
+};
+
+let Main = print (fizzbuzz n);

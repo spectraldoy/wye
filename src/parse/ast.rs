@@ -70,13 +70,13 @@ pub enum TypeExpression {
     DeclaredType(String, Vec<TypeExpression>),
     ListType(Box<TypeExpression>),
     TupleType(Vec<TypeExpression>),
-    TypeVariable(String),
+    UniversalType(String),
     FunctionType(Box<TypeExpression>, Box<TypeExpression>),
     // TODO: right now the type checker is the only entity that creates type expressions
     // of this variant. However, this can and should be the responsibility of the parser
     // as it is reasonably construed as part of the AST. Thus, long-term the parser should
     // be responsibly for creating such inferrable types
-    InferredType(String)
+    InferableType(String)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
