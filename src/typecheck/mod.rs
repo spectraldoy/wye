@@ -25,18 +25,6 @@ impl<'a> TypeChecker<'a> {
         let mut declared_typenames: HashMap<String, HashSet<String>> = HashMap::new();
         let mut next_k: usize = 0;
 
-        fn collect_functype(types: &[TypeExpression]) -> TypeExpression {
-            if types.len() == 1 {
-                return types[0].clone();
-            }
-
-            let rest_type = collect_functype(&types[1..]);
-            TypeExpression::FunctionType(
-                Box::new(types[0].clone()),
-                Box::new(rest_type)
-            )
-        }
-
         for stmt in program {
             match stmt {
                 Statement::UntypedLet(ids, _) => {
@@ -50,17 +38,21 @@ impl<'a> TypeChecker<'a> {
                             varname
                         ));
                     }
+
                     // guess a type for each id
-                    let (types, type_variables): (Vec<TypeExpression>, HashSet<String>) = ids
+                    let types: Vec<TypeExpression> = ids
                         .iter()
                         .map(|_| {
-                            let typevar_name = util::next_typevar_name(&mut next_k);
-                            (TypeExpression::TypeVariable(typevar_name.clone()), typevar_name)
+                            let inftype_name = util::typevar_name(next_k);
+                            next_k += 1;
+                            TypeExpression::InferredType(inftype_name)
                         })
-                        .unzip();
-
-                    let id_type = collect_functype(&types[..]);
-                    // every type is quantified over
+                        .collect::<_>();
+                    
+                    let id_type = util::collect_functype(&types[..]);
+                    
+                    // we don't actually yet know which argument types are forall types
+                    let type_variables: HashSet<String> = HashSet::new();
                     context.insert(varname.clone(), (type_variables, id_type));
                 },
                 Statement::TypedLet(varname, out_type, args, _) => {
@@ -87,7 +79,7 @@ impl<'a> TypeChecker<'a> {
                         .collect::<_>();
 
                     types.push(out_type.clone());
-                    let id_type = collect_functype(&types[..]);
+                    let id_type = util::collect_functype(&types[..]);
                     context.insert(varname.clone(), (type_variables, id_type));
                 },
                 Statement::TypeDeclaration(typename, typevars, variants) => {
@@ -127,63 +119,6 @@ impl<'a> TypeChecker<'a> {
             }
         }
 
-        fn type_check_variant_fields(
-            type_expression: &TypeExpression,
-            type_vars_in_scope: &HashSet<String>,
-            declared_typenames: &HashMap<String, HashSet<String>>
-        ) -> Result<(), String> {
-            match type_expression {
-                TypeExpression::DeclaredType(decl_type, type_args) => {
-                    if !declared_typenames.contains_key(decl_type) {
-                        return Err(format!("Type {} is not declared", decl_type));
-                    }
-
-                    let expected_num_type_vars = declared_typenames.get(decl_type).unwrap().len();
-                    let actual_num_type_vars = type_args.len();
-                    if expected_num_type_vars != actual_num_type_vars {
-                        Err(format!(
-                            "Expected {} type arguments to declared type {}, got {}",
-                            expected_num_type_vars,
-                            decl_type,
-                            actual_num_type_vars
-                        ))
-                    } else {
-                        type_args
-                        .iter()
-                        .map(|ta| type_check_variant_fields(ta, type_vars_in_scope, declared_typenames))
-                        .fold(Ok(()), |acc, el| acc.and(el))
-                    }
-                },
-                TypeExpression::ListType(te) => {
-                    type_check_variant_fields(te, type_vars_in_scope, declared_typenames)
-                },
-                TypeExpression::TupleType(tup_types) => {
-                    tup_types
-                    .iter()
-                    .map(|t| type_check_variant_fields(t, type_vars_in_scope, declared_typenames))
-                    .fold(Ok(()), |acc, el| acc.and(el))
-                },
-                TypeExpression::TypeVariable(tv) => {
-                    if type_vars_in_scope.contains(tv) {
-                        Ok(())
-                    } else {
-                        Err(format!("Type variable {} not in scope", tv))
-                    }
-                },
-                TypeExpression::FunctionType(te_func, te_arg) => {
-                    type_check_variant_fields(te_func, type_vars_in_scope, declared_typenames)
-                    .and(type_check_variant_fields(te_arg, type_vars_in_scope, declared_typenames))
-                },
-                // int, float, string are all ok
-                _ => Ok(())
-            }
-        }
-
-        // TODO: the type variables that are added for the untyped lets are not the same as
-        // type variables that are used in typed lets and type declarations. The former are primed
-        // for unification as part of the type inference algorithm, whereas the latter are meant to
-        // be as general as possible.
-
         // now that the description of every type in the program is known,
         // vet that the fields of declared types do not contradict any type functions
         // that is, that the fields of variants all are declared to be valid types
@@ -192,11 +127,20 @@ impl<'a> TypeChecker<'a> {
                 None => {},
                 Some(te) => {
                     let type_vars_in_scope = declared_typenames.get(typename).unwrap();
-                    let res = type_check_variant_fields(te, type_vars_in_scope, &declared_typenames);
+                    let res = TypeChecker::vet_type_expr_makes_sense(te, type_vars_in_scope, &declared_typenames);
                     if let Err(e) = res {
                         return Err(e);
                     }
                 }
+            }
+        }
+
+        // also for every typed let in the context, we can ensure that the specified types
+        // have the correct number of type arguments, and otherwise make sense
+        for (_, (type_vars_in_scope, out_type)) in context.iter() {
+            let res = TypeChecker::vet_type_expr_makes_sense(out_type, type_vars_in_scope, &declared_typenames);
+            if res.is_err() {
+                return Err(res.err().unwrap());
             }
         }
 
@@ -208,9 +152,58 @@ impl<'a> TypeChecker<'a> {
             next_k
         })
     }
+    
+    // Ensure that variant fields have reasonable arguments
+    fn vet_type_expr_makes_sense(
+        type_expression: &TypeExpression,
+        type_vars_in_scope: &HashSet<String>,
+        declared_typenames: &HashMap<String, HashSet<String>>
+    ) -> Result<(), String> {
+        match type_expression {
+            TypeExpression::DeclaredType(decl_type, type_args) => {
+                if !declared_typenames.contains_key(decl_type) {
+                    return Err(format!("Type {} is not declared", decl_type));
+                }
 
-    fn x() {
-
+                let expected_num_type_vars = declared_typenames.get(decl_type).unwrap().len();
+                let actual_num_type_vars = type_args.len();
+                if expected_num_type_vars != actual_num_type_vars {
+                    Err(format!(
+                        "Expected {} type arguments to declared type {}, got {}",
+                        expected_num_type_vars,
+                        decl_type,
+                        actual_num_type_vars
+                    ))
+                } else {
+                    type_args
+                    .iter()
+                    .map(|ta| TypeChecker::vet_type_expr_makes_sense(ta, type_vars_in_scope, declared_typenames))
+                    .fold(Ok(()), |acc, el| acc.and(el))
+                }
+            },
+            TypeExpression::ListType(te) => {
+                TypeChecker::vet_type_expr_makes_sense(te, type_vars_in_scope, declared_typenames)
+            },
+            TypeExpression::TupleType(tup_types) => {
+                tup_types
+                .iter()
+                .map(|t| TypeChecker::vet_type_expr_makes_sense(t, type_vars_in_scope, declared_typenames))
+                .fold(Ok(()), |acc, el| acc.and(el))
+            },
+            TypeExpression::TypeVariable(tv) => {
+                if type_vars_in_scope.contains(tv) {
+                    Ok(())
+                } else {
+                    Err(format!("Type variable {} not in scope", tv))
+                }
+            },
+            TypeExpression::FunctionType(te_func, te_arg) => {
+                TypeChecker::vet_type_expr_makes_sense(te_func, type_vars_in_scope, declared_typenames)
+                .and(TypeChecker::vet_type_expr_makes_sense(te_arg, type_vars_in_scope, declared_typenames))
+            },
+            // int, float, string, inferred type (because we don't yet know what to do with it) are all ok
+            _ => Ok(())
+        }
     }
 }
 
