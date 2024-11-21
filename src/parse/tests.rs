@@ -555,7 +555,7 @@ fn test_parse_match() {
 // Type Expressions
 
 #[test]
-fn test_parse_type_lit_type_var() {
+fn test_parse_type_lit_univ_type() {
     let parser = grammar::TypeExpressionParser::new();
     // Ok literal type
     assert!(parser.parse("int").unwrap() == ast::TypeExpression::IntType);
@@ -1265,7 +1265,52 @@ fn test_parse_program() {
             ast::Expression::Identifier(String::from("y"))
         ])))
     )]);
+    assert!(parser.parse("
+        type Option 'a = Some with 'a | None;
+        let x: Option int = Some with 4;
+    ").unwrap() == vec![
+        ast::Statement::TypeDeclaration(String::from("Option"), vec![String::from("a")], vec![
+            (String::from("Some"), Some(ast::TypeExpression::UniversalType(String::from("a")))),
+            (String::from("None"), None)
+        ]),
+        ast::Statement::TypedLet(
+            String::from("x"),            
+            ast::TypeExpression::DeclaredType(String::from("Option"), vec![ast::TypeExpression::IntType]),
+            vec![],
+            ast::Expression::TypeVariant(String::from("Some"), Box::new(ast::Expression::IntegerLiteral(4)))
+        )
+    ]);
+    assert!(parser.parse("
+        type Option 'a = Some with 'a | None;
+        let x: Option int = {
+            let y = 4;
+            Some with y
+        };
+    ").unwrap() == vec![
+        ast::Statement::TypeDeclaration(String::from("Option"), vec![String::from("a")], vec![
+            (String::from("Some"), Some(ast::TypeExpression::UniversalType(String::from("a")))),
+            (String::from("None"), None)
+        ]),
+        ast::Statement::TypedLet(
+            String::from("x"),            
+            ast::TypeExpression::DeclaredType(String::from("Option"), vec![ast::TypeExpression::IntType]),
+            vec![],
+            ast::Expression::Block(
+                vec![
+                    ast::Statement::UntypedLet(vec![String::from("y")], ast::Expression::IntegerLiteral(4))
+                ],
+                Box::new(ast::Expression::TypeVariant(String::from("Some"), Box::new(ast::Expression::Identifier(String::from("y")))))
+            )
+        )
+    ]);
     // Err
+    assert!(parser.parse("
+        let x = {
+            type Option 'a = Some with 'a | None;
+            let y = 4;
+            Some with y
+        };
+    ").is_err());
     assert!(parser.parse("let x = 4 let y = 5").is_err());
     assert!(parser.parse("let x = ylet z = 4").is_err());
 }

@@ -151,7 +151,7 @@ pub Expression: ast::Expression = {
         }
     },
     r"\\" <ids: Identifier+> "->" <body: Expression> => ast::Expression::Lambda(ids, Box::new(body)),
-    "{" <stmts: Statement*> <e: Expression> "}" => {
+    "{" <stmts: LetStatement*> <e: Expression> "}" => {
         ast::Expression::Block(stmts, Box::new(e))
     }
 }
@@ -273,7 +273,7 @@ TypeVariantDeclType: (String, Option<ast::TypeExpression>) = {
     }
 }
 
-pub Statement: ast::Statement = {
+LetStatement: ast::Statement = {
     <let_: Sp<"let">> <ids: Sp<Identifier>+> "=" <e: Expression> ";" =>? {
         if let_.end == ids[0].start {
             Err(ParseError::User {
@@ -306,7 +306,11 @@ pub Statement: ast::Statement = {
         } else {
             Ok(ast::Statement::TypedLet(id.value, te, typed_ids, e)   )
         }
-    },
+    }
+}
+
+pub Statement: ast::Statement = {
+    LetStatement,
     <type_: Sp<"type">> <tid: Sp<Identifier>> <tvars: Sp<TypeVar>*> "=" <variants: SepListAtLeastOne<TypeVariantDeclType, "|">> ";" =>? {
         if type_.end == tid.start {
             Err(ParseError::User {

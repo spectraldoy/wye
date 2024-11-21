@@ -70,6 +70,7 @@ pub enum TypeExpression {
     DeclaredType(String, Vec<TypeExpression>),
     ListType(Box<TypeExpression>),
     TupleType(Vec<TypeExpression>),
+    // Type arguments to type constructors and functions
     UniversalType(String),
     FunctionType(Box<TypeExpression>, Box<TypeExpression>),
     // TODO: right now the type checker is the only entity that creates type expressions

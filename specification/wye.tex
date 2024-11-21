@@ -145,7 +145,7 @@ Tuple \substo& \texttt{(}\: (Expr \: \texttt{,})+\: Expr\: \texttt{)}\\
 BuiltinOp \substo& \texttt{+}\sepbar\texttt{-}\sepbar\texttt{*}\sepbar\texttt{/}\sepbar\texttt{//}\sepbar\texttt{::}\sepbar\texttt{<}\sepbar\texttt{<=}\sepbar\texttt{>}\sepbar\texttt{>=}\sepbar\texttt{==}\sepbar\texttt{!=}\\
 Pat \substo& \uscore \sepbar IntLiteral\sepbar FloatLiteral\sepbar StringLiteral\sepbar Id \\
 & \sepbar Id\:\texttt{::}\: Id\:\langle\text{head : tail list destructuring}\rangle\\
-& \sepbar TypeId \: \texttt{with}\: Pat\\
+& \sepbar TypeId \: (\texttt{with}\: Pat)?\\
 & \sepbar \texttt{[} \: ( Pat\:\texttt{,})*\: Pat \: \texttt{]} \sepbar  \texttt{[]}\\
 & \sepbar \texttt{(} \: ( Pat\:\texttt{,})+\: Pat\: \texttt{)}\\
 & \sepbar \sim\:Pat \:\langle\text{pattern complement}\rangle\\
@@ -423,13 +423,21 @@ let f (x: 'a) -> (y: 'b) -> OptionalTuple 'a 'b = Some with (x, y);
 let j = f "hello" 4;
 \end{lstlisting}
 
-\subsubsection{Type inference}
+\newpage
+\section{Type inference}
 
-Wye is a statically typed language, and due to its Hindley-Milner type system, it is able to infer the types of expressions (and thus variables) at compile-time. The exact rules for the type system will be discussed in greater detail in the Type Checking section of this document. However, it is important to note that Wye expressions, when not annotated with a type, are typed to the \textit{most general possible type}. For example, in the following code:
+Wye is a statically typed language, and due to its Hindley-Milner type system, it is able to infer the types of expressions (and thus variables) at compile-time. The exact rules for the type system will be discussed in greater detail in this section. Moreover, we will go over how exactly type inference is implemented in the Wye type checker.
+
+It is important to note that Wye expressions, when not annotated with a type, are typed to the \textit{most general possible type}. For example, in the following code:
 \begin{lstlisting}{wye}
 let cons x lst = x :: lst;
 \end{lstlisting}
-the function \texttt{cons} type checks to the functional type \texttt{'a -> ['a] -> 'a}. For more information, check out the \href{{https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system}}{the Hindley-Milner type system}.
+the function \texttt{cons} type checks to the function type \texttt{'a -> ['a] -> 'a}. The interested reader should explore \href{{https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system}}{the Hindley-Milner type system}.
+
+\section{Wye's Type System}
+
+This section dives into great detail about the typing rules that make type inference in Wye possible. It greatly references Typing Haskell in Haskell, a tutorial on describing the typing rules of Haskell.
+
 \newpage
 \section{Type Checking}
 

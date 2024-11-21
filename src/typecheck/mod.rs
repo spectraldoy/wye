@@ -1,4 +1,5 @@
 mod util;
+mod infer;
 
 use crate::parse::ast::{Statement, TypeExpression, Expression};
 use std::collections::{HashMap, HashSet};
@@ -7,7 +8,11 @@ pub struct TypeChecker<'a> {
     // program to type check
     program: &'a Vec<Statement>,
     // declared variable -> (universally quantified types, type)
-    context: HashMap<String, (HashSet<String>, TypeExpression)>,
+    // this is also a type environment. but the term type environment will be reserved
+    // specifically for type checking expressions and subexpressions. Thus the context
+    // is essentially the top-level of the Wye program, and the type environment can grow
+    // or shrink as you enter nested scopes
+    type_context: HashMap<String, (HashSet<String>, TypeExpression)>,
     // map of declared typename to type variables
     declared_typenames: HashMap<String, HashSet<String>>,
     // declared type variant -> type name, field type
@@ -21,7 +26,7 @@ impl<'a> TypeChecker<'a> {
     pub fn new(program: &'a Vec<Statement>) -> Result<Self, String> {        
         // first we gather the declared types and assign initial types
         // to the let statements
-        let mut context: HashMap<String, (HashSet<String>, TypeExpression)> = HashMap::new();
+        let mut type_context: HashMap<String, (HashSet<String>, TypeExpression)> = HashMap::new();
         let mut type_variants: HashMap<String, (String, Option<TypeExpression>)> = HashMap::new();
         let mut declared_typenames: HashMap<String, HashSet<String>> = HashMap::new();
         let mut next_k: usize = 0;
@@ -30,7 +35,7 @@ impl<'a> TypeChecker<'a> {
             match stmt {
                 Statement::UntypedLet(ids, _) => {
                     let varname = &ids[0];
-                    if context.contains_key(varname) {
+                    if type_context.contains_key(varname) {
                         return Err(format!("Redefinition of variable {}", varname));
                     }
                     if type_variants.contains_key(varname) {
@@ -54,10 +59,10 @@ impl<'a> TypeChecker<'a> {
                     
                     // we don't actually yet know which argument types are forall types
                     let univ_types: HashSet<String> = HashSet::new();
-                    context.insert(varname.clone(), (univ_types, id_type));
+                    type_context.insert(varname.clone(), (univ_types, id_type));
                 },
                 Statement::TypedLet(varname, out_type, args, _) => {
-                    if context.contains_key(varname) {
+                    if type_context.contains_key(varname) {
                         return Err(format!("Redefinition of variable {}", varname));
                     }
                     if type_variants.contains_key(varname) {
@@ -83,7 +88,7 @@ impl<'a> TypeChecker<'a> {
 
                     types.push(out_type.clone());
                     let id_type = util::collect_functype(&types[..]);
-                    context.insert(varname.clone(), (univ_types, id_type));
+                    type_context.insert(varname.clone(), (univ_types, id_type));
                 },
                 Statement::TypeDeclaration(typename, univ_types, variants) => {
                     if declared_typenames.contains_key(typename) {
@@ -140,16 +145,16 @@ impl<'a> TypeChecker<'a> {
 
         // also for every typed let in the context, we can ensure that the specified types
         // have the correct number of type arguments, and otherwise make sense
-        for (_, (univ_types_in_scope, out_type)) in context.iter() {
+        for (_, (univ_types_in_scope, out_type)) in type_context.iter() {
             let res = TypeChecker::check_type_expr_in_context(out_type, univ_types_in_scope, &declared_typenames);
-            if res.is_err() {
-                return Err(res.err().unwrap());
+            if let Err(e) = res {
+                return Err(e);
             }
         }
 
         Ok(Self {
             program,
-            context,
+            type_context,
             declared_typenames,
             type_variants,
             next_k
@@ -212,7 +217,8 @@ impl<'a> TypeChecker<'a> {
 
 // Type inference impl
 impl<'a> TypeChecker<'a> {
-    
+    // a substitution is a mapping from inferable type names to type expressions to substite them with
+    // String -> TypeExpression
 }
 
 // Type checking impl
@@ -240,7 +246,7 @@ impl<'a> TypeChecker<'a> {
         // but in order for this to happen, the arguments to the function need to be added
         // to the context available in which to type check the expression
         // so we need to create a new context here and pass that into the expression type checker
-        let t = self.type_check_expression(expr, &self.context);
+        let t = self.type_check_expression(expr, &self.type_context);
 
         Ok(())
     }
