@@ -1,5 +1,6 @@
 /target
 /specification/*
+/specification_old
 /research
 !/specification/*.pdf
 !/specification/*.bib

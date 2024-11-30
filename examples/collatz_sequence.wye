@@ -1,20 +1,42 @@
-(*
-Generate the Collatz sequence starting at the input x
-*)
-# return remainder of dividing x by y
-let rem (x: int) -> (y: int) -> int = x - ((x // y) * y);
+(* Generate the Collatz sequence starting at an input x *)
 
-let collatz_sequence (x: int) -> [int] = match x {
-    # ignore negative numbers
-    _ if x < 0 => [],
-    # if we're at 1, terminate
-    1 => [1],
-    # otherwise we add x to the sequence and recursively enumerate the rest
-    # if x is even, divide by 2
-    _ if (rem x 2) == 0 => x :: (collatz_sequence (x // 2)),
-    # if we reach here, x is odd, so we multiply by 3 and add 1
-    _ => x :: (collatz_sequence ((3 * x) + 1))
-};
+struct CollatzSeq
+    len: int
+    sequence: [int]
+end
 
-# currently Wye does not take user input, so we specify the input manually
-let Main = print (collatz_sequence 97);
+struct Sequence {
+    len: int,
+    _sequence: [int],
+}
+
+# This is janky
+main
+    let mod (a: int) -> (b: int) -> int = a - ((a // b) * b),
+    let collatz_sequence (x: int) -> [int] =
+    match x
+        case x < 1 => []
+        1 => [1]
+        case (mod x 2) == 0 => x :: (collatz_sequence (x // 2))
+        _ => x :: (collatz_sequence ((3 * x) + 1))
+    end,
+    let seq = print (collatz_sequence 97)
+end
+
+match bruh:
+    case x:
+        do something
+    case y:
+        do something
+
+# Go back to the semicolons and commas and braces?
+main {
+    let mod (a: int) -> (b: int) -> int = a - ((a // b) * b) in
+    let collatz_sequence (x: int) -> [int] = match x {
+        case x < 1 => [],
+        1 => [1],
+        case (mod x 2) == 0 =>
+            x :: (collatz_sequence (x // 2)),
+        _ => x :: (collatz_sequence ((3 * x) + 1)),
+    };
+}

@@ -4,6 +4,7 @@ use super::util;
 use ordered_float::OrderedFloat;
 use lalrpop_util::ParseError;
 
+// TODO: % is the comment operator
 grammar;
 
 // Comments

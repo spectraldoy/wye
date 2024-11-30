@@ -1,5 +1,7 @@
 use super::span::Spanned;
 
+pub type OptionBox<T> = Option<Box<T>>;
+
 pub fn spans_overlap(spans: &Vec<(usize, usize)>) -> bool {
     if spans.len() == 0 {
         return false;
@@ -29,9 +31,7 @@ pub fn collect_function<T: Clone>(
     // Check spans do not overlap
 
     let mut spans = vec![(first_func.start, first_func.end)];
-    args.iter().for_each(|a| {
-        spans.push((a.start, a.end))
-    });
+    args.iter().for_each(|a| spans.push((a.start, a.end)));
     if spans_overlap(&spans) {
         return Err("Space required between tokens to constitute a syntactically valid function application");
     }
@@ -40,11 +40,8 @@ pub fn collect_function<T: Clone>(
     if args.len() == 1 {
         Ok(mapper(first_func.value, args[0].value.clone()))
     } else {
-        let actual_func = collect_function::<T>(
-            first_func,
-            args[..args.len() - 1].to_vec(),
-            mapper
-        );
+        let actual_func =
+            collect_function::<T>(first_func, args[..args.len() - 1].to_vec(), mapper);
         match actual_func {
             Ok(func) => Ok(mapper(func, args[args.len() - 1].value.clone())),
             Err(e) => Err(e),

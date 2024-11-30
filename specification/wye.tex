@@ -40,7 +40,7 @@
   keywordstyle=\color{darkgreen}\bfseries,
   keywords=[2]{int, string, float},
   keywordstyle=[2]\color{blue},
-  comment=[l]{\#},
+  comment=[l]{;},
   commentstyle=\color{gray},
   identifierstyle=\color{black},
   stringstyle=\color{red},
@@ -63,16 +63,20 @@
 \newcommand{\sepbar}{\: | \:}	% separated bar
 \newcommand{\substo}{\quad\rightarrow\quad}
 \newcommand{\uscore}{\underline{\hspace{0.3cm}}}
-\newcommand{\version}{1.0.0}
+\newcommand{\version}{2.0.0}
 \newcommand{\dedrule}[2]{\begin{align*}\frac{$1}{$2}\end{align*}}
 \newcommand{\free}{\text{free}}
+\renewcommand{\tt}{\texttt}
+\newcommand{\la}{\langle}
+\newcommand{\ra}{\rangle}
 
 % --- Document ---
+\allowdisplaybreaks
 \begin{document}
 
 % --- Title ---
 \title{
-\textsc{Wye: a Functional Language} \\
+\textsc{Wye: an Interface-Oriented Language} \\
 \vspace{2ex}
 \large{\textsc{Version \version}}\\
 \vspace{2ex}}
@@ -86,408 +90,186 @@
 
 % --- Abstract --- 
 \begin{abstract}
-To learn more about functional languages and compilers, I decided to build a functional language. This language is intended not only to have a minimal set of features so that it be relatively easy to implement, but also to be useful. As functional programming is based upon the lambda calculus, I have decided to name the language Wye, as $\mathsf{y}$ is $\lambda$ upside-down.
+Wye started out as a project to learn more about compilers. It turned into an
+epic journey through the beautiful areas of type theory, the lambda calculus,
+and programming language design. Though originally intended to be a compiled,
+pure-functional language, Wye succumbed to my ideas about
+``interface-orientation," as opposed to object-orientation. Wye retains features
+of functional languages such as its basis in the lambda calculus, fast type
+inference, and a focus on functional rather than imperative design.
+Nevertheless, its functional origins are indicated in its name, as $\mathsf{y}$
+is $\lambda$ upside-down.
 
-This document will compile the specification of Wye: its syntax, semantics, type system, intermediate representation, register allocation, and finally its translation into an assembly language of choice.
+This document compiles the specification of Wye: its syntax, semantics, type
+system, intermediate representation, register allocation, and finally its
+translation into an assembly language of choice.
 \end{abstract}
 
 % --- Body ---
 \section{Introduction}
-Wye is a statically-typed functional language based on the lambda calculus. It utilizes a Hindley-Milner type system, which enables both parametric polymorphism and type inference. For clarity of your code, and to aid the compiler, Wye allows the annotation of types of Wye variables. Wye also allows the declaration of custom types.
+Wye is a statically-typed, interface-oriented, functional language. Wye is
+heavily inspired by Rust, Haskell, and OCaml, as well as object-oriented
+languages like C++. It utilizes a Hindley-Milner type system augmented with
+basic record types (\tt{struct}s), bounded interfaces, enumerations, pattern
+matching, and so on. Wye's ``interface-orientation'' combined with its
+underlying Hindley-Milner type system, enables perfect type-inference
+simultaneously with encapsulation and code-sharing, while preventing as much as
+possible the the messiness that OOP can become.
+
+For clarity of your code, and to aid the compiler, Wye allows the annotation of
+types of variables.
 
 \subsection{Features that Wye does not have}
 
-\subsubsection{Type Classes}
-The original ideas for Wye included the ability to create Haskell-like Type Classes, between which one could establish subtype relations, and moreover, by which type variables could be bound (for example, one could annotate that a function argument generalize over all \texttt{'Ordered} types, instead of all types). Due to the added complexity of implementing such a system, Type Classes are deferred to a later version of Wye.
-
 \subsubsection{List Comprehension}
-List comprehension should not be too hard to implement compared to the rest of this project, but it will require some additions to the grammar, and so in keeping with the idea of a minimal set of features, are also deferred to a future version.
+List comprehension should not be too hard to implement compared to the rest of
+this project, but it will require some additions to the grammar, and is not
+a strong focus of the initial versions of Wye.
 
 \subsubsection{User Input}
-In Wye version \version{}, users may only output to the screen. Taking user input is slightly more complicated and is thus deferred to a future version of Wye.
+In Wye version \version{}, users may only output to the screen. Taking user
+input is slightly more complicated and is thus deferred to a future version of
+Wye.
 
 \subsubsection{Type Aliases}
-Similar to TypeScript, it would be nice if the user could do something like the following to create an abbreviation for a type:
+Similar to TypeScript, it would be nice if the user could do something like the
+following to create an abbreviation for a type:
 \begin{lstlisting}{wye}
-# just a tuple-type of length 2
+; just a tuple-type of length 2
 type Pair 'a 'b = ('a, 'b);
 \end{lstlisting}
 
 \section{Syntax}
-A Wye program is stored in a \texttt{.wye} file and is, in its most abstract view, simply a sequence of Wye statements.
+A Wye program is stored in a \tt{.wye} file and is, in its most abstract
+view, simply a sequence of Wye statements.
 
-Witten below in Backus-Naur form is roughly the Wye grammar. The start symbol is $Program$. Nonterminals start with a capital letter. Terminals are written in \texttt{this font}. $pat*$ denotes the Kleene star: zero or more repetitions of the pattern $pat$. $pat+$ is a shorthand for $pat\: pat*$. $pat?$ denotes that $pat$ may or may not occur. $( pat_1\:...\: pat_n )$ groups $pat_1, ..., pat_n$ into a new pattern in which each $pat_i$ is to occur in the specified sequence. $pat1 | pat2$ means that exactly one of $pat1$ or $pat2$ may occur. Beware that \texttt{|} and $|$ are different -- the first is a Wye token. $\langle$These brackets$\rangle$ are used to annotate certain grammar rules.
+Written below in Backus-Naur form is roughly the Wye grammar. The start symbol is
+$Program$. Nonterminals start with a capital letter. Terminals are written in
+\tt{this font}. $pat*$ denotes the Kleene star: zero or more repetitions of
+the pattern $pat$. $pat+$ is a shorthand for $pat\: pat*$. $pat?$ denotes that
+$pat$ may or may not occur. $( pat_1\:...\: pat_n )$ groups $pat_1, ..., pat_n$
+into a new pattern in which each $pat_i$ is to occur in the specified sequence.
+$pat1 | pat2$ means that exactly one of $pat1$ or $pat2$ may occur. Beware that
+\tt{|} and $|$ are different -- the first is a Wye token. $\la$These
+brackets$\ra$ are used to annotate certain grammar rules. $\symbol{92}n$ refers
+to a newline or carriage return.
 
 \subsection{Grammar}
+\subsubsection{Top-level non-terminals}
 \begin{align*}
 Program \substo& Statement+\\
-Statement \substo& LetStatement \sepbar TypeDeclaration\\
-LetStatement \substo& \texttt{let}\: Id \: (\texttt{:}\: Type\sepbar Id* \sepbar (\texttt{(}Id\: \texttt{:}\:Type\texttt{)}\:\texttt{->})+\:Type)?\:\texttt{=}\: Expr\:\texttt{;}\\
-TypeDeclaration \substo& \texttt{type}\: TypeId\: (\texttt{'}\: Id)*\: \texttt{=} \: (TypeId \: (\texttt{with}\: Type)?)\\
-&(\texttt{|}\:TypeId \: (\texttt{with}\: Type)?)*\:\texttt{;}\\
-Expr\substo& IntLiteral \sepbar FloatLiteral \sepbar StringLiteral \sepbar List \sepbar Tuple\\
-& \sepbar Id \sepbar BuiltinOp \sepbar \texttt{print} \sepbar \texttt{error}\:\langle\text{variable within scope}\rangle\\
-& \sepbar TypeId\: (\texttt{with}\: Expr)?\: \langle\text{Type variant}\rangle\\
-& \sepbar Expr\:Expr\:\langle\text{function application}\rangle\\
-& \sepbar Expr \: BuiltinOp \: Expr\:\langle\text{reserved binary operator}\rangle \\
-& \sepbar \texttt{match}\: Expr \: \texttt{\{} \: (Pat \: \texttt{=>}\: Expr\: \texttt{,})*\: Pat\texttt{ => } Expr \: (\texttt{,}?) \: \texttt{\}} \\
-& \sepbar \texttt{\symbol{92}}\:Id+\: \texttt{->}\: Expr\:\langle\text{lambda expression}\rangle \\ 
-& \sepbar \texttt{(}\: Expr \:\texttt{)}\\
-& \sepbar \texttt{\{}\: Statement*\: Expr\texttt{\}} \:\langle \text{let .. in block}\rangle\\
-Type \substo& \texttt{int} \sepbar \texttt{float} \sepbar \texttt{string}\\
-& \sepbar TypeId\: (Type)*\\
-& \sepbar \texttt{[}\:Type\:\texttt{]}\\
-& \sepbar \texttt{(} \: (Type\: \texttt{,} )+\: Type\: \texttt{)}\\
-& \sepbar \texttt{'}\:Id \: \langle\text{type variable}\rangle\\
-& \sepbar Type \: \texttt{-> }Type\:\langle\text{function type}\rangle\\
-List \substo& \texttt{[}\: (Expr \: \texttt{,})*\: Expr\: \texttt{]} \sepbar \texttt{[]}\\
-Tuple \substo& \texttt{(}\: (Expr \: \texttt{,})+\: Expr\: \texttt{)}\\
-BuiltinOp \substo& \texttt{+}\sepbar\texttt{-}\sepbar\texttt{*}\sepbar\texttt{/}\sepbar\texttt{//}\sepbar\texttt{::}\sepbar\texttt{<}\sepbar\texttt{<=}\sepbar\texttt{>}\sepbar\texttt{>=}\sepbar\texttt{==}\sepbar\texttt{!=}\\
-Pat \substo& \uscore \sepbar IntLiteral\sepbar FloatLiteral\sepbar StringLiteral\sepbar Id \\
-& \sepbar Id\:\texttt{::}\: Id\:\langle\text{head : tail list destructuring}\rangle\\
-& \sepbar TypeId \: (\texttt{with}\: Pat)?\\
-& \sepbar \texttt{[} \: ( Pat\:\texttt{,})*\: Pat \: \texttt{]} \sepbar  \texttt{[]}\\
-& \sepbar \texttt{(} \: ( Pat\:\texttt{,})+\: Pat\: \texttt{)}\\
-& \sepbar \sim\:Pat \:\langle\text{pattern complement}\rangle\\
-& \sepbar Pat\: (\texttt{|}\: Pat)+\:\langle\text{pattern union}\rangle\\
-& \sepbar Pat\:\texttt{if}\: Expr\:\langle\text{guarded pattern}\rangle
+Statement \substo& Expr \sepbar EnumDecl \sepbar StructDecl\\
+&\sepbar InterfaceDecl \sepbar ImplBlock \sepbar Main\\
+Main \substo& \tt{main \symbol{92}n}\: Expr \: \tt{end}
 \end{align*}
-\pagebreak
+\subsubsection{Expressions}
+\begin{align*}
+Expr \substo& IntLiteral \sepbar FloatLiteral \sepbar StringLiteral\\
+&\sepbar List \sepbar Tuple \sepbar AnonRecord\\
+&\sepbar Id \sepbar BuiltinOp\\
+&\sepbar \tt{print} \sepbar \tt{error}\\
+&\sepbar TypeId\tt{.}TypeId \: (\tt{with} \: Expr) \: \la\text{enum variant}\ra \\
+&\sepbar Expr \: Expr \: \la\text{function application}\ra \\
+&\sepbar Expr \: BuiltinOp \: Expr \: \la\text{reserved binary op}\ra \\
+&\sepbar \tt{match}\: Expr\: \tt{\symbol{92}n} \:(Pat \: \tt{=>} \: Expr\:\tt{\symbol{92}n})* Pat \: \tt{=>} \: Expr\:\tt{end}\\
+&\sepbar \tt{\symbol{92}}\:Id\: \tt{->}\: Expr\:\la\text{lambda expression}\ra \\
+&\sepbar Id\tt{.}Id \: \la\text{member access}\ra\\
+&\sepbar Id\tt{\#}Id \: \la\text{method access}\ra\\
+&\sepbar \tt{(}\: Expr \: \tt{)}\\
+&\sepbar LetExpr \: (\tt{in}\: Expr)?\\
+&\sepbar AttrSet\\
+List \substo& \tt{[}\: (Expr \: \tt{,})*\: Expr\: \tt{]} \sepbar \tt{[]}\\
+Tuple \substo& \tt{(}\: (Expr \: \tt{,})+\: Expr\: \tt{)}\\
+AnonRecord \substo& \tt{\{} (Id\tt{:} Expr\tt{,})+ (Id\tt{:} Expr\: \tt{,}?) \tt{\}}\\
+BuiltinOp \substo& \tt{+}\sepbar\tt{-}\sepbar\tt{*}\sepbar\tt{/}\sepbar\tt{//}\sepbar\tt{::}\sepbar\tt{<}\sepbar\tt{<=}\sepbar\tt{>}\sepbar\tt{>=}\sepbar\tt{==}\sepbar\tt{!=}\\
+Pat \substo& \uscore \sepbar IntLiteral\sepbar FloatLiteral\sepbar StringLiteral\sepbar Id \\
+& \sepbar Id\:\tt{::}\: Id\:\la\text{head::tail list destructuring}\ra\\
+& \sepbar TypeId \: (\tt{with}\: Pat)?\\
+& \sepbar \tt{[} \: ( Pat\:\tt{,})*\: Pat \: \tt{]} \sepbar  \tt{[]}\\
+& \sepbar \tt{(} \: ( Pat\:\tt{,})+\: Pat\: \tt{)}\\
+& \sepbar \tt{\{} \: (Id\tt{:}Pat\tt{,})*\: (Id\tt{:}Pat\: \tt{,}?) (\tt{,}\:\uscore)?\: \tt{\}}\\
+& \sepbar \sim\:Pat \:\la\text{pattern complement}\ra\\
+& \sepbar Pat\: (\tt{|}\: Pat)+\:\la\text{pattern union}\ra\\
+& \sepbar Pat\:\tt{if}\: Expr\:\la\text{guarded pattern}\ra\\
+& \sepbar \tt{case}\: Expr\:\la\text{check boolean }Expr\ra\\
+LetExpr \substo& \tt{let}\: Id \:(\tt{:} Type)? \: \tt{=} \: Expr\\
+&\sepbar \tt{let}\: Id \: Id+ \: \tt{=} \: Expr\\
+&\sepbar \tt{let}\: Id \: (\: \tt{(} Id\tt{:} Type \tt{)}\: \tt{->} \:)+ Type \: \tt{=}\: Expr\\
+AttrSet \substo& \tt{set}\: Id\tt{.}Id\: \tt{=} \:Expr\\
+\end{align*}
+\subsubsection{Structures and interfaces}
+\begin{align*}
+EnumDecl \substo& \tt{enum}\: TypeId \: (\tt{'}\: TypeId?\: Id)* \: \texttt{=} \: (TypeId \: (\texttt{with}\: Type)?)\\
+&(\texttt{|}\:TypeId \: (\texttt{with}\: Type)?)*\\
+StructDecl \substo& \tt{struct}\: Id \: (\tt{'}\: TypeId?\: Id)*\: \tt{\symbol{92}n} \: (Id\tt{:} Type\: \tt{\symbol{92}n})+\: \tt{end}\\
+InterfaceDecl \substo& \tt{interface}\: Id\: ( \tt{requires} \: (Id \: \tt{+})*\: Id)? \:  \tt{\symbol{92}n}\\
+&(ValDecl \sepbar MethodImpl \sepbar MethodDecl)+\: \tt{end}\\
+ImplBlock \substo& \tt{impl}\: Id (\tt{'}\: TypeId?\: Id)* \: \tt{:} Id (\tt{'}\: TypeId?\: Id)* \: \tt{\symbol{92}n}\\
+&(AttrSet \sepbar MethodImpl)+\: \tt{end} \\
+ValDecl \substo& \tt{val} \: Id\: \tt{:}\: Type \\
+MethodDecl \substo& \tt{method} \: Id\: \tt{:} \: Type\\\
+MethodImpl \substo& \tt{method} \: Id\: Id*\: \tt{=}\: Expr\\
+&\sepbar \tt{method}\: Id \: (\: \tt{(} Id\tt{:} Type \tt{)}\: \tt{->} \:)+ Type \: \tt{=}\: Expr\\
+\end{align*}
+\subsubsection{Types and type expressions}
+\begin{align*}
+Type \substo& \tt{int} \sepbar \tt{float} \sepbar \tt{string}\\
+& \sepbar TypeId\: (Type)*\\
+& \sepbar \tt{[}\:Type\:\tt{]}\\
+& \sepbar \tt{(} \: (Type\: \tt{,} )+\: Type\: \tt{)}\\
+& \sepbar TypeId? \: \tt{\{}\: \tt{method}?\: Id \: \tt{:}\: Type \: \tt{\}}\\
+& \sepbar \texttt{'}\:TypeId?\: Id \: \la\text{(bounded) type variable}\ra\\
+& \sepbar Type \: \tt{-> }Type\:\la\text{function type}\ra\\
+\end{align*}
+\subsubsection{Notes on the grammar}
+The exact substitution rules for the $Literal$ patterns are omitted to avoid
+boring the reader. If you are reading this, you know what a float is. Similarly,
+the rules for $Id$ and $TypeId$ are omitted, though they are the same: a string
+of digit, lowercase, underscore, or uppercase ASCII characters, not starting
+with a digit. Note that while Wye uses ASCII as its character set for
+identifiers and type names, strings may contain Unicode characters.
 
-The exact substitution rules for the $Literal$ patterns are omitted to avoid boring the reader. If you are reading this, you know what a float is. Similarly, the rules for $Id$ and $TypeId$ are omitted, though they are the same: a string of digit, lowercase, underscore, or uppercase ASCII characters, not starting with a digit. Note that while Wye uses ASCII as its character set for identifiers and type names, strings may contain Unicode characters.
+$Id$s and $TypeId$s should not be any of the builtin keywords such as
+\tt{int}, \tt{float}, \tt{string}, \tt{print}, \tt{match},
+\tt{with}, \tt{requires}, and so on. $Id$s and $TypeId$s must not conflict
+with each other within their scope.
 
-$Id$s and $TypeId$s should not be any of the builtin keywords such as \texttt{int}, \texttt{float}, \texttt{string}, \texttt{print}, \texttt{match}, \texttt{with}, \texttt{if}, and so on. $Id$s and $TypeId$s must not conflict with each other within their scope.
+Notice that \tt{bool} is not a builtin type. This is because the
+$TypeDeclaration$ system of Wye is used to define it in the Wye prelude.
 
-Notice that \texttt{bool} is not a builtin type. This is because the $TypeDeclaration$ system of Wye is used to define it in the Wye prelude.
+One-line Wye comments begin with \tt{;} and mark all following text until
+the next carriage return or newline as whitespace. Multiline Wye comments begin
+with \tt{(*} and end with \tt{*)}.
 
-One-line Wye comments begin with \texttt{\#} and mark all following text until the next carriage return or newline as whitespace. Multiline Wye comments begin with \texttt{(*} and end with \texttt{*)}.
-
-In Wye, the application of functions is always written in postfix notation, except for certain reserved binary operations (such as \texttt{+} and \texttt{::}) that may be written in infix notation. These binary operations are, under the hood, translated into postfix notation.
+In Wye, the application of functions is always written in postfix notation,
+except for certain reserved binary operators (such as \tt{+} and
+\tt{::}) that may be written in infix notation. These binary operations are,
+under the hood, translated into postfix notation.
 
 \section{Semantics}
 
-\subsection{Statements}
-There are two types of statements in Wye -- let statements and type declarations. The following are valid examples of Wye statements:
-
-\subsubsection{Let Statements}
-Wye \texttt{let} statements declare constants (referred to throughout this document as variables for consistency with common notions of \texttt{let}) at the top-level, or within blocks. In Wye, functions are first-class -- that is, they occupy the same status as ``regular'' types of values such as \texttt{int}s. They can be declared as variables, passed as function arguments, and so on.
-
-Variables declared using \texttt{let} statements are visible throughout their entire scope, both backwards and forwards. Blocks create nested scopes. The variables declared in such nested scopes are not visible in outer scopes. Function arguments shadow over the outer scope. Here are some examples:
-\begin{lstlisting}{wye}
-# variable (actually a constant)
-let x = 4;
-# type-annotated variable
-let y: int = 4;
-
-# function
-let plus_4 = (+) 4;
-# type-annotated functions
-let plus_4 (x: int) -> int = (+ x 4);
-let id: (x: 'a) -> 'a = x;
-let into_tup (x: int) -> (y: float) -> (z: bool) -> (int, float, bool)
-	= ((plus_4 x), y, (id z));
-# blocks
-let y = { 5 };
-let doublesum lst: [int] -> int = {
-	let sum lst: [int] -> int = match lst {
-		[] => 0;
-		x :: xs => (+ x (sum xs));
-	};
-	(* 2 (sum lst)) # no semicolon
-}; # semicolon
-# function argument type annotation
-let func (g: int -> int) -> (x: int) -> int = g x;
-\end{lstlisting}
-
-It would be slightly uncomfortable to express this through the grammar, but Wye reserves a let statement of the following form at the top-level to be its Main statement -- that is, the expression on the right hand side is run when the \texttt{.y} file is executed from the command line:
-\begin{lstlisting}{wye}
-let Main = print (plus_4 6);
-\end{lstlisting}
-Apart from \texttt{Main}, every function in Wye is pure, i.e., it will not affect the scope outside of the function. There are no global mutable variables, and the only function that is allowed to call other functions that take input or output to the terminal is \texttt{Main}.
-
-\subsubsection{Type Declarations}
-Type declarations in Wye are akin to enums in Rust and abstract data types  in Haskell. Variants of the type are separated by \texttt{|} and one may choose to give any variant an optional field. Unlike Rust, wherein enums can have multiple fields, Wye allows only one field. However, one can declare this field to have a tuple type, which will allow the variant to behave as if it holds multiple fields. Moreover, user-defined types can be \textit{polymorphic} -- i.e., they may have a type argument. For example:
-\begin{lstlisting}{wye}
-type bool = false | true;
-type Option 'a = None | Some with 'a;
-type binary_tree 'a = Leaf
-	| Node with ('a, binary_tree 'a, binary_tree 'a);
-\end{lstlisting}
-One can think of polymorphic user-defined types as ``type functions'' that take in a type parameter and output an instance of a type. In the above example \texttt{Some with 4} would take in the type \texttt{int} of the expression \texttt{4} and output an instance of \texttt{Option int}.
-
 \subsection{Expressions}
-The right hand side of every let statement in Wye must be an expression. Wye version \version{} supports only a few expressions. Most of them exist in other languages and are fairly self-explanatory. This section will go over the less familiar ones.
 
-\subsubsection{Function Application}
-As a language that implements the lambda calculus, Wye supports function application, which expressed by the following substitution rule:
-\begin{align*}
-Expr\substo& Expr\: Expr
-\end{align*}
-For example:
-\begin{lstlisting}{wye}
-let f (x: int) -> (y: int) -> int = (+ x y);
-let plus_4 (y: int) -> int = f 4;
-\end{lstlisting}
-Functions in Wye are \textit{curried}. That is, the definition of \texttt{func} actually looks something like this under the hood:
-\begin{minted}{javascript}
-function f(int x) {
-  function g(int y) {
-    return x + y;
-  }
-  return g;
-}
-\end{minted}
-Thus, in defining \texttt{plus\_4} as \texttt{f 4}, \texttt{plus\_4} is actually like the function \texttt{g}, which has captured the value of \texttt{4} from an outer scope, and which on input \texttt{y} returns \texttt{4 + y}.
+\subsubsection{Patterns}
 
-This is also the reason why Wye's function types include an arrow between arguments. The function \texttt{f} has type \texttt{int -> int -> int}, the function \texttt{f 4} has type \texttt{int -> int}, and the value obtained from computing \texttt{plus\_4 5} has type \texttt{int}.
+\subsubsection{Main}
 
-Moreover, because of currying, Wye can safely evaluate functions left to right. That is, Wye functions are \textit{left-associative}. So, for instance, the expression \texttt{f g 4} is evaluated as \texttt{((f g) 4)}. As a concrete example:
-\begin{lstlisting}
-let f (g: int -> int) -> (x: int) -> int = (g x);
-let double (x: int) -> int = 2 * x;
-let z = f double 4;
-\end{lstlisting}
-Here, the function \texttt{f} takes in a function argument \texttt{g} of type \texttt{int -> int} and an integer argument \texttt{x}. The function \texttt{double} is a function of type \texttt{int -> int}. Most importantly, the expression assigned to  \texttt{z} is evaluated as \texttt{((f double) 4)}. If we were to evaluate as \texttt{(f (double 4))} then this would supply the value 8 as the first argument to \texttt{f}, which is expected to be a function of type \texttt{int -> int}.
+\subsection{Enums}
 
-As mentioned earlier, under the hood, \texttt{f} is curried, and thus is really a function of \textit{one} argument only. When we write \texttt{f double} we return the result of \texttt{partially applying} \texttt{f}. That is, \texttt{f double} returns a function that takes an integer argument (\texttt{x}). Then, \texttt{(f double) 4} actually computes the result intended to be stored in \texttt{z}, applying the partial function obtained from \texttt{(f double)}.
+\subsection{Structures, interfaces and implementations}
 
-Now, if we were to have this example:
-\begin{lstlisting}
-let f (x: int) -> int = x;
-let double (x: int) -> int = 2 * x;
-let z = f double 4;
-\end{lstlisting}
-then this would not compile, as \texttt{double}, which is of type \texttt{int -> int} is \textit{not} of the type \texttt{int} that was expected as the first argument of \texttt{f}. Nevertheless, the following compiles:
-\begin{lstlisting}
-let f (x: int) -> int = x;
-let double (x: int) -> int = 2 * x;
-let z = f (double 4);
-\end{lstlisting}
-as the parentheses make it clear that \texttt{double 4} is one expression intended to be supplied to \texttt{f}.
-
-\subsubsection{List Construction}\label{expr:cons}
-Just like Lisp, OCaml, Haskell, and many other functional languages, lists are an important part of Wye. As such, Wye provides list construction via the ``cons'' operator \texttt{::}. Wye also supports pattern matching of lists using cons notation, which is talked about in \ref{expr:pat}.
-
-The cons operator operates as follows: if $x$ is a value of type $t$ and $l$ is a list of type $\texttt{[}t\texttt{]}$, with value $\texttt{[}a_1, a_2, ..., a_n\texttt{]}$ where $n\geq 0$, then \texttt{x :: l} denotes the list $\texttt{[}x, a_1, ..., a_n\texttt{]}$.
-
-The list construction expression falls under the $Expr\: BuiltinOp\: Expr$ grammar substitution rule for $Expr$. Moreover, like other functions, \texttt{::} is itself curried.
-
-\subsubsection{Using variants of a user-defined type}
-If $t$ is a custom type declared via a $TypeDeclaration$ statement, with variants $t_1, ..., t_n$, then one may access the variant $t_i$ as $t_i$. In version \version{} of Wye, for simplicity of the parser, variants with the same name across different user-defined types is not allowed. Thus, the following Wye code compiles:
-\begin{lstlisting}{wye}
-# synonyms of many
-type SynMany = Numerous | Several | Plenty;
-# synonyms of abundant
-type SynAbundant = Copious | Profuse;
-let x = Plenty;
-let x = Copious;
-\end{lstlisting}
-but this does not:
-\begin{lstlisting}{wye}
-# synonyms of many
-type SynMany = Numerous | Several | Plenty;
-# synonyms of abundant. ERROR - conflicting variants
-type SynAbundant = Plenty | Copious | Profuse;
-\end{lstlisting}
-
-If the type variant has a field, then one should use \texttt{with} syntax to define the value of the field. For example:
-\begin{lstlisting}{wye}
-type Option 'a = None | Some with 'a;
-let x: Option int = Some with 4;
-\end{lstlisting}
-
-\subsubsection{Match constructs}
-The \texttt{match} construct allows control flow of the program to be determined dynamically at runtime, based on whether or not a particular expression matches a pattern. The technical syntax of the \texttt{match} construct is as follows, with match arms separated by a comma (\texttt{,}):
-\begin{align*}
-MatchExpression \substo& \texttt{match}\: Expr \: \texttt{\{} \: (Pat \: \texttt{=>}\: Expr\: \texttt{,})*\: Pat\texttt{ => } Expr \: (\texttt{,}?) \: \texttt{\}}
-\end{align*}
-or equivalently:
-\begin{align*}
-MatchExpression \substo& \texttt{match}\: Expr \: \texttt{\{} \: Pat_1 \: \texttt{=>}\: Expr_1\: \texttt{,} \:  ... \: \texttt{,}\:Pat_n \: \texttt{=>}\: Expr_n\: (\texttt{,}?) \: \texttt{\}}
-\end{align*}
-where $n \geq 1$. 
-
-The operation of the \texttt{match} construct is as follows: the $Expr$ following \texttt{match} is first evaluated to a value $v$. Wye then checks at runtime whether $v$ matches each of $Pat_1$ to $Pat_n$ in order. Let $i$ be the smallest number from $1$ to $n$ such that $v$ matches $Pat_i$ (what it means to ``match'' a pattern will be discussed later). This branch will be taken, and only $Expr_i$ will be evaluated. The value to which $Expr_i$ evaluates is then the value of the entire \texttt{match} construct. If $v$ matches \textit{none} of the patterns $Pat_1, ..., Pat_n$, Wye will throw a runtime error. 
-
-Each of $Expr_1, ..., Expr_n$ must evaluate to a value of the same type under all possible executions. Thus, the \texttt{match} expression will evaluate to something of exactly one type, under all possible executions. Note that Wye does not check for exhaustiveness of the patterns.
-
-\subsubsection{Patterns in a Match construct}\label{expr:pat}
-The patterns that one can match against in a \texttt{match} are described by the following substitution rules:
-\begin{align*}
-Pat \substo& \uscore \sepbar IntLiteral\sepbar FloatLiteral\sepbar StringLiteral\sepbar Id \\
-& \sepbar Id\:\texttt{::}\: Id\\
-& \sepbar TypeId \: \texttt{with}\: Pat\\
-& \sepbar \texttt{[} \: ( Pat\:\texttt{,})*\: Pat \: \texttt{]} \sepbar \texttt{[]}\\
-& \sepbar \texttt{(} \: ( Pat\:\texttt{,})+\: Pat\: \texttt{)}\\
-& \sepbar \sim\:Pat\\
-& \sepbar Pat\: (\texttt{|}\: Pat)+\\
-& \sepbar Pat\:\texttt{if}\: Expr
-\end{align*}
-Throughout the subsequent discussion, let $v$ denote the value to which the $Expr$ after the \texttt{match} keyword evaluates. The following list describes when a particular pattern is matched:
-\begin{itemize}
-\item If $Pat \to IntLiteral | FloatLiteral | StringLiteral$, then the expression on the right is evaluated to some $w$, and $v$ matches this expression iff there is exact equality of $v$ and $w$. Note equality in Wye is always \textit{by value}. This implies that if two expressions do not have the same type, they cannot ever be equal. Moreover, equality of two functions is \textit{by identity}, not by the mathematical notion of function equivalence. However, this is consistent with by-value equality semantics, as functions are stored via pointer under the hood.
-\item If $Pat \to Id$, let $x$ denote the $Id$ that occurs on the right. If this $x$ is a variable already present in the outer scope of the \texttt{match} construct, then the value of this $x$ is taken and exact equality is checked between the value of $x$ and $v$, as described above. If such $x$ is the name of a variant of a declared type, we check that $v$ is a type variant with this type. If $x$ is the name of a type variant that had a field (which is not specified in this pattern), then a type error is thrown. Otherwise, if $x$ does not exist in the outer scope as either a variable or a variant of some declared type, Wye will catch this as an undefined symbol error.
-\item If $Pat \to \uscore$ then $v$ always matches the pattern. \uscore{} is a wildcard in Wye.
-\item If $Pat \to Id \:\texttt{::}\: Id$, then $v$ matches the pattern iff $v$ is a list of type $\texttt{[}t\texttt{]}$ with at least one element. This pattern type is better explained with the following example:
-\begin{lstlisting}{wye}
-match e1 {
-	x :: s => e2
-}
-\end{lstlisting}
-Suppose the expression \texttt{e1} evaluates to the value $v$. Then $v$ matches \texttt{x :: s} iff:
-\begin{enumerate}
-\item $v$ is of some list type $\texttt{[}t\texttt{]}$
-\item $v$ has at least one element
-\end{enumerate}
-If $v$ matches the pattern, then the \textit{new variable} \texttt{x} will be set to the first element of $v$ (the ``head'' of $v$) and the \textit{new variable} \texttt{s} will be set to the list containing the remaining elements of $v$, in the original order (that is, \texttt{s} will be set to the ``tail'' of $v$). \texttt{x} and \texttt{s} will be available for use in the scope of \texttt{e2} ONLY, and will shadow over variables with the same name from the outer scope. $v$ will always fail to match such a ``list-construction'' pattern if it is a list of 0 elements. Note that if $v$ is a list of 1 element, \texttt{x} will always be set to that element, and \texttt{s} will be an empty list.
-\item if $Pat \to TypeId\:\texttt{with}\: Pat$, then $b$ must evaluate to a variant of a type defined in a $TypeDeclaration$ statement \textit{that has a field}. Now, if the $Pat$ after the \texttt{with} is an identifier $Id$, the semantics are similar to the list destructuring pattern \texttt{x :: s}. That is, if the $Id$ that occurs is \texttt{x}, then \texttt{x} is a new variable visible in the scope of only the expression of that \texttt{match} arm. For example:
-\begin{lstlisting}{wye}
-type Option 'a = None | Some with 'a;
-let print_optional (opt: Option string) -> string = match opt {
-	None => print "nothing!",
-	# assume that cat concatenates two strings
-	Some with x => print (cat "some with" x),
-}
-\end{lstlisting}
-This $Id$ will shadow over a variable with the same name from the outer scope. On the other hand, if the $Pat$ after the \texttt{with} is a integer, float, or string literal, $v$ is checked not only to be of the specified variant type, but to have a field that is exactly the specified literal. Similarly, 
-\item If $Pat \to \texttt{[}\texttt{]}$ then $v$ matches the pattern iff it is an empty list (and it type checks).
-\item If $Pat \to \texttt{[}(Pat\: \texttt{,})*\: Pat\texttt{]}$, then $v$ must be a list type in order to match the pattern. Let $p$ denote this pattern. Then $v$ matches $p$ iff:
-\begin{enumerate}
-\item $v$ is a list of the same length as $p$ (note in this case, $|p| \geq 1$)
-\item if $v_i$ is the $i^{th}$ element of $v$ and $p_i$ is the $i^{th}$ pattern in $p$, then for each $i$, $v_i$ must match $p_i$
-\end{enumerate}
-If any variable-introducing patterns occur as elements of the above list, such as $TypeId\:\texttt{with}\:Id$ or $Id\:\texttt{::}\:Id$, then such variable names must not conflict across list elements, and all are available for use in ONLY the scope of the expression that follows the \texttt{=>}.
-\item If $Pat \to \texttt{(}(Pat\texttt{,})+ Pat\texttt{)}$, then $v$ must be a tuple type in order to match the pattern. Let $p$ denote this pattern.. Then, $v$ matches $p$ iff:
-\begin{enumerate}
-\item $v$ is a tuple of the same length as $p$ (note in this case, $|p| \geq 1$)
-\item if $v_i$ is the $i^{th}$ element of $v$ and $p_i$ is the $i^{th}$ pattern in $p$, then for each $i$, $v_i$ must match $p_i$ (in type as well).
-\end{enumerate}
-If any variable-introducing patterns occur as elements of the above tuple, such as $TypeId\:\texttt{with}\:Id$ or $Id\:\texttt{::}\:Id$, then such variable names must not conflict across tuple elements, and all are available for use in ONLY the scope of the expression that follows the \texttt{=>}.
-\item If $Pat\to\:\sim Pat$, let $p$ be the LHS $Pat$ and $q$ be the RHS $Pat$. Then $v$ matches $p$ iff $v$ does not match $q$.
-\item If $Pat \to Pat \:(\texttt{|}\:Pat)+$, i.e., if $Pat\to Pat_1\:\texttt{|}\:...\:\texttt{|}\: Pat_n$ where $n\geq 2$, then $v$ matches $Pat$ iff $v$ matches some $Pat_i$ where $1\leq i\leq n$. Note that variable-introducing patterns such as $Id\:\texttt{::}\:Id$ are NOT allowed in the union pattern, as such variables will have no meaning if $v$ does not match that particular pattern of the union.
-\item If $Pat \to Pat\:\texttt{if}\:Expr$ then, letting $p$ denote the $Pat$ on the left hand side, $q$ the $Pat$ on the right hand side, and $e$ the $Expr$, $v$ will match $p$ iff $v$ matches $q$ and $e$ evaluates to the \texttt{bool} variant \texttt{true}. Note that the \texttt{bool} type is declared in the Wye prelude and is thus available for use like this. Moreover, note that Wye employs short-circuiting in the evaluating of \texttt{match} guards -- $e$ is not evaluated if $v$ does not match $q$.
-\end{itemize}
-
-\subsubsection{Function overloading}
-Wye does not support function overloading of user-defined functions. However, certain functions, such as \texttt{+} are defined on multiple types, which the compiler is able to handle. For a reader interested in how one could handle function overloading in a functional language, look up Haskell's type classes and kinds.
-
-\subsubsection{Builtin Operations}
-There are a few builtin operations in Wye:
-\begin{itemize}
-\item[\texttt{+}] adds two \texttt{int}s or \texttt{float}s or concatenates two \texttt{string}s or lists. Wye does not support addition of \texttt{int} and \texttt{float}. An explicit cast must occur (more on this later).
-\item[\texttt{-}] an expression \texttt{a - b} results in the subtraction of the value \texttt{b} from the value \texttt{a}. Subtraction is supported only on \texttt{int}s and \texttt{float}s.
-\item[\texttt{*}] multiplication of \texttt{int}s or \texttt{float}s.
-\item[\texttt{/}] an expression \texttt{a / b} results in the division of the value \texttt{a} by the value \texttt{b}. In Wye, division is supported \textit{only for \texttt{float}s}. If \texttt{b} is the value 0, then Wye will throw a division-by-zero error at runtime.
-\item[\texttt{//}] an expression \texttt{a // b} results in the floor division of the value \texttt{a} by the value \texttt{b}. In Wye floor division is supported \textit{only when \texttt{a} is a \texttt{float} and \texttt{b} is an \texttt{int}}. If \texttt{b} is the integer 0, then Wye will throw a division-by-zero error at runtime.
-\item[\texttt{==}] an expression \texttt{a == b} results in the \texttt{bool} variant \texttt{true} if the value \texttt{a} and the value \texttt{b} are exactly the same integer, float, or string literal, or exactly the same function pointer, or lists or tuples whose elements are equal according to this rule. Otherwise, this expression results in the \texttt{bool} variant \texttt{false}. Wye will throw a type error if the arguments to \texttt{==} are of dfiferent types.
-\item[\texttt{!=}] an expression \texttt{a != b} is \texttt{true} iff \texttt{a == b} is \texttt{false}. Wye will throw a type error if the arguments to \texttt{==} are of dfiferent types.
-\item[\texttt{<}] an expression \texttt{a < b} results in the \texttt{bool} variant \texttt{true} if \texttt{a} is an integer or float that is less than the integer or float \texttt{b}. Otherwise, it results in the \texttt{bool} variant \texttt{false}. \texttt{a} is a float iff \texttt{b} is a float; \texttt{a} is an integer iff \texttt{b} is an integer. If either \texttt{a} or \texttt{b} is not an integer, then a type error is thrown. Note that Wye does not support the float \texttt{NaN}, and thus a total ordering of the float type is possible.
-\item[\texttt{>}] an expression \texttt{a > b} results in \texttt{true} iff \texttt{a < b} is not true and \texttt{a == b} is not true. Note that this operation is supported only on integers or floats, and a float cannot be compared with an integer with \texttt{>}.
-\item[\texttt{<=}] an expression \texttt{a <= b} is \texttt{true} iff \texttt{a > b} is \texttt{false}, otherwise it is \texttt{false}.
-\item[\texttt{>=}] an expression \texttt{a >= b} is \texttt{true} iff \texttt{a < b} is \texttt{false}, otherwise it is \texttt{false}.
-\item[\texttt{::}] as discussed in \ref{expr:cons}, \texttt{::} is the list construction operator in Wye for constructing a list via specifying its head and tail.
-\end{itemize}
-
-Wye's builtin binary operations can be written both in postfix notation (for example, division can be written as \texttt{(/) a b}), or in infix notation (\texttt{a / b}). The parentheses around these binary operators in postfix notation aids the parser in disambiguating.
-
-\subsection{Types}
-
-\subsubsection{Basic types}
-
-Wye has essentially 3 builtin primitive types, with support for constructing list and tuple data structures. The three primitive types are:
-
-\texttt{int:} a 64-bit signed integer.
-
-\texttt{float:} a 64-bit floating point number.
-
-\texttt{string:} essentially a list of 4-byte unicode characters.\\
-An expression \texttt{[e\_1, ..., e\_n]} is of list type \texttt{[t]} if $e_i$ is of type $t$ for all $1\leq i\leq n$. An expression \texttt{(e\_1, ..., e\_n)} is of tuple type $(t_1, ..., t_n)$ if each $e_i$ has type $t_i$.
-
-\subsubsection{Polymorphic types}
-
-Just like OCaml and Haskell, Wye's type system is based on the Hindley-Milner type system and thus supports polymorphic types. A polymorphic type is essentially a type of the form $\forall \alpha\:\sigma$ where $\sigma$ is a type signature in which $\alpha$ is a free variable. Such type signatures have been referred to earlier, for example in the \texttt{Option} type:
-\begin{lstlisting}{wye}
-type Option 'a = None | Some with 'a;
-\end{lstlisting}
-Or, in the identity function:
-\begin{lstlisting}{wye}
-let id (x: 'a) -> 'a = x;
-\end{lstlisting}
-In Wye, the \texttt{'} token specifies that the $Id$ immediately following it is a \textit{type variable} which is implicitly quantified over in a type expression (an expression that evaluates to a type). In this way, the function \texttt{id} can take in \texttt{any value} of \texttt{any type}! The function's argument is polymorphic.
-
-Whenever the \texttt{id} function is called, it actually implicitly takes in a \textit{type argument} -- namely, the type of its actual argument! Due to Wye's type system, this type is actually known at compile-time, and thus type checking can be adequately performed via substitution of the quantified type variable \texttt{a} with whatever type the function is called with. For example, the following code type-checks, with the type variable \texttt{a} being substituted with \texttt{string} and the type variable \texttt{b} being substituted with \texttt{int}:
-\begin{lstlisting}{wye}
-type OptionalTuple 'a 'b = None | Some with ('a, 'b);
-let f (x: 'a) -> (y: 'b) -> OptionalTuple 'a 'b = Some with (x, y);
-# j is of variant Some with (string, int)
-let j = f "hello" 4;
-\end{lstlisting}
-
-\newpage
-\section{Type inference}
-
-Wye is a statically typed language, and due to its Hindley-Milner type system, it is able to infer the types of expressions (and thus variables) at compile-time. The exact rules for the type system will be discussed in greater detail in this section. Moreover, we will go over how exactly type inference is implemented in the Wye type checker.
-
-It is important to note that Wye expressions, when not annotated with a type, are typed to the \textit{most general possible type}. For example, in the following code:
-\begin{lstlisting}{wye}
-let cons x lst = x :: lst;
-\end{lstlisting}
-the function \texttt{cons} type checks to the function type \texttt{'a -> ['a] -> 'a}. The interested reader should explore \href{{https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system}}{the Hindley-Milner type system}.
-
-\section{Wye's Type System}
-
-This section dives into great detail about the typing rules that make type inference in Wye possible. It greatly references Typing Haskell in Haskell, a tutorial on describing the typing rules of Haskell.
-
-\newpage
-\section{Type Checking}
-
-In order to verify at compile-time that a program accomplishes the author's intention, it is helpful to type-check the program. Type checking is the process of verifying that all operations in the program are performed on values of appropriate types. Type checking can be performed at compile-time only if the types of every Wye expression are known at compile-time. Thus, if the Wye compiler cannot figure out the type of a Wye expression, the compiler will refuse to compile the input program. Type checking is achieved via deductive reasoning on the input program based on certain typing rules. In version \version{} of Wye's compiler, type checking is implemented via a depth-first traversal of the Abstract Syntax Tree of an input Wye program.
-
-\subsection{Notation}
-
-The rules by which Wye performs type checking are written in the following form:
-\begin{align*}
-\frac{hypothesis_1, ..., hypothesis_n}{conclusion}
-\end{align*}
-
-In order to perform typing, a context is necessary. For example, if a function \texttt{f} is applied in an expression, then \texttt{f} must be defined somewhere, and its type must be known. The set of variables, functions, their types, and the set of types declared in scope for use in an expression is referred to as the \textit{context} and notated as $\Gamma$.
-
-The symbol $\vdash$ means ``entails'' or ``proves.'' We say $\Gamma\vdash e: \tau$ if the context $\Gamma$ and the deductive rules of Wye's type system prove that the expression $e$ has type $\tau$. If interested in the origins of this symbol, the reader should look up the notions of soundness and completeness in mathematical logic.
-
-A comma between hypotheses indicates a logical and. That is, $hypothesis_1, hypothesis_2$ is logically equivalent to $hypothesis_1 \wedge hypothesis_2$. Moreover, $\Gamma$ can be considered a hypothesis itself, an assertion that all declared variables and functions have their specific types, along with assertions about the available types. Thus, the notation $\Gamma, hypothesis \vdash e: \tau$ may be used to express that $\Gamma \wedge hypothesis$ proves that $e: \tau$.
-
-In general, $\tau$ will be used to indicate a monomorphic type (i.e., a ``concrete'' type like \texttt{int}), and $\sigma$ will be used to indicate a polymorphic type. Any type with a type variable, i.e., with an implicit quantifier over a type parameter, is a polymorphic type.
-
-Also important to consider are the free type variables in a type expression. For example in the identity function:
-\begin{lstlisting}{wye}
-let f x: 'a -> 'a = x;
-\end{lstlisting}
-within the expression on the right hand side of the \texttt{=} (namely, \texttt{x}), the type of the parameter $x$ is free. It is equal to some \texttt{a} which is only concretized when \texttt{f} is applied to some parameter. On the other hand, there are no free variables in \texttt{f}'s type. \texttt{f} has the type $\forall a\: a\to a$ -- all the type variables in this function definition have been fully quantified.
-
-The set of free variables in an expression or set of expressions $S$ is notated as $\free(S)$. free is defined as follows:
-\begin{enumerate}
-\item if $\alpha$ is a type variable, $\free(\alpha) = \alpha$.
-\item if $C$ is a type function (a variant of a user-defined type with a field), then $\free(C\: \tau) = free(\tau)$
-\item if $\Gamma$ is a context, then $\free(\Gamma) = \bigcup_{x : \sigma\in\Gamma }free(\sigma)$ where the union is taken over all distinct polymorphic types of variables or functions in $\Gamma$.
-\item for polymorphic types, $\free(\forall \alpha \: \sigma) = \free(\sigma) - \{\alpha\}$
-\item for contexts, $\free(\Gamma\vdash e: \sigma) = \free(\sigma) - \free(\Gamma)$
-\end{enumerate}
-
-\subsection{Type order}
-
-Before we give the rules for type inference, it is important to define an ordering on types. This allows Wye to infer the most general type possible for an expression (the ``least'' potential type in this type ordering), which creates a highly flexible yet still strict type system.
-
-\subsection{Typing rules}
-
-\begin{align*}
-\end{align*}
-
-Note: arguments to a lambda expression are NOT GENERALIZABLE. In what sense? In the sense that they are assumed to be concrete types, and not forallable types like functions that use type variables.
-
+Methods that define shared code cannot be overridden. If you want to override them, that indicates you
+actually want to implement a different interface than what is being shared. That is, your code either
+should not be shared, or the implementation you want to provide in the override should have a
+different name.
 
 \pagebreak
 \section{Acknowledgements}
-The syntax and semantics of Wye are based on Rust, Haskell, and OCaml. I thank the developers of these languages for making it much easier for me to learn about and write a compiler. I thank Jens Palsberg of UCLA for teaching me the fundamentals of compiler implementation.
+The syntax and semantics of Wye are based on Rust, Haskell, and OCaml. I thank
+the developers of these languages for making it much easier for me to learn
+about and write a compiler. I thank Jens Palsberg and Carey Nachenberg of UCLA
+for teaching me the fundamentals of compiler implementation and programming
+languages.
 
 % --- Bibliography ---
 \pagebreak
