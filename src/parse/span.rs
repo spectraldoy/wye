@@ -1,32 +1,38 @@
-#[derive(Clone)]
-pub struct Spanned<T>
-where
-    T: Clone,
-{
+/// A node in the parse tree of a program is spanned by bytes at certain
+/// positions in the text of a program. This struct captures those byte
+/// positions along with the node value so that line numbers and other
+/// information can be reported with errors.
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Span {
     pub start: usize,
     pub end: usize,
-    pub value: T,
 }
 
-/// In order to count line numbers:
-/// we read the whole file and get the byte positions
-/// put them into a btree map which maps byte pos to line number
-/// use the lowest match in this btree map to get the line number
-/// So spans should use byte positions
-///
-/// Use codespan_reporting. Then, spans basically only need to have
-/// byte start and end information
-///
-/// Use type holes as types of variables that need to be inferred
-/// That way type checking and type inference can proceed simultaneously
-/// oh this is epic
-/// this is gonna be epic
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Spanned<T>
+where
+    T: Clone + PartialEq + Eq
+{
+    pub value: T,
+    pub span: Span,
+}
 
 impl<T> Spanned<T>
 where
-    T: Clone,
+    T: Clone + PartialEq + Eq
 {
-    pub fn new(start: usize, end: usize, value: T) -> Self {
-        Spanned { start, end, value }
+    /// Construct a new spanned value.
+    pub fn new(value: T, start: usize, end: usize) -> Self {
+        Spanned { value, span: Span { start, end } }
     }
+}
+
+/// Reduces clutter
+pub fn spanned<T: Clone + PartialEq + Eq>(value: T, span: Span) -> Spanned<T> {
+    Spanned { value, span }
+}
+
+pub fn get_spanned_value<T: Clone + PartialEq + Eq>(spanned_val: Spanned<T>) -> T {
+    spanned_val.value
 }

@@ -1,38 +1,374 @@
 use super::ast;
-use super::span::Spanned;
-use super::util;
+use super::span::{Spanned, spanned};
+// use super::util;
 use ordered_float::OrderedFloat;
-use lalrpop_util::ParseError;
 
-// TODO: % is the comment operator
 grammar;
 
-// Comments
+// ****************************************
+// Comments and whitespace
+// ****************************************
 match {
-    r"\s+" => { }, // Ignore whitespace
-    r"#[^\n\r]*[\n\r]*" => { }, // Skip `# comments`
-    r#"\(\*[^*]*\*+(?:[^\)*][^*]*\*+)*\)"# => { },  // Skip `(* comments *)`
+    // Ignore whitespace
+    r"\s+" => { },
+    // Skip `%` comments
+    r"%[^\n\r]*[\n\r]*" => { },
+    // Skip `(* ... *)` comments
+    r#"\(\*[^*]*\*+(?:[^\)*][^*]*\*+)*\)"# => { },
 } else {
     _
 }
 
-// Macros
-Sp<Rule>: Spanned<Rule> = <l: @L> <rule: Rule> <r: @R> => Spanned::new(l, r, rule);
+// ****************************************
+// Token rules
+// ****************************************
 
-SepListAtLeastOne<T, Sep>: Vec<T> = { // (1)
+/// Identifier: sequence of ASCII alphanumerics, or underscore.
+Identifier: String = <r"[a-zA-Z_][a-zA-Z0-9_]*"> => String::from(<>);
+
+/// Potentially bounded polymorphic type variable
+PolytypeVar: ast::PolytypeDecl =
+    "'" <bound: Identifier?> <name: Identifier> => ast::PolytypeDecl { name, bound };
+
+/// Integer literal
+IntLiteral: i64 = <r"-?([0-9]|[1-9][0-9]*)"> => <>.parse::<i64>().unwrap();
+
+/// String literal, eliminating surrounding quotes. May contain unicode.
+StringLiteral: String = <s: r#""[^\"]*""#> => s[1..s.len() - 1].to_string();
+
+/// Float literal, stored as ordered float for comparability.
+FloatLiteral: OrderedFloat<f64> =
+    <r"-?([0-9]|[1-9][0-9]*)\.[0-9]+([eE]-?[0-9]+)?"> => 
+        OrderedFloat(<>.parse::<f64>().unwrap());
+
+/// Builtin binary operators.
+BinaryOp: ast::BinaryOp = {
+    "+"  => ast::BinaryOp::Add,
+    "-"  => ast::BinaryOp::Subtract,
+    "*"  => ast::BinaryOp::Multiply,
+    "/"  => ast::BinaryOp::Divide,
+    "//" => ast::BinaryOp::FloorDiv,
+    "<"  => ast::BinaryOp::Lt,
+    ">"  => ast::BinaryOp::Gt,
+    "<=" => ast::BinaryOp::Leq,
+    ">=" => ast::BinaryOp::Geq,
+    "==" => ast::BinaryOp::Eq,
+    "!=" => ast::BinaryOp::Neq,
+    "::" => ast::BinaryOp::Cons,
+}
+
+/// Builtin binary operator for postfix notation.
+PostfixBinaryOp: ast::BinaryOp =
+    "(" <bop: BinaryOp> ")" => bop;
+
+// ****************************************
+// Expression building
+// ****************************************
+
+AtomicExpr: Spanned<ast::Expression> = {
+    <n: Sp<"nothing">> => spanned(ast::Expression::Nothing, n.span),
+    <i: Sp<IntLiteral>> => spanned(ast::Expression::IntLiteral(i.value), i.span),
+    <f: Sp<FloatLiteral>> => spanned(ast::Expression::FloatLiteral(f.value), f.span),
+    <s: Sp<StringLiteral>> => spanned(ast::Expression::StringLiteral(s.value), s.span),
+    <id: Sp<Identifier>> => spanned(ast::Expression::Identifier(id.value), id.span),
+    <bop: Sp<PostfixBinaryOp>> => spanned(ast::Expression::BinaryOp(bop.value), bop.span),
+    <p: Sp<"print">> => spanned(ast::Expression::Print, p.span),
+    <e: Sp<"fail">> => spanned(ast::Expression::Fail, e.span),
+    <lst: Sp<r"[\s*]">> => spanned(ast::Expression::List(vec![]), lst.span),
+    <lst: Sp<NonemptyList<Expression>>> => spanned(ast::Expression::List(lst.value), lst.span),
+    <t: Sp<WyeTuple<Expression>>> => spanned(ast::Expression::Tuple(t.value), t.span),
+    "(" <e: Expression> ")" => e,
+}
+
+pub Expression: Spanned<ast::Expression> = {
+    AtomicExpr,
+}
+
+pub Program: ast::Program = {
+    ".*" => vec![]
+}
+
+// pub Expression: Spanned<ast::Expression> = {
+//     AtomicExpr,
+//     <tid: Sp<Identifier>> <with: Sp<"with">> <field: Sp<AtomicExpr>> =>? {
+//         if tid.end == with.start {
+//             Err(ParseError::User {
+//                 error: "Variant with argument requires space between TypeId and `with` token"
+//             })
+//         } else if with.end == field.start {
+//             Err(ParseError::User {
+//                 error: "Variant with argument requires space between `with` token and field expression"
+//             })
+//         } else {
+//             Ok(ast::Expression::TypeVariant(tid.value, Box::new(field.value)))
+//         }
+//     },
+//     <func: Sp<AtomicExpr>> <args: Sp<AtomicExpr>+> =>? match util::collect_function::<ast::Expression>(
+//         func,
+//         args,
+//         |e1, e2| ast::Expression::FuncApplication(Box::new(e1), Box::new(e2))
+//     ) {
+//         Ok(v) => Ok(v),
+//         Err(e) => Err(ParseError::User { error: e })
+//     },
+//     // BuiltinOp
+//     <op1: AtomicExpr> <bop: BuiltinOp> <op2: AtomicExpr> => ast::Expression::FuncApplication(
+//         Box::new(ast::Expression::FuncApplication(
+//             Box::new(ast::Expression::BuiltinOp(bop)),
+//             Box::new(op1)
+//         )),
+//         Box::new(op2)
+//     ),
+//     <match_: Sp<"match">> <matchand: Sp<Expression>> "{" <arm: (<Pattern> "=>" <Expression> ","?)> "}" =>? {
+//         if match_.end == matchand.start {
+//             Err(ParseError::User {
+//                 error: "Space required between `match` keyword and matchand"
+//             })
+//         } else {
+//             Ok(ast::Expression::MatchConstruct(
+//                 Box::new(matchand.value), vec![arm]
+//             ))
+//         }
+//     },
+//     <match_: Sp<"match">> <matchand: Sp<Expression>> "{" <arms: SepTupleAtLeastTwo<(<Pattern> "=>" <Expression>), ",">> "}" =>? {
+//         if match_.end == matchand.start {
+//             Err(ParseError::User {
+//                 error: "Space required between `match` keyword and matchand"
+//             })
+//         } else {
+//             Ok(ast::Expression::MatchConstruct(
+//                 Box::new(matchand.value), arms
+//             ))
+//         }
+//     },
+//     r"\\" <ids: Identifier+> "->" <body: Expression> => ast::Expression::Lambda(ids, Box::new(body)),
+//     "{" <stmts: LetStatement*> <e: Expression> "}" => {
+//         ast::Expression::Block(stmts, Box::new(e))
+//     }
+// }
+
+// AtomicPattern: ast::Pattern = {
+//     "_" => ast::Pattern::Wildcard,
+//     <i: IntegerLiteral> => ast::Pattern::IntegerLiteral(i),
+//     <f: FloatLiteral> => ast::Pattern::FloatLiteral(f),
+//     <s: StringLiteral> => ast::Pattern::StringLiteral(s),
+//     <id: Identifier> => ast::Pattern::Identifier(id),
+//     <tid: Sp<Identifier>> <with: Sp<"with">> <field: Sp<CompoundPattern>> =>? {
+//         if tid.end == with.start {
+//             Err(ParseError::User {
+//                 error: "Variant with argument requires space between TypeId and `with` token"
+//             })
+//         } else if with.end == field.start {
+//             Err(ParseError::User {
+//                 error: "Variant with argument requires space between `with` token and field identifier"
+//             })
+//         } else {
+//             Ok(ast::Pattern::TypeVariant(tid.value, Box::new(field.value)))
+//         }
+//     },
+//     "[" "]" => ast::Pattern::EmptyList,
+//     "(" <AtomicPattern> ")" => <>,
+// }
+
+// ScopablePattern: ast::Pattern = {
+//     AtomicPattern,
+//     <head: Identifier> "::" <tail: Identifier> => ast::Pattern::ListConstruction(head, tail),
+// }
+
+// CompoundPattern: ast::Pattern = {
+//     ScopablePattern,
+//     "[" <pats: SepSeqAtLeastOne<ScopablePattern, ",">> "]" => ast::Pattern::List(pats),
+//     "(" <pats: SepTuple<ScopablePattern, ",">> ")" => ast::Pattern::Tuple(pats),
+// }
+
+// UnguardedPattern: ast::Pattern = {
+//     CompoundPattern,
+//     <pats: SepSeqAtLeastTwo<AtomicPattern, "|">> => ast::Pattern::Union(pats),
+//     "~" <pat: CompoundPattern> => ast::Pattern::Complement(Box::new(pat)),
+// }
+
+// pub Pattern: ast::Pattern = {
+//     UnguardedPattern,
+//     <pat: Sp<UnguardedPattern>> <if_: Sp<"if">> <guard: Sp<Expression>> =>? {
+//         if pat.end == if_.start {
+//             Err(ParseError::User {
+//                 error: "Space required between pattern to guard and `if` token"
+//             })
+//         } else if if_.end == guard.start {
+//             Err(ParseError::User {
+//                 error: "Space required between `if` token and guard expression"
+//             })
+//         } else {
+//             Ok(ast::Pattern::Guarded(Box::new(pat.value), guard.value))
+//         }
+//     },
+// }
+
+// AtomicTypeExpr: ast::TypeExpression = {
+//     "int" => ast::TypeExpression::IntType,
+//     "float" => ast::TypeExpression::FloatType,
+//     "string" => ast::TypeExpression::StringType,
+//     "[" <te: TypeExpression> "]" => ast::TypeExpression::ListType(Box::new(te)),
+//     "(" <te: TypeExpression> ")" => te,
+//     "(" <tes: SepTuple<TypeExpression, ",">> ")" => ast::TypeExpression::TupleType(tes),
+//     <tvar: TypeVar> => ast::TypeExpression::UniversalType(tvar),
+// }
+
+// NonFuncTypeExpr: ast::TypeExpression = {
+//     AtomicTypeExpr,
+//     // <Declared TypeId> <TypeArgs>
+//     <t: Sp<Identifier>> <targs: Sp<AtomicTypeExpr>*> =>? {
+//         let mut texpr_spans = vec![(t.start, t.end)];
+//         let (targ_vals, mut targ_spans): (Vec<_>, Vec<_>) = targs.iter().map(|el| {
+//             (el.value.clone(), (el.start, el.end))
+//         }).unzip();
+//         texpr_spans.append(&mut targ_spans);
+//         if util::spans_overlap(&texpr_spans) {
+//             Err(ParseError::User {
+//                 error: "Space required between tokens here, cannot identify type arguments"
+//             })
+//         } else {
+//             Ok(ast::TypeExpression::DeclaredType(t.value, targ_vals))
+//         }
+//     },
+// }
+
+// pub TypeExpression: ast::TypeExpression = {
+//     NonFuncTypeExpr,
+//     <ftype: SepSeqAtLeastTwo<Sp<NonFuncTypeExpr>, "->" >> =>? match util::collect_function::<ast::TypeExpression>(
+//         ftype[0].clone(),
+//         ftype[1..].to_vec(),
+//         |t1, t2| ast::TypeExpression::FunctionType(Box::new(t1), Box::new(t2))
+//     ) {
+//         Ok(v) => Ok(v),
+//         Err(e) => Err(ParseError::User { error: e })
+//     }
+// }
+
+// // Program
+
+// TypeVariantDeclType: (String, Option<ast::TypeExpression>) = {
+//     <tid: Identifier> => (tid, None),
+//     <tid: Sp<Identifier>> <with: Sp<"with">> <field_t: Sp<TypeExpression>> =>? {
+//         if tid.end == with.start {
+//             Err(ParseError::User {
+//                 error: "Type of variant with argument requires space between TypeId and `with` token"
+//             })
+//         } else if with.end == field_t.start {
+//             Err(ParseError::User {
+//                 error: "Type of variant with argument requires space between `with` token and field type"
+//             })
+//         } else {
+//             Ok((tid.value, Some(field_t.value)))
+//         }
+//     }
+// }
+
+// LetStatement: ast::Statement = {
+//     <let_: Sp<"let">> <ids: Sp<Identifier>+> "=" <e: Expression> ";" =>? {
+//         if let_.end == ids[0].start {
+//             Err(ParseError::User {
+//                 error: "Space required between `let` token and first identifier in let statement"
+//             })
+//         } else if util::spans_overlap(&ids.iter().map(|x| (x.start, x.end)).collect::<Vec<_>>()) {
+//             Err(ParseError::User {
+//                 error: "Identifiers in untyped let require space between them"
+//             })
+//         } else {
+//             Ok(ast::Statement::UntypedLet(
+//                 ids.iter().map(|x| x.value.clone()).collect::<Vec<_>>(), e
+//             ))
+//         }
+//     },
+//     <let_: Sp<"let">> <typed_id: Sp<TypedIdentifier>> "=" <e: Expression> ";" =>? {
+//         if let_.end == typed_id.start {
+//             Err(ParseError::User {
+//                 error: "Space required between `let` token and first identifier in let statement"
+//             })
+//         } else {
+//             Ok(ast::Statement::TypedLet(typed_id.value.0, typed_id.value.1, vec![], e))
+//         }
+//     },
+//     <let_: Sp<"let">> <id: Sp<Identifier>> <typed_ids: ("(" <TypedIdentifier> ")" "->")+> <te: TypeExpression> "=" <e: Expression> ";" =>? {
+//         if let_.end == id.start {
+//             Err(ParseError::User {
+//                 error: "Space required between `let` token and first identifier"
+//             })
+//         } else {
+//             Ok(ast::Statement::TypedLet(id.value, te, typed_ids, e)   )
+//         }
+//     }
+// }
+
+// pub Statement: ast::Statement = {
+//     LetStatement,
+//     <type_: Sp<"type">> <tid: Sp<Identifier>> <tvars: Sp<TypeVar>*> "=" <variants: SepSeqAtLeastOne<TypeVariantDeclType, "|">> ";" =>? {
+//         if type_.end == tid.start {
+//             Err(ParseError::User {
+//                 error: "Space required between `type` token and declared type name"
+//             })
+//         } else if tvars.len() != 0 && tid.end == tvars[0].start {
+//             Err(ParseError::User {
+//                 error: "Space required between declared type name and type arguments"
+//             })
+//         } else if util::spans_overlap(&tvars.iter().map(|tv| (tv.start, tv.end)).collect::<Vec<_>>()) {
+//             Err(ParseError::User {
+//                 error: "Type variables in type declaration require space between them"
+//             })
+//         } else {
+//             Ok(ast::Statement::TypeDeclaration(
+//                 tid.value,
+//                 tvars.iter().map(|tv| tv.value.clone()).collect::<Vec<_>>(),
+//                 variants
+//             ))
+//         }
+//     }
+// }
+
+// pub Program: Vec<ast::Statement> = <stmts: Sp<Statement>+> =>? {
+//     if util::spans_overlap(&stmts.iter().map(|s| (s.start, s.end)).collect::<Vec<_>>()) {
+//         Err(ParseError::User {
+//             error: "Space required between adjacent statements"
+//         })
+//     } else {
+//         Ok(stmts.iter().map(|s| s.value.clone()).collect::<Vec<_>>())
+//     }
+// };
+
+// ****************************************
+// Utility macros
+// ****************************************
+
+// TODO: it may be useful to split this out into a separate file
+
+/// Match `Rule` and extract the match's span.
+Sp<Rule>: Spanned<Rule> = <l: @L> <value: Rule> <r: @R> => Spanned::new(value, l, r);
+
+/// A sequence of `T` nodes separated by `Sep` tokens, with at least one element.
+/// Used for matching lists.
+SepSeqAtLeastOne<T, Sep>: Vec<T> = {
     <mut v: (<T> Sep)*> <suffix: T> => {
         v.push(suffix);
         v
     }
 }
 
-SepListAtLeastTwo<T, Sep>: Vec<T> = { // (1)
+/// A sequence of `T` nodes separated by `Sep` tokens, with at least two elements.
+/// Used for matching function types and union patterns.
+SepSeqAtLeastTwo<T, Sep>: Vec<T> = {
     <mut v: (<T> Sep)+> <suffix: T> => {
         v.push(suffix);
         v
     }
 }
 
+/// Having this rule makes it easier to extract the spanning positions of list
+/// elements enclosed within square brackets.
+NonemptyList<T>: Vec<T> =
+    "[" <lst: SepSeqAtLeastOne<T, ",">> "]" => lst;
+
+/// A sequence of `T` nodes separated by `Sep` tokens with at least one `T` `Sep`
+/// and potentially ending with `Sep`.
 SepTuple<T, Sep>: Vec<T> = {
     <mut v: (<T> Sep)+> <suffix: T?> => match suffix {
         None => v,
@@ -43,6 +379,13 @@ SepTuple<T, Sep>: Vec<T> = {
     }
 }
 
+/// Used to match a Wye tuple, as notated within `(` `)` and separated with commas.
+/// Distinct from the SepTuple rule above, which is used to match arbitrary sequences
+/// that appear in tuple-style separation notation.
+WyeTuple<T>: Vec<T> =
+    "(" <t: SepTuple<T, ",">> ")" => t;
+
+/// A sequence of `T` nodes separated by `Sep` tokens. Used for tuples.
 SepTupleAtLeastTwo<T, Sep>: Vec<T> = {
     <prefix: T> <mut v: (Sep <T>)+> Sep? => {
         let mut out = vec![prefix];
@@ -51,296 +394,6 @@ SepTupleAtLeastTwo<T, Sep>: Vec<T> = {
     }
 }
 
-// Tokens
-Identifier: String = <r"[a-zA-Z_][a-zA-Z0-9_]*"> => String::from(<>);
-
-TypedIdentifier: (String, ast::TypeExpression) =
-    <id: Identifier> ":" <te: TypeExpression> => (id, te);
-
-TypeVar: String = <s: r"'[a-zA-Z_][a-zA-Z0-9_]*"> => String::from(&s[1..]);
-
-IntegerLiteral: i64 = <r"-?([0-9]|[1-9][0-9]*)"> => <>.parse::<i64>().unwrap();
-
-StringLiteral: String = <s: r#""[^\"]*""#> => s[1..s.len() - 1].to_string();
-
-FloatLiteral: OrderedFloat<f64> =
-    <r"-?([0-9]|[1-9][0-9]*)\.[0-9]+([eE]-?[0-9]+)?"> => 
-        OrderedFloat(<>.parse::<f64>().unwrap());
-
-BuiltinOp: ast::Operation = {
-    "+" => ast::Operation::Add,
-    "-" => ast::Operation::Subtract,
-    "*" => ast::Operation::Multiply,
-    "/" => ast::Operation::Divide,
-    "//" => ast::Operation::FloorDiv,
-    "<" => ast::Operation::Lt,
-    ">" => ast::Operation::Gt,
-    "<=" => ast::Operation::Leq,
-    ">=" => ast::Operation::Geq,
-    "==" => ast::Operation::Eq,
-    "!=" => ast::Operation::Neq,
-    "::" => ast::Operation::Cons,
-}
-
-// Expressions
-
-AtomicExpr: ast::Expression = {
-    <i: IntegerLiteral> => ast::Expression::IntegerLiteral(i),
-    <f: FloatLiteral> => ast::Expression::FloatLiteral(f),
-    <s: StringLiteral> => ast::Expression::StringLiteral(s),
-    "[" "]" => ast::Expression::List(vec![]),
-    "[" <v: SepListAtLeastOne<Expression, ",">> "]" => ast::Expression::List(v),
-    <id: Identifier> => ast::Expression::Identifier(id),
-    "(" <bop: BuiltinOp> ")" => ast::Expression::BuiltinOp(bop),
-    "print" => ast::Expression::Print,
-    "error" => ast::Expression::Error,
-    "(" <t: SepTuple<Expression, ",">> ")" => ast::Expression::Tuple(t),
-    "(" <e: Expression> ")" => e,
-}
-
-pub Expression: ast::Expression = {
-    AtomicExpr,
-    <tid: Sp<Identifier>> <with: Sp<"with">> <field: Sp<AtomicExpr>> =>? {
-        if tid.end == with.start {
-            Err(ParseError::User {
-                error: "Variant with argument requires space between TypeId and `with` token"
-            })
-        } else if with.end == field.start {
-            Err(ParseError::User {
-                error: "Variant with argument requires space between `with` token and field expression"
-            })
-        } else {
-            Ok(ast::Expression::TypeVariant(tid.value, Box::new(field.value)))
-        }
-    },
-    <func: Sp<AtomicExpr>> <args: Sp<AtomicExpr>+> =>? match util::collect_function::<ast::Expression>(
-        func,
-        args,
-        |e1, e2| ast::Expression::FuncApplication(Box::new(e1), Box::new(e2))
-    ) {
-        Ok(v) => Ok(v),
-        Err(e) => Err(ParseError::User { error: e })
-    },
-    // BuiltinOp
-    <op1: AtomicExpr> <bop: BuiltinOp> <op2: AtomicExpr> => ast::Expression::FuncApplication(
-        Box::new(ast::Expression::FuncApplication(
-            Box::new(ast::Expression::BuiltinOp(bop)),
-            Box::new(op1)
-        )),
-        Box::new(op2)
-    ),
-    <match_: Sp<"match">> <matchand: Sp<Expression>> "{" <arm: (<Pattern> "=>" <Expression> ","?)> "}" =>? {
-        if match_.end == matchand.start {
-            Err(ParseError::User {
-                error: "Space required between `match` keyword and matchand"
-            })
-        } else {
-            Ok(ast::Expression::MatchConstruct(
-                Box::new(matchand.value), vec![arm]
-            ))
-        }
-    },
-    <match_: Sp<"match">> <matchand: Sp<Expression>> "{" <arms: SepTupleAtLeastTwo<(<Pattern> "=>" <Expression>), ",">> "}" =>? {
-        if match_.end == matchand.start {
-            Err(ParseError::User {
-                error: "Space required between `match` keyword and matchand"
-            })
-        } else {
-            Ok(ast::Expression::MatchConstruct(
-                Box::new(matchand.value), arms
-            ))
-        }
-    },
-    r"\\" <ids: Identifier+> "->" <body: Expression> => ast::Expression::Lambda(ids, Box::new(body)),
-    "{" <stmts: LetStatement*> <e: Expression> "}" => {
-        ast::Expression::Block(stmts, Box::new(e))
-    }
-}
-
-AtomicPattern: ast::Pattern = {
-    "_" => ast::Pattern::Wildcard,
-    <i: IntegerLiteral> => ast::Pattern::IntegerLiteral(i),
-    <f: FloatLiteral> => ast::Pattern::FloatLiteral(f),
-    <s: StringLiteral> => ast::Pattern::StringLiteral(s),
-    <id: Identifier> => ast::Pattern::Identifier(id),
-    <tid: Sp<Identifier>> <with: Sp<"with">> <field: Sp<CompoundPattern>> =>? {
-        if tid.end == with.start {
-            Err(ParseError::User {
-                error: "Variant with argument requires space between TypeId and `with` token"
-            })
-        } else if with.end == field.start {
-            Err(ParseError::User {
-                error: "Variant with argument requires space between `with` token and field identifier"
-            })
-        } else {
-            Ok(ast::Pattern::TypeVariant(tid.value, Box::new(field.value)))
-        }
-    },
-    "[" "]" => ast::Pattern::EmptyList,
-    "(" <AtomicPattern> ")" => <>,
-}
-
-ScopablePattern: ast::Pattern = {
-    AtomicPattern,
-    <head: Identifier> "::" <tail: Identifier> => ast::Pattern::ListConstruction(head, tail),
-}
-
-CompoundPattern: ast::Pattern = {
-    ScopablePattern,
-    "[" <pats: SepListAtLeastOne<ScopablePattern, ",">> "]" => ast::Pattern::List(pats),
-    "(" <pats: SepTuple<ScopablePattern, ",">> ")" => ast::Pattern::Tuple(pats),
-}
-
-UnguardedPattern: ast::Pattern = {
-    CompoundPattern,
-    <pats: SepListAtLeastTwo<AtomicPattern, "|">> => ast::Pattern::Union(pats),
-    "~" <pat: CompoundPattern> => ast::Pattern::Complement(Box::new(pat)),
-}
-
-pub Pattern: ast::Pattern = {
-    UnguardedPattern,
-    <pat: Sp<UnguardedPattern>> <if_: Sp<"if">> <guard: Sp<Expression>> =>? {
-        if pat.end == if_.start {
-            Err(ParseError::User {
-                error: "Space required between pattern to guard and `if` token"
-            })
-        } else if if_.end == guard.start {
-            Err(ParseError::User {
-                error: "Space required between `if` token and guard expression"
-            })
-        } else {
-            Ok(ast::Pattern::Guarded(Box::new(pat.value), guard.value))
-        }
-    },
-}
-
-AtomicTypeExpr: ast::TypeExpression = {
-    "int" => ast::TypeExpression::IntType,
-    "float" => ast::TypeExpression::FloatType,
-    "string" => ast::TypeExpression::StringType,
-    "[" <te: TypeExpression> "]" => ast::TypeExpression::ListType(Box::new(te)),
-    "(" <te: TypeExpression> ")" => te,
-    "(" <tes: SepTuple<TypeExpression, ",">> ")" => ast::TypeExpression::TupleType(tes),
-    <tvar: TypeVar> => ast::TypeExpression::UniversalType(tvar),
-}
-
-NonFuncTypeExpr: ast::TypeExpression = {
-    AtomicTypeExpr,
-    // <Declared TypeId> <TypeArgs>
-    <t: Sp<Identifier>> <targs: Sp<AtomicTypeExpr>*> =>? {
-        let mut texpr_spans = vec![(t.start, t.end)];
-        let (targ_vals, mut targ_spans): (Vec<_>, Vec<_>) = targs.iter().map(|el| {
-            (el.value.clone(), (el.start, el.end))
-        }).unzip();
-        texpr_spans.append(&mut targ_spans);
-        if util::spans_overlap(&texpr_spans) {
-            Err(ParseError::User {
-                error: "Space required between tokens here, cannot identify type arguments"
-            })
-        } else {
-            Ok(ast::TypeExpression::DeclaredType(t.value, targ_vals))
-        }
-    },
-}
-
-pub TypeExpression: ast::TypeExpression = {
-    NonFuncTypeExpr,
-    <ftype: SepListAtLeastTwo<Sp<NonFuncTypeExpr>, "->" >> =>? match util::collect_function::<ast::TypeExpression>(
-        ftype[0].clone(),
-        ftype[1..].to_vec(),
-        |t1, t2| ast::TypeExpression::FunctionType(Box::new(t1), Box::new(t2))
-    ) {
-        Ok(v) => Ok(v),
-        Err(e) => Err(ParseError::User { error: e })
-    }
-}
-
-// Program
-
-TypeVariantDeclType: (String, Option<ast::TypeExpression>) = {
-    <tid: Identifier> => (tid, None),
-    <tid: Sp<Identifier>> <with: Sp<"with">> <field_t: Sp<TypeExpression>> =>? {
-        if tid.end == with.start {
-            Err(ParseError::User {
-                error: "Type of variant with argument requires space between TypeId and `with` token"
-            })
-        } else if with.end == field_t.start {
-            Err(ParseError::User {
-                error: "Type of variant with argument requires space between `with` token and field type"
-            })
-        } else {
-            Ok((tid.value, Some(field_t.value)))
-        }
-    }
-}
-
-LetStatement: ast::Statement = {
-    <let_: Sp<"let">> <ids: Sp<Identifier>+> "=" <e: Expression> ";" =>? {
-        if let_.end == ids[0].start {
-            Err(ParseError::User {
-                error: "Space required between `let` token and first identifier in let statement"
-            })
-        } else if util::spans_overlap(&ids.iter().map(|x| (x.start, x.end)).collect::<Vec<_>>()) {
-            Err(ParseError::User {
-                error: "Identifiers in untyped let require space between them"
-            })
-        } else {
-            Ok(ast::Statement::UntypedLet(
-                ids.iter().map(|x| x.value.clone()).collect::<Vec<_>>(), e
-            ))
-        }
-    },
-    <let_: Sp<"let">> <typed_id: Sp<TypedIdentifier>> "=" <e: Expression> ";" =>? {
-        if let_.end == typed_id.start {
-            Err(ParseError::User {
-                error: "Space required between `let` token and first identifier in let statement"
-            })
-        } else {
-            Ok(ast::Statement::TypedLet(typed_id.value.0, typed_id.value.1, vec![], e))
-        }
-    },
-    <let_: Sp<"let">> <id: Sp<Identifier>> <typed_ids: ("(" <TypedIdentifier> ")" "->")+> <te: TypeExpression> "=" <e: Expression> ";" =>? {
-        if let_.end == id.start {
-            Err(ParseError::User {
-                error: "Space required between `let` token and first identifier"
-            })
-        } else {
-            Ok(ast::Statement::TypedLet(id.value, te, typed_ids, e)   )
-        }
-    }
-}
-
-pub Statement: ast::Statement = {
-    LetStatement,
-    <type_: Sp<"type">> <tid: Sp<Identifier>> <tvars: Sp<TypeVar>*> "=" <variants: SepListAtLeastOne<TypeVariantDeclType, "|">> ";" =>? {
-        if type_.end == tid.start {
-            Err(ParseError::User {
-                error: "Space required between `type` token and declared type name"
-            })
-        } else if tvars.len() != 0 && tid.end == tvars[0].start {
-            Err(ParseError::User {
-                error: "Space required between declared type name and type arguments"
-            })
-        } else if util::spans_overlap(&tvars.iter().map(|tv| (tv.start, tv.end)).collect::<Vec<_>>()) {
-            Err(ParseError::User {
-                error: "Type variables in type declaration require space between them"
-            })
-        } else {
-            Ok(ast::Statement::TypeDeclaration(
-                tid.value,
-                tvars.iter().map(|tv| tv.value.clone()).collect::<Vec<_>>(),
-                variants
-            ))
-        }
-    }
-}
-
-pub Program: Vec<ast::Statement> = <stmts: Sp<Statement>+> =>? {
-    if util::spans_overlap(&stmts.iter().map(|s| (s.start, s.end)).collect::<Vec<_>>()) {
-        Err(ParseError::User {
-            error: "Space required between adjacent statements"
-        })
-    } else {
-        Ok(stmts.iter().map(|s| s.value.clone()).collect::<Vec<_>>())
-    }
-};
+/// An identifier with a type annotation.
+// TypedIdentifier: (String, ast::Type) =
+//     <id: Identifier> ":" <te: TypeExpression> => (id, te);
