@@ -18,10 +18,10 @@ fn main() {
 
     match action.as_str() {
         "parse" | "p" => {
-            println!("{:?}", parser.parse(wye_program.as_str()));
+            println!("{:?}", parser.parse(true, wye_program.as_str()));
         }
         "typecheck" | "tc" => {
-            let _ = parser.parse(wye_program.as_str()).unwrap();
+            let _ = parser.parse(true, wye_program.as_str()).unwrap();
             todo!();
         }
         _ => {

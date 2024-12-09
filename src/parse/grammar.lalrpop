@@ -1,9 +1,9 @@
 use super::ast;
-use super::span::{Spanned, spanned};
+use super::span::{OptionSpanned, Span};
 // use super::util;
 use ordered_float::OrderedFloat;
 
-grammar;
+grammar(collect_spans: bool);
 
 // ****************************************
 // Comments and whitespace
@@ -28,7 +28,16 @@ Identifier: String = <r"[a-zA-Z_][a-zA-Z0-9_]*"> => String::from(<>);
 
 /// Potentially bounded polymorphic type variable
 PolytypeVar: ast::PolytypeDecl =
-    "'" <bound: Identifier?> <name: Identifier> => ast::PolytypeDecl { name, bound };
+    <start: @L> "'" <bound: Identifier?> <name: Identifier> <end: @R> =>
+        ast::PolytypeDecl {
+            name,
+            bound,
+            span: if collect_spans {
+                Some(Span {start, end })
+            } else {
+                None
+            }
+        };
 
 /// Integer literal
 IntLiteral: i64 = <r"-?([0-9]|[1-9][0-9]*)"> => <>.parse::<i64>().unwrap();
@@ -65,27 +74,27 @@ PostfixBinaryOp: ast::BinaryOp =
 // Expression building
 // ****************************************
 
-AtomicExpr: Spanned<ast::Expression> = {
-    <n: Sp<"nothing">> => spanned(ast::Expression::Nothing, n.span),
-    <i: Sp<IntLiteral>> => spanned(ast::Expression::IntLiteral(i.value), i.span),
-    <f: Sp<FloatLiteral>> => spanned(ast::Expression::FloatLiteral(f.value), f.span),
-    <s: Sp<StringLiteral>> => spanned(ast::Expression::StringLiteral(s.value), s.span),
-    <id: Sp<Identifier>> => spanned(ast::Expression::Identifier(id.value), id.span),
-    <bop: Sp<PostfixBinaryOp>> => spanned(ast::Expression::BinaryOp(bop.value), bop.span),
-    <p: Sp<"print">> => spanned(ast::Expression::Print, p.span),
-    <e: Sp<"fail">> => spanned(ast::Expression::Fail, e.span),
-    <lst: Sp<r"[\s*]">> => spanned(ast::Expression::List(vec![]), lst.span),
-    <lst: Sp<NonemptyList<Expression>>> => spanned(ast::Expression::List(lst.value), lst.span),
-    <t: Sp<WyeTuple<Expression>>> => spanned(ast::Expression::Tuple(t.value), t.span),
+AtomicExpr: ast::Expression = {
+    <n: Sp<"nothing">> => ast::Expression::Nothing(n.span),
+    <i: Sp<IntLiteral>> => ast::Expression::IntLiteral(i.value, i.span),
+    <f: Sp<FloatLiteral>> => ast::Expression::FloatLiteral(f.value, f.span),
+    <s: Sp<StringLiteral>> => ast::Expression::StringLiteral(s.value, s.span),
+    <id: Sp<Identifier>> => ast::Expression::Identifier(id.value, id.span),
+    <bop: Sp<PostfixBinaryOp>> => ast::Expression::BinaryOp(bop.value, bop.span),
+    <p: Sp<"print">> => ast::Expression::Print(p.span),
+    <f: Sp<"fail">> => ast::Expression::Fail(f.span),
+    <lst: Sp<r"\[\s*\]">> => ast::Expression::List(vec![], lst.span),
+    <lst: Sp<NonemptyList<Expression>>> => ast::Expression::List(lst.value, lst.span),
+    <t: Sp<WyeTuple<Expression>>> => ast::Expression::Tuple(t.value, t.span),
     "(" <e: Expression> ")" => e,
 }
 
-pub Expression: Spanned<ast::Expression> = {
+pub Expression: ast::Expression = {
     AtomicExpr,
 }
 
 pub Program: ast::Program = {
-    ".*" => vec![]
+    ".*" => vec![],
 }
 
 // pub Expression: Spanned<ast::Expression> = {
@@ -342,7 +351,15 @@ pub Program: ast::Program = {
 // TODO: it may be useful to split this out into a separate file
 
 /// Match `Rule` and extract the match's span.
-Sp<Rule>: Spanned<Rule> = <l: @L> <value: Rule> <r: @R> => Spanned::new(value, l, r);
+Sp<Rule>: OptionSpanned<Rule> = {
+    <start: @L> <value: Rule> <end: @R> => {
+        if collect_spans {
+            OptionSpanned { value, span: Some(Span::new(start, end)) }
+        } else {
+            OptionSpanned { value, span: None }
+        }
+    }
+}
 
 /// A sequence of `T` nodes separated by `Sep` tokens, with at least one element.
 /// Used for matching lists.

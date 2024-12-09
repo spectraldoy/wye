@@ -9,30 +9,22 @@ pub struct Span {
     pub end: usize,
 }
 
+impl Span {
+    pub fn new(start: usize, end: usize) -> Self {
+        Self { start, end }
+    }
+}
+
+pub type OptionSpan = Option<Span>;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Spanned<T>
-where
-    T: Clone + PartialEq + Eq
-{
+pub struct Spanned<T: Clone + PartialEq + Eq> {
     pub value: T,
     pub span: Span,
 }
 
-impl<T> Spanned<T>
-where
-    T: Clone + PartialEq + Eq
-{
-    /// Construct a new spanned value.
-    pub fn new(value: T, start: usize, end: usize) -> Self {
-        Spanned { value, span: Span { start, end } }
-    }
-}
-
-/// Reduces clutter
-pub fn spanned<T: Clone + PartialEq + Eq>(value: T, span: Span) -> Spanned<T> {
-    Spanned { value, span }
-}
-
-pub fn get_spanned_value<T: Clone + PartialEq + Eq>(spanned_val: Spanned<T>) -> T {
-    spanned_val.value
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OptionSpanned<T: Clone + PartialEq + Eq> {
+    pub value: T,
+    pub span: OptionSpan,
 }
