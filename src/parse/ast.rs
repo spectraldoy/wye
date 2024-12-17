@@ -1,6 +1,5 @@
-use super::util::OptionBox;
 use ordered_float::OrderedFloat;
-use super::span::{Span, OptionSpan};
+use super::span::OptionSpan;
 
 /// This file describes the Abstract Syntax Tree for Wye. A Wye program is, at
 /// base, a sequence of Wye statements. At present, there are only 6 allowed Wye
@@ -17,8 +16,6 @@ use super::span::{Span, OptionSpan};
 /// It is useful to describe these types in an abstract syntax within the AST.
 
 // TODO: documentation
-
-// what can I do here about testing parse errors
 
 pub type Program = Vec<Statement>;
 
@@ -62,8 +59,6 @@ pub enum Statement {
     },
     // Main is just an expression in Wye
     Main(Expression),
-    // Erroneous statement
-    Error(&'static str, Span),
 }
 
 
@@ -73,9 +68,6 @@ pub enum Statement {
 // you still have to have unspans right, where you replace
 // all the spans with Nones
 // and apart from that, you also need to have equality checks
-
-// TODO We can use Span fields in every enum variant and then
-// have an unspan method
 
 /// Expressions describe some kind of computation that evaluates to a value,
 /// which can be stored in a variable, or used in further expressions.
@@ -101,7 +93,7 @@ pub enum Expression {
     EnumVariant {
         enum_id: String,
         variant: String,
-        field: OptionBox<Expression>,
+        field: Box<Expression>,
         span: OptionSpan,
     },
     // <Id>.<Id>: could be enum or struct
@@ -133,8 +125,6 @@ pub enum Expression {
     Set(AttrSet, OptionSpan),
     // <attrset> in <expr>
     SetIn(AttrSet, OptionSpan, Box<Expression>),
-    // Erroneous expression
-    Error(&'static str, Span),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -144,7 +134,8 @@ pub enum Type {
     Int,
     Float,
     String,
-    Enum { name: String, polytype_vars: Vec<PolytypeDecl> },
+    // Could be enum or struct, this is not known at parse-time
+    TypeId { name: String, polytype_vars: Vec<PolytypeDecl> },
     List(Box<Type>),
     Tuple(Vec<Type>),
     // { method? <id>: <type> }
@@ -157,8 +148,6 @@ pub enum Type {
     Function(Box<Type>, Box<Type>),
     // Type to be inferred
     Hole,
-    // Erroneous type
-    Error(&'static str, Span),
 }
 
 /// Reserved tokens used to denote builtin binary operations, which are
@@ -237,8 +226,6 @@ pub enum Pattern {
     },
     // case <e>; e must evaluate to boolean
     Case(Expression, OptionSpan),
-    // Error, for reporting.
-    Error(&'static str, Span),
 }
 
 // TODO: What are the easter eggs in the grammar?

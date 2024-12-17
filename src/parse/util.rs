@@ -1,14 +1,4 @@
-#[cfg(test)]
-use ordered_float::OrderedFloat;
 
-/// TODO
-pub type OptionBox<T> = Option<Box<T>>;
-
-/// TODO
-#[cfg(test)]
-pub fn to_of64(x: f64) -> OrderedFloat<f64> {
-    OrderedFloat::<f64>(x)
-}
 
 // pub fn spans_overlap(spans: &Vec<(usize, usize)>) -> bool {
 //     if spans.len() == 0 {

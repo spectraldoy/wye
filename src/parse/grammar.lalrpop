@@ -1,9 +1,13 @@
 use super::ast;
-use super::span::{OptionSpanned, Span};
-// use super::util;
+use super::span::{OptionSpanned, OptionSpan, Span};
 use ordered_float::OrderedFloat;
+use lalrpop_util::ParseError;
 
 grammar(collect_spans: bool);
+
+extern {
+    type Error = (&'static str, OptionSpan);
+}
 
 // ****************************************
 // Comments and whitespace
@@ -70,9 +74,31 @@ BinaryOp: ast::BinaryOp = {
 PostfixBinaryOp: ast::BinaryOp =
     "(" <bop: BinaryOp> ")" => bop;
 
+
+/// Projection: TODO(WYE-4)
+Projection: (String, String) =
+    <r"[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*"> => {
+        let res = <>.split(".").map(str::to_string).collect::<Vec<String>>();
+        (res[0].clone(), res[1].clone())
+    };
+
+RecordTypeMethod: (String, ast::Type) = 
+    "method" <m: Identifier> ":" <t: Type> => (m, t);
+
+// TODO(WYE-2): parse record method declarations
+// Also allow definition of methods with type annotations
+
+RecordTypeMember: (String, ast::Type) = {
+    RecordField<Type>,
+    RecordTypeMethod,
+}
+
 // ****************************************
 // Expression building
 // ****************************************
+
+SpRecordExprField: OptionSpanned<(String, ast::Expression)> =
+    Sp<RecordField<Expression>>;
 
 AtomicExpr: ast::Expression = {
     <n: Sp<"nothing">> => ast::Expression::Nothing(n.span),
@@ -80,21 +106,103 @@ AtomicExpr: ast::Expression = {
     <f: Sp<FloatLiteral>> => ast::Expression::FloatLiteral(f.value, f.span),
     <s: Sp<StringLiteral>> => ast::Expression::StringLiteral(s.value, s.span),
     <id: Sp<Identifier>> => ast::Expression::Identifier(id.value, id.span),
+    // TODO(WYE-4): this can more generally be expressions, instead of just strings
+    <proj: Sp<Projection>> => ast::Expression::Projection(proj.value.0, proj.value.1, proj.span),
     <bop: Sp<PostfixBinaryOp>> => ast::Expression::BinaryOp(bop.value, bop.span),
     <p: Sp<"print">> => ast::Expression::Print(p.span),
     <f: Sp<"fail">> => ast::Expression::Fail(f.span),
     <lst: Sp<r"\[\s*\]">> => ast::Expression::List(vec![], lst.span),
     <lst: Sp<NonemptyList<Expression>>> => ast::Expression::List(lst.value, lst.span),
     <t: Sp<WyeTuple<Expression>>> => ast::Expression::Tuple(t.value, t.span),
+    <r: Sp<WyeRecord<SpRecordExprField>>> => {
+        let record_span = r.span;
+        // spanned_string_expr: OptionSpanned<(String, Expression)>
+        let record_elems = r.value.iter().map(|spanned_string_expr| {
+            (spanned_string_expr.value.0.clone(), spanned_string_expr.value.1.clone(), spanned_string_expr.span.clone())
+        }).collect::<Vec<_>>();
+        ast::Expression::Record(record_elems, record_span)
+    },
     "(" <e: Expression> ")" => e,
 }
 
+// TODO(WYE-3): Make error reporting consistent
 pub Expression: ast::Expression = {
     AtomicExpr,
+    <evar: Sp<Projection>> <with: Sp<"with">> <field: Sp<AtomicExpr>> =>? {
+        if evar.start() == with.end() && collect_spans {
+            Err(ParseError::User {
+                error: ("Space required between enum variant and `with` token", Span::maybe_new(evar.start(), with.end()))
+            })
+        } else if with.end() == field.start() && collect_spans {
+            Err(ParseError::User {
+                error: ("Space required between `with` token and enum field", Span::maybe_new(with.start(), field.end()))
+            })
+        } else {
+            Ok(ast::Expression::EnumVariant {
+                enum_id: evar.clone().value.0,
+                variant: evar.clone().value.1,
+                field: Box::new(field.clone().value),
+                span: Span::maybe_new(evar.start(), field.end()),
+            })
+        }
+    },
+// <func: Sp<AtomicExpr>> <args: Sp<AtomicExpr>+> =>? match util::collect_function::<ast::Expression>(
+//         func,
+//         args,
+//         |e1, e2| ast::Expression::FuncApplication(Box::new(e1), Box::new(e2))
+//     ) {
+//         Ok(v) => Ok(v),
+//         Err(e) => Err(ParseError::User { error: e })
+//     },
+//     // BuiltinOp
+//     <op1: AtomicExpr> <bop: BuiltinOp> <op2: AtomicExpr> => ast::Expression::FuncApplication(
+//         Box::new(ast::Expression::FuncApplication(
+//             Box::new(ast::Expression::BuiltinOp(bop)),
+//             Box::new(op1)
+//         )),
+//         Box::new(op2)
+//     ),
+//     <match_: Sp<"match">> <matchand: Sp<Expression>> "{" <arm: (<Pattern> "=>" <Expression> ","?)> "}" =>? {
+//         if match_.end == matchand.start {
+//             Err(ParseError::User {
+//                 error: "Space required between `match` keyword and matchand"
+//             })
+//         } else {
+//             Ok(ast::Expression::MatchConstruct(
+//                 Box::new(matchand.value), vec![arm]
+//             ))
+//         }
+//     },
+//     <match_: Sp<"match">> <matchand: Sp<Expression>> "{" <arms: SepTupleAtLeastTwo<(<Pattern> "=>" <Expression>), ",">> "}" =>? {
+//         if match_.end == matchand.start {
+//             Err(ParseError::User {
+//                 error: "Space required between `match` keyword and matchand"
+//             })
+//         } else {
+//             Ok(ast::Expression::MatchConstruct(
+//                 Box::new(matchand.value), arms
+//             ))
+//         }
+//     },
 }
 
 pub Program: ast::Program = {
     ".*" => vec![],
+}
+
+// The parser can build a list of declared types
+AtomicType: ast::Type = {
+    "none" => ast::Type::None,
+    "string" => ast::Type::String,
+    "int" => ast::Type::Int,
+    "float" => ast::Type::Float,
+    <i: Identifier> => ast::Type::TypeId { name: i, polytype_vars: vec![] },
+    "[" <t: Type> "]" => ast::Type::List(Box::new(t)),
+    <tup: WyeTuple<Type>> => ast::Type::Tuple(tup),
+}
+
+pub Type: ast::Type = {
+    AtomicType,
 }
 
 // pub Expression: Spanned<ast::Expression> = {
@@ -410,6 +518,13 @@ SepTupleAtLeastTwo<T, Sep>: Vec<T> = {
         out
     }
 }
+
+RecordField<T>: (String, T) = 
+    <i: Identifier> ":" <t: T> => (i, t);
+
+WyeRecord<MemberType>: Vec<MemberType> =
+    "{" <n: SepSeqAtLeastOne<MemberType, ",">> "}" => n;
+
 
 /// An identifier with a type annotation.
 // TypedIdentifier: (String, ast::Type) =

@@ -6,6 +6,8 @@ mod test_expr;
 mod test_type;
 #[cfg(test)]
 mod test_pattern;
+#[cfg(test)]
+mod util;
 
 
 // Statements

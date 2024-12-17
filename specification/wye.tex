@@ -154,6 +154,10 @@ $pat1 | pat2$ means that exactly one of $pat1$ or $pat2$ may occur. Beware that
 brackets$\ra$ are used to annotate certain grammar rules. $\symbol{92}n$ refers
 to a newline or carriage return.
 
+% WYE: only structs can hold state. You cannot define methods on anon records
+% anon records should not be allowed to change state with methods. If you want
+% to store state, then declare a struct
+
 \subsection{Grammar}
 \subsubsection{Top-level non-terminals}
 \begin{align*}
