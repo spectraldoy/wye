@@ -196,13 +196,15 @@ AtomicType: ast::Type = {
     "string" => ast::Type::String,
     "int" => ast::Type::Int,
     "float" => ast::Type::Float,
-    <i: Identifier> => ast::Type::TypeId { name: i, polytype_vars: vec![] },
+    <i: Identifier> => ast::Type::TypeId(i, vec![]),
     "[" <t: Type> "]" => ast::Type::List(Box::new(t)),
     <tup: WyeTuple<Type>> => ast::Type::Tuple(tup),
+    "(" <t: Type> ")" => t,
 }
 
 pub Type: ast::Type = {
     AtomicType,
+    // TODO (WYE-6): records, functions, polymorphic
 }
 
 // pub Expression: Spanned<ast::Expression> = {
@@ -455,8 +457,6 @@ pub Type: ast::Type = {
 // ****************************************
 // Utility macros
 // ****************************************
-
-// TODO: it may be useful to split this out into a separate file
 
 /// Match `Rule` and extract the match's span.
 Sp<Rule>: OptionSpanned<Rule> = {

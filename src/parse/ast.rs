@@ -15,7 +15,7 @@ use super::span::OptionSpan;
 /// let statements may be annotated with types in order to aid the type checker.
 /// It is useful to describe these types in an abstract syntax within the AST.
 
-// TODO: documentation
+// TODO(WYE-5): documentation
 
 pub type Program = Vec<Statement>;
 
@@ -134,8 +134,8 @@ pub enum Type {
     Int,
     Float,
     String,
-    // Could be enum or struct, this is not known at parse-time
-    TypeId { name: String, polytype_vars: Vec<PolytypeDecl> },
+    // (name, polytypes). Could be enum or struct, this is not known at parse-time
+    TypeId(String, Vec<PolytypeDecl>),
     List(Box<Type>),
     Tuple(Vec<Type>),
     // { method? <id>: <type> }
@@ -173,7 +173,7 @@ pub enum BinaryOp {
     Cons,
 }
 
-/// TODO
+/// TODO(WYE-5): Documentation
 /// f a b = c
 /// f a: int -> b: string -> int = c
 #[derive(Debug, Clone, PartialEq, Eq)]

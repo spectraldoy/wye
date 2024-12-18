@@ -1,273 +1,251 @@
-// use super::*;
+use super::*;
 
-// // Type Expressions
+#[test]
+fn test_parse_literal() {
+    let parser = grammar::TypeParser::new();
+    assert!(parser.parse(false, "none").unwrap() == ast::Type::None);
+    assert!(parser.parse(false, "int").unwrap() == ast::Type::Int);
+    assert!(parser.parse(false, "float").unwrap() == ast::Type::Float);
+    assert!(parser.parse(false, "string").unwrap() == ast::Type::String);
+    assert!(
+        parser.parse(false, "iNT").unwrap()
+            == ast::Type::TypeId("iNT".to_string(), vec![])
+    );
+    assert!(
+        parser.parse(false, "_x").unwrap()
+            == ast::Type::TypeId("_x".to_string(), vec![])
+    );
+    assert!(
+        parser.parse(false, "flot").unwrap()
+            == ast::Type::TypeId("flot".to_string(), vec![])
+    );
+    assert!(parser.parse(false, "(int)").unwrap() == ast::Type::Int);
+    assert!(
+        parser.parse(false, "(xello)").unwrap()
+            == ast::Type::TypeId("xello".to_string(), vec![])
+    );
+    // Err literal type
+    assert!(parser.parse(false, "Un[").is_err());
+    assert!(parser.parse(false, "()").is_err());
+    assert!(parser.parse(false, "8").is_err());
+    assert!(parser.parse(false, "\"hello\"").is_err());
+    assert!(parser.parse(false, "x:int").is_err());
+    assert!(parser.parse(false, "nothing").is_err());
+}
+
+#[test]
+fn test_parse_list_tuple_type() {
+    let parser = grammar::TypeParser::new();
+    assert!(
+        parser.parse(false, "[int]").unwrap()
+            == ast::Type::List(Box::new(ast::Type::Int))
+    );
+    assert!(
+        parser.parse(false, "[Option]").unwrap()
+            == ast::Type::List(Box::new(ast::Type::TypeId("Option".to_string(), vec![])))
+    );
+    assert!(
+        parser.parse(false, "[(int)]").unwrap()
+            == ast::Type::List(Box::new(ast::Type::Int))
+    );
+    assert!(
+        parser.parse(false, "[(int, Option)]").unwrap()
+            == ast::Type::List(Box::new(ast::Type::Tuple(vec![
+                ast::Type::Int,
+                ast::Type::TypeId("Option".to_string(), vec![])
+            ])))
+    );
+    assert!(
+        parser.parse(false, "[[int]]").unwrap()
+            == ast::Type::List(Box::new(ast::Type::List(Box::new(
+                ast::Type::Int
+            ))))
+    );
+    assert!(parser.parse(false, "[int").is_err());
+    assert!(parser.parse(false, "[int, string]").is_err());
+    assert!(parser.parse(false, "hel]o").is_err());
+    assert!(
+        parser.parse(false, "(int, string, float)").unwrap()
+            == ast::Type::Tuple(vec![
+                ast::Type::Int,
+                ast::Type::String,
+                ast::Type::Float
+            ])
+    );
+    assert!(
+        parser
+            .parse(false, "(none, int, Option, string)")
+            .unwrap()
+            == ast::Type::Tuple(vec![
+                ast::Type::None,
+                ast::Type::Int,
+                ast::Type::TypeId("Option".to_string(), vec![]),
+                ast::Type::String
+            ])
+    );
+    assert!(parser.parse(false, "()").is_err());
+    assert!(parser.parse(false, "int, string)").is_err());
+    assert!(parser.parse(false, "int, string, 'a").is_err());
+    assert!(parser.parse(false, "hi(, there").is_err());
+    assert!(parser.parse(false, "(xello, int, stri)ng, )").is_err());
+    assert!(parser.parse(false, "int string").is_err());
+}
+
+
+// TODO(WYE-6) uncomment these and test_parse_enum types and record types
+// note that record types can have polytype variables to handle structs/interfaces
+// that are parametrized with polytype variables
 
 // #[test]
-// fn test_parse_type_lit_univ_type() {
-//     let parser = grammar::TypeExpressionParser::new();
-//     // Ok literal type
-//     assert!(parser.parse("int").unwrap() == ast::TypeExpression::IntType);
-//     assert!(parser.parse("float").unwrap() == ast::TypeExpression::FloatType);
-//     assert!(parser.parse("string").unwrap() == ast::TypeExpression::StringType);
+// fn test_parse_polymorphic_type() {
+//     assert!(parser.parse(false, "'a").unwrap() == ast::Type::UniversalType("a".to_string()));
 //     assert!(
-//         parser.parse("iNT").unwrap()
-//             == ast::TypeExpression::DeclaredType(String::from("iNT"), vec![])
+//         parser.parse(false, "'_yusdf").unwrap()
+//             == ast::Type::UniversalType("_yusdf".to_string())
 //     );
 //     assert!(
-//         parser.parse("_x").unwrap()
-//             == ast::TypeExpression::DeclaredType(String::from("_x"), vec![])
+//         parser.parse(false, "'aAbABBB").unwrap()
+//             == ast::Type::UniversalType("aAbABBB".to_string())
+//     );
+//     assert!(parser.parse(false, "'v1").unwrap() == ast::Type::UniversalType("v1".to_string()));
+//     assert!(
+//         parser.parse(false, "'Type").unwrap() == ast::Type::UniversalType("Type".to_string())
 //     );
 //     assert!(
-//         parser.parse("flot").unwrap()
-//             == ast::TypeExpression::DeclaredType(String::from("flot"), vec![])
+//         parser.parse(false, "'___Type").unwrap()
+//             == ast::Type::UniversalType("___Type".to_string())
 //     );
-//     assert!(parser.parse("(int)").unwrap() == ast::TypeExpression::IntType);
-//     assert!(
-//         parser.parse("(xello)").unwrap()
-//             == ast::TypeExpression::DeclaredType(String::from("xello"), vec![])
-//     );
-//     // Err literal type
-//     assert!(parser.parse("Un[").is_err());
-//     assert!(parser.parse("()").is_err());
-//     // Ok type variable
-//     assert!(parser.parse("'a").unwrap() == ast::TypeExpression::UniversalType(String::from("a")));
-//     assert!(
-//         parser.parse("'_yusdf").unwrap()
-//             == ast::TypeExpression::UniversalType(String::from("_yusdf"))
-//     );
-//     assert!(
-//         parser.parse("'aAbABBB").unwrap()
-//             == ast::TypeExpression::UniversalType(String::from("aAbABBB"))
-//     );
-//     assert!(parser.parse("'v1").unwrap() == ast::TypeExpression::UniversalType(String::from("v1")));
-//     assert!(
-//         parser.parse("'Type").unwrap() == ast::TypeExpression::UniversalType(String::from("Type"))
-//     );
-//     assert!(
-//         parser.parse("'___Type").unwrap()
-//             == ast::TypeExpression::UniversalType(String::from("___Type"))
-//     );
-//     // Err type variable
-//     assert!(parser.parse("''").is_err());
-//     assert!(parser.parse("'hello'").is_err());
-//     assert!(parser.parse("'950abc").is_err());
-//     assert!(parser.parse("8").is_err());
-//     assert!(parser.parse("\"hello\"").is_err());
-//     assert!(parser.parse("x:int").is_err());
-//     assert!(parser.parse("'aபாதை").is_err());
-// }
-
-// #[test]
-// fn test_parse_list_tuple_type() {
-//     let parser = grammar::TypeExpressionParser::new();
-//     // Ok list type
-//     assert!(
-//         parser.parse("[int]").unwrap()
-//             == ast::TypeExpression::ListType(Box::new(ast::TypeExpression::IntType))
-//     );
-//     assert!(
-//         parser.parse("[Option]").unwrap()
-//             == ast::TypeExpression::ListType(Box::new(ast::TypeExpression::DeclaredType(
-//                 String::from("Option"),
-//                 vec![]
-//             )))
-//     );
-//     assert!(
-//         parser.parse("['a]").unwrap()
-//             == ast::TypeExpression::ListType(Box::new(ast::TypeExpression::UniversalType(
-//                 String::from("a")
-//             )))
-//     );
-//     assert!(
-//         parser.parse("[(int)]").unwrap()
-//             == ast::TypeExpression::ListType(Box::new(ast::TypeExpression::IntType))
-//     );
-//     assert!(
-//         parser.parse("[(int, Option)]").unwrap()
-//             == ast::TypeExpression::ListType(Box::new(ast::TypeExpression::TupleType(vec![
-//                 ast::TypeExpression::IntType,
-//                 ast::TypeExpression::DeclaredType(String::from("Option"), vec![])
-//             ])))
-//     );
-//     assert!(
-//         parser.parse("[[int]]").unwrap()
-//             == ast::TypeExpression::ListType(Box::new(ast::TypeExpression::ListType(Box::new(
-//                 ast::TypeExpression::IntType
-//             ))))
-//     );
-//     assert!(
-//         parser.parse("[Option int]").unwrap()
-//             == ast::TypeExpression::ListType(Box::new(ast::TypeExpression::DeclaredType(
-//                 String::from("Option"),
-//                 vec![ast::TypeExpression::IntType]
-//             )))
-//     );
-//     // Err list type
-//     assert!(parser.parse("[int").is_err());
-//     assert!(parser.parse("[int, string]").is_err());
-//     assert!(parser.parse("hel]o").is_err());
-//     // Ok tuple type
-//     assert!(
-//         parser.parse("('a, )").unwrap()
-//             == ast::TypeExpression::TupleType(vec![ast::TypeExpression::UniversalType(
-//                 String::from("a")
-//             )])
-//     );
-//     assert!(
-//         parser.parse("(int, string, float)").unwrap()
-//             == ast::TypeExpression::TupleType(vec![
-//                 ast::TypeExpression::IntType,
-//                 ast::TypeExpression::StringType,
-//                 ast::TypeExpression::FloatType
-//             ])
-//     );
-//     assert!(
-//         parser
-//             .parse("(Option int float, int, Option, string)")
-//             .unwrap()
-//             == ast::TypeExpression::TupleType(vec![
-//                 ast::TypeExpression::DeclaredType(
-//                     String::from("Option"),
-//                     vec![ast::TypeExpression::IntType, ast::TypeExpression::FloatType]
-//                 ),
-//                 ast::TypeExpression::IntType,
-//                 ast::TypeExpression::DeclaredType(String::from("Option"), vec![]),
-//                 ast::TypeExpression::StringType
-//             ])
-//     );
-//     // Err tuple type
-//     assert!(parser.parse("()").is_err());
-//     assert!(parser.parse("int, string)").is_err());
-//     assert!(parser.parse("int, string, 'a").is_err());
-//     assert!(parser.parse("hi(, there").is_err());
-//     assert!(parser.parse("(xello, int, stri)ng, )").is_err());
+//     assert!(parser.parse(false, "''").is_err());
+//     assert!(parser.parse(false, "'hello'").is_err());
+//     assert!(parser.parse(false, "'950abc").is_err());
+//     assert!(parser.parse(false, "'aபாதை").is_err());
 // }
 
 // #[test]
 // fn test_parse_function_type() {
-//     let parser = grammar::TypeExpressionParser::new();
+//     let parser = grammar::TypeParser::new();
 //     // Ok function type
 //     assert!(
-//         parser.parse("int -> float").unwrap()
-//             == ast::TypeExpression::FunctionType(
-//                 Box::new(ast::TypeExpression::IntType),
-//                 Box::new(ast::TypeExpression::FloatType)
+//         parser.parse(false, "int -> float").unwrap()
+//             == ast::Type::FunctionType(
+//                 Box::new(ast::Type::Int),
+//                 Box::new(ast::Type::Float)
 //             )
 //     );
 //     assert!(
-//         parser.parse("(int -> float)").unwrap()
-//             == ast::TypeExpression::FunctionType(
-//                 Box::new(ast::TypeExpression::IntType),
-//                 Box::new(ast::TypeExpression::FloatType)
+//         parser.parse(false, "(int -> float)").unwrap()
+//             == ast::Type::FunctionType(
+//                 Box::new(ast::Type::Int),
+//                 Box::new(ast::Type::Float)
 //             )
 //     );
 //     assert!(
 //         parser
 //             .parse("(int->float->        string ->Option)")
 //             .unwrap()
-//             == ast::TypeExpression::FunctionType(
-//                 Box::new(ast::TypeExpression::FunctionType(
-//                     Box::new(ast::TypeExpression::FunctionType(
-//                         Box::new(ast::TypeExpression::IntType),
-//                         Box::new(ast::TypeExpression::FloatType)
+//             == ast::Type::FunctionType(
+//                 Box::new(ast::Type::FunctionType(
+//                     Box::new(ast::Type::FunctionType(
+//                         Box::new(ast::Type::Int),
+//                         Box::new(ast::Type::Float)
 //                     )),
-//                     Box::new(ast::TypeExpression::StringType)
+//                     Box::new(ast::Type::String)
 //                 )),
-//                 Box::new(ast::TypeExpression::DeclaredType(
-//                     String::from("Option"),
+//                 Box::new(ast::Type::DeclaredType(
+//                     "Option".to_string(),
 //                     vec![]
 //                 ))
 //             )
 //     );
 //     assert!(
-//         parser.parse("'a -> 'b -> (int)").unwrap()
-//             == ast::TypeExpression::FunctionType(
-//                 Box::new(ast::TypeExpression::FunctionType(
-//                     Box::new(ast::TypeExpression::UniversalType(String::from("a"))),
-//                     Box::new(ast::TypeExpression::UniversalType(String::from("b")))
+//         parser.parse(false, "'a -> 'b -> (int)").unwrap()
+//             == ast::Type::FunctionType(
+//                 Box::new(ast::Type::FunctionType(
+//                     Box::new(ast::Type::UniversalType("a".to_string())),
+//                     Box::new(ast::Type::UniversalType("b".to_string()))
 //                 )),
-//                 Box::new(ast::TypeExpression::IntType)
+//                 Box::new(ast::Type::Int)
 //             )
 //     );
 //     assert!(
-//         parser.parse("string -> Option int -> float").unwrap()
-//             == ast::TypeExpression::FunctionType(
-//                 Box::new(ast::TypeExpression::FunctionType(
-//                     Box::new(ast::TypeExpression::StringType),
-//                     Box::new(ast::TypeExpression::DeclaredType(
-//                         String::from("Option"),
-//                         vec![ast::TypeExpression::IntType]
+//         parser.parse(false, "string -> Option int -> float").unwrap()
+//             == ast::Type::FunctionType(
+//                 Box::new(ast::Type::FunctionType(
+//                     Box::new(ast::Type::String),
+//                     Box::new(ast::Type::DeclaredType(
+//                         "Option".to_string(),
+//                         vec![ast::Type::Int]
 //                     ))
 //                 )),
-//                 Box::new(ast::TypeExpression::FloatType)
+//                 Box::new(ast::Type::Float)
 //             )
 //     );
 //     assert!(
-//         parser.parse("'a -> ('a -> int) -> 'a").unwrap()
-//             == ast::TypeExpression::FunctionType(
-//                 Box::new(ast::TypeExpression::FunctionType(
-//                     Box::new(ast::TypeExpression::UniversalType(String::from("a"))),
-//                     Box::new(ast::TypeExpression::FunctionType(
-//                         Box::new(ast::TypeExpression::UniversalType(String::from("a"))),
-//                         Box::new(ast::TypeExpression::IntType)
+//         parser.parse(false, "'a -> ('a -> int) -> 'a").unwrap()
+//             == ast::Type::FunctionType(
+//                 Box::new(ast::Type::FunctionType(
+//                     Box::new(ast::Type::UniversalType("a".to_string())),
+//                     Box::new(ast::Type::FunctionType(
+//                         Box::new(ast::Type::UniversalType("a".to_string())),
+//                         Box::new(ast::Type::Int)
 //                     ))
 //                 )),
-//                 Box::new(ast::TypeExpression::UniversalType(String::from("a")))
+//                 Box::new(ast::Type::UniversalType("a".to_string()))
 //             )
 //     );
 //     // Err function type
-//     assert!(parser.parse("int ->").is_err());
-//     assert!(parser.parse("-> float").is_err());
-//     assert!(parser.parse("(int -> float").is_err());
-//     assert!(parser.parse("(int - > float)").is_err());
-//     assert!(parser.parse("(int -> 4)").is_err());
-//     assert!(parser.parse("'a int -> int").is_err());
-//     assert!(parser.parse("x: int -> y: float -> string").is_err());
+//     assert!(parser.parse(false, "int ->").is_err());
+//     assert!(parser.parse(false, "-> float").is_err());
+//     assert!(parser.parse(false, "(int -> float").is_err());
+//     assert!(parser.parse(false, "(int - > float)").is_err());
+//     assert!(parser.parse(false, "(int -> 4)").is_err());
+//     assert!(parser.parse(false, "'a int -> int").is_err());
+//     assert!(parser.parse(false, "x: int -> y: float -> string").is_err());
 // }
 
 // #[test]
 // fn test_parse_declared_type() {
-//     let parser = grammar::TypeExpressionParser::new();
+//     let parser = grammar::TypeParser::new();
 //     // Ok declared type
 //     assert!(
-//         parser.parse("bool").unwrap()
-//             == ast::TypeExpression::DeclaredType(String::from("bool"), vec![])
+//         parser.parse(false, "bool").unwrap()
+//             == ast::Type::DeclaredType("bool".to_string(), vec![])
 //     );
 //     assert!(
-//         parser.parse("Option int").unwrap()
-//             == ast::TypeExpression::DeclaredType(
-//                 String::from("Option"),
-//                 vec![ast::TypeExpression::IntType]
+//         parser.parse(false, "Option int").unwrap()
+//             == ast::Type::DeclaredType(
+//                 "Option".to_string(),
+//                 vec![ast::Type::Int]
 //             )
 //     );
 //     assert!(
-//         parser.parse("Tree (Tree) float").unwrap()
-//             == ast::TypeExpression::DeclaredType(
-//                 String::from("Tree"),
+//         parser.parse(false, "Tree (Tree) float").unwrap()
+//             == ast::Type::DeclaredType(
+//                 "Tree".to_string(),
 //                 vec![
-//                     ast::TypeExpression::DeclaredType(String::from("Tree"), vec![]),
-//                     ast::TypeExpression::FloatType
+//                     ast::Type::DeclaredType("Tree".to_string(), vec![]),
+//                     ast::Type::Float
 //                 ]
 //             )
 //     );
 //     assert!(
-//         parser.parse("Tree (Tree float)").unwrap()
-//             == ast::TypeExpression::DeclaredType(
-//                 String::from("Tree"),
-//                 vec![ast::TypeExpression::DeclaredType(
-//                     String::from("Tree"),
-//                     vec![ast::TypeExpression::FloatType]
+//         parser.parse(false, "Tree (Tree float)").unwrap()
+//             == ast::Type::DeclaredType(
+//                 "Tree".to_string(),
+//                 vec![ast::Type::DeclaredType(
+//                     "Tree".to_string(),
+//                     vec![ast::Type::Float]
 //                 )]
 //             )
 //     );
 //     // Err declared type
-//     assert!(parser.parse("Option \"hi\"").is_err());
-//     assert!(parser.parse("Tree Tree float").is_err());
-//     assert!(parser.parse("(Tree) float").is_err());
-//     assert!(parser.parse("(Tree) 'a").is_err());
-//     assert!(parser.parse("bool'a").is_err());
-//     assert!(parser.parse("(yello").is_err());
-//     assert!(parser.parse("bool [int,]").is_err());
-//     assert!(parser.parse("(yello").is_err());
-//     assert!(parser.parse("X with int").is_err());
+//     assert!(parser.parse(false, "Option \"hi\"").is_err());
+//     assert!(parser.parse(false, "Tree Tree float").is_err());
+//     assert!(parser.parse(false, "(Tree) float").is_err());
+//     assert!(parser.parse(false, "(Tree) 'a").is_err());
+//     assert!(parser.parse(false, "bool'a").is_err());
+//     assert!(parser.parse(false, "(yello").is_err());
+//     assert!(parser.parse(false, "bool [int,]").is_err());
+//     assert!(parser.parse(false, "(yello").is_err());
+//     assert!(parser.parse(false, "X with int").is_err());
 // }

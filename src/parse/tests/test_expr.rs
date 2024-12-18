@@ -163,12 +163,6 @@ fn test_parse_record_expr() {
         ],
         None)
     );
-
-    assert!(parser.parse(false, "{}").is_err());
-    assert!(parser.parse(false, "{super(pub): 4}").is_err());
-    assert!(parser.parse(false, "{super: 4,}").is_err());
-    assert!(parser.parse(false, "{int: 4}").is_err());
-
     assert!(parser.parse(false, "{
         bint: 3,
         jint: [2],
@@ -180,7 +174,24 @@ fn test_parse_record_expr() {
         ("cidnt".to_string(), ast::Expression::IntLiteral(1, None), None),
         ("lint".to_string(), ast::Expression::Tuple(vec![ast::Expression::StringLiteral("hi".to_string(), None)], None), None)
     ], None));
+    assert!(parser.parse(false, "({one: 2, three: 4})").unwrap()
+        == ast::Expression::Record(vec![
+            ("one".to_string(), ast::Expression::IntLiteral(2, None), None),
+            ("three".to_string(), ast::Expression::IntLiteral(4, None), None)
+        ], None));
+    
+    assert!(parser.parse(false, "({one:2,three:4},)").unwrap()
+        == ast::Expression::Tuple(vec![ast::Expression::Record(vec![
+            ("one".to_string(), ast::Expression::IntLiteral(2, None), None),
+            ("three".to_string(), ast::Expression::IntLiteral(4, None), None)
+        ], None)], None));
 
+    assert!(parser.parse(false, "{}").is_err());
+    assert!(parser.parse(false, "{super(pub): 4}").is_err());
+    assert!(parser.parse(false, "{super: 4,}").is_err());
+    assert!(parser.parse(false, "{int: 4}").is_err());
+    assert!(parser.parse(false, "{4: thing}").is_err());
+    assert!(parser.parse(false, "unclosed: curly}").is_err());
     assert!(parser.parse(false, "{one: two three: four}").is_err());
 }
 
@@ -207,6 +218,7 @@ fn test_parse_identifier() {
     assert!(parser.parse(false, "(<)").unwrap() == ast::Expression::BinaryOp(ast::BinaryOp::Lt, None));
     assert!(parser.parse(false, "(+)").unwrap() == ast::Expression::BinaryOp(ast::BinaryOp::Add, None));
     assert!(parser.parse(false, "(//)").unwrap() == ast::Expression::BinaryOp(ast::BinaryOp::FloorDiv, None));
+
     assert!(parser.parse(false, "string").is_err());
     assert!(parser.parse(false, "with").is_err());
     assert!(parser.parse(false, "int").is_err());
