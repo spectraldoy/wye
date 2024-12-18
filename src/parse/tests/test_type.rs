@@ -7,22 +7,12 @@ fn test_parse_literal() {
     assert!(parser.parse(false, "int").unwrap() == ast::Type::Int);
     assert!(parser.parse(false, "float").unwrap() == ast::Type::Float);
     assert!(parser.parse(false, "string").unwrap() == ast::Type::String);
-    assert!(
-        parser.parse(false, "iNT").unwrap()
-            == ast::Type::TypeId("iNT".to_string(), vec![])
-    );
-    assert!(
-        parser.parse(false, "_x").unwrap()
-            == ast::Type::TypeId("_x".to_string(), vec![])
-    );
-    assert!(
-        parser.parse(false, "flot").unwrap()
-            == ast::Type::TypeId("flot".to_string(), vec![])
-    );
+    assert!(parser.parse(false, "iNT").unwrap() == ast::Type::TypeId("iNT".to_string(), vec![]));
+    assert!(parser.parse(false, "_x").unwrap() == ast::Type::TypeId("_x".to_string(), vec![]));
+    assert!(parser.parse(false, "flot").unwrap() == ast::Type::TypeId("flot".to_string(), vec![]));
     assert!(parser.parse(false, "(int)").unwrap() == ast::Type::Int);
     assert!(
-        parser.parse(false, "(xello)").unwrap()
-            == ast::Type::TypeId("xello".to_string(), vec![])
+        parser.parse(false, "(xello)").unwrap() == ast::Type::TypeId("xello".to_string(), vec![])
     );
     // Err literal type
     assert!(parser.parse(false, "Un[").is_err());
@@ -36,18 +26,12 @@ fn test_parse_literal() {
 #[test]
 fn test_parse_list_tuple_type() {
     let parser = grammar::TypeParser::new();
-    assert!(
-        parser.parse(false, "[int]").unwrap()
-            == ast::Type::List(Box::new(ast::Type::Int))
-    );
+    assert!(parser.parse(false, "[int]").unwrap() == ast::Type::List(Box::new(ast::Type::Int)));
     assert!(
         parser.parse(false, "[Option]").unwrap()
             == ast::Type::List(Box::new(ast::Type::TypeId("Option".to_string(), vec![])))
     );
-    assert!(
-        parser.parse(false, "[(int)]").unwrap()
-            == ast::Type::List(Box::new(ast::Type::Int))
-    );
+    assert!(parser.parse(false, "[(int)]").unwrap() == ast::Type::List(Box::new(ast::Type::Int)));
     assert!(
         parser.parse(false, "[(int, Option)]").unwrap()
             == ast::Type::List(Box::new(ast::Type::Tuple(vec![
@@ -57,25 +41,17 @@ fn test_parse_list_tuple_type() {
     );
     assert!(
         parser.parse(false, "[[int]]").unwrap()
-            == ast::Type::List(Box::new(ast::Type::List(Box::new(
-                ast::Type::Int
-            ))))
+            == ast::Type::List(Box::new(ast::Type::List(Box::new(ast::Type::Int))))
     );
     assert!(parser.parse(false, "[int").is_err());
     assert!(parser.parse(false, "[int, string]").is_err());
     assert!(parser.parse(false, "hel]o").is_err());
     assert!(
         parser.parse(false, "(int, string, float)").unwrap()
-            == ast::Type::Tuple(vec![
-                ast::Type::Int,
-                ast::Type::String,
-                ast::Type::Float
-            ])
+            == ast::Type::Tuple(vec![ast::Type::Int, ast::Type::String, ast::Type::Float])
     );
     assert!(
-        parser
-            .parse(false, "(none, int, Option, string)")
-            .unwrap()
+        parser.parse(false, "(none, int, Option, string)").unwrap()
             == ast::Type::Tuple(vec![
                 ast::Type::None,
                 ast::Type::Int,
@@ -90,7 +66,6 @@ fn test_parse_list_tuple_type() {
     assert!(parser.parse(false, "(xello, int, stri)ng, )").is_err());
     assert!(parser.parse(false, "int string").is_err());
 }
-
 
 // TODO(WYE-6) uncomment these and test_parse_enum types and record types
 // note that record types can have polytype variables to handle structs/interfaces

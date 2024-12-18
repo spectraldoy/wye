@@ -1,5 +1,5 @@
-use ordered_float::OrderedFloat;
 use super::span::OptionSpan;
+use ordered_float::OrderedFloat;
 
 /// This file describes the Abstract Syntax Tree for Wye. A Wye program is, at
 /// base, a sequence of Wye statements. At present, there are only 6 allowed Wye
@@ -61,9 +61,8 @@ pub enum Statement {
     Main(Expression),
 }
 
-
 // You could make spans optional
-// and then have a parser argument, depending on which we 
+// and then have a parser argument, depending on which we
 // collect spans or not
 // you still have to have unspans right, where you replace
 // all the spans with Nones
@@ -112,7 +111,7 @@ pub enum Expression {
     Lambda {
         args: Vec<(String, OptionSpan)>,
         expr: Box<Expression>,
-        span: OptionSpan
+        span: OptionSpan,
     },
     // Evaluate an expression and store in a variable of a type
     // let <id> (arguments & type-annotation) = <expression>
@@ -144,7 +143,10 @@ pub enum Type {
         values: Vec<(String, Type)>,
     },
     // Identifier for polymorphic type and optional interface bound.
-    Polymorphic { name: String, bound: Option<String> },
+    Polymorphic {
+        name: String,
+        bound: Option<String>,
+    },
     Function(Box<Type>, Box<Type>),
     // Type to be inferred
     Hole,
@@ -222,7 +224,7 @@ pub enum Pattern {
     Guarded {
         pattern: Box<Pattern>,
         guard_expr: Expression,
-        span: OptionSpan
+        span: OptionSpan,
     },
     // case <e>; e must evaluate to boolean
     Case(Expression, OptionSpan),

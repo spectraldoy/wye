@@ -1,5 +1,3 @@
-
-
 // pub fn spans_overlap(spans: &Vec<(usize, usize)>) -> bool {
 //     if spans.len() == 0 {
 //         return false;

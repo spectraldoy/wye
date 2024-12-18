@@ -17,7 +17,7 @@ impl Span {
     pub fn maybe_new(start: Option<usize>, end: Option<usize>) -> Option<Self> {
         match (start, end) {
             (None, _) | (_, None) => None,
-            (Some(start), Some(end)) => Some(Self { start, end })
+            (Some(start), Some(end)) => Some(Self { start, end }),
         }
     }
 }
@@ -40,14 +40,14 @@ impl<T: Clone + PartialEq + Eq> OptionSpanned<T> {
     pub fn start(&self) -> Option<usize> {
         match &self.span {
             None => None,
-            Some(span) => Some(span.start)
+            Some(span) => Some(span.start),
         }
     }
 
     pub fn end(&self) -> Option<usize> {
         match &self.span {
             None => None,
-            Some(span) => Some(span.end)
+            Some(span) => Some(span.end),
         }
     }
 }

@@ -3,15 +3,13 @@ use super::*;
 #[cfg(test)]
 mod test_expr;
 #[cfg(test)]
-mod test_type;
-#[cfg(test)]
 mod test_pattern;
+#[cfg(test)]
+mod test_type;
 #[cfg(test)]
 mod util;
 
-
 // Statements
-
 
 // #[test]
 // fn test_parse_type_decl() {
@@ -140,7 +138,7 @@ mod util;
 //                 "
 //         let f (g: 'a -> 'a) -> (x: 'a) -> 'a = g x;
 //         let double x = (*) 2 x;
-//         let z = f double 4; 
+//         let z = f double 4;
 //     "
 //             )
 //             .unwrap()
@@ -195,7 +193,7 @@ mod util;
 //         type Option 'a = None | Some with 'a;
 //         let print_optional (x: Option 'a) -> string = match x {
 //             None => print \"nothing!\",
-//             Some with x => print (\"something: \" + x) 
+//             Some with x => print (\"something: \" + x)
 //         };
 //     "
 //             )
