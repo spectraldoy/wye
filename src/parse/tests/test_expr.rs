@@ -1,4 +1,4 @@
-use super::span::Span;
+use super::span::{Span, UnSpan};
 use super::*;
 use lalrpop_util::ParseError;
 use util;
@@ -9,74 +9,75 @@ fn test_parse_literal() {
     let parser = grammar::ExpressionParser::new();
 
     // Ok IntLiteral
-    assert!(parser.parse(false, "nothing").unwrap() == ast::Expression::Nothing(None));
-    assert!(parser.parse(false, "4").unwrap() == ast::Expression::IntLiteral(4, None));
-    assert!(parser.parse(false, "52").unwrap() == ast::Expression::IntLiteral(52, None));
+    assert!(parser.parse("nothing").unwrap().unspanned() == ast::Expression::Nothing(None));
+    assert!(parser.parse("4").unwrap().unspanned() == ast::Expression::IntLiteral(4, None));
+    assert!(parser.parse("52").unwrap().unspanned() == ast::Expression::IntLiteral(52, None));
     assert!(
-        parser.parse(false, "-1787234").unwrap() == ast::Expression::IntLiteral(-1787234, None)
+        parser.parse("-1787234").unwrap().unspanned()
+            == ast::Expression::IntLiteral(-1787234, None)
     );
-    assert!(parser.parse(false, "675").unwrap() == ast::Expression::IntLiteral(675, None));
+    assert!(parser.parse("675").unwrap().unspanned() == ast::Expression::IntLiteral(675, None));
     // Err IntLiteral
-    assert!(parser.parse(false, "0527").is_err());
-    assert!(parser.parse(false, "-000343").is_err());
+    assert!(parser.parse("0527").is_err());
+    assert!(parser.parse("-000343").is_err());
     // Ok FloatLiteral
     assert!(
-        parser.parse(false, "5.0").unwrap()
+        parser.parse("5.0").unwrap().unspanned()
             == ast::Expression::FloatLiteral(util::to_of64(5.0), None)
     );
     assert!(
-        parser.parse(false, "1.0e-9").unwrap()
+        parser.parse("1.0e-9").unwrap().unspanned()
             == ast::Expression::FloatLiteral(util::to_of64(1e-9), None)
     );
     assert!(
-        parser.parse(false, "0.23124").unwrap()
+        parser.parse("0.23124").unwrap().unspanned()
             == ast::Expression::FloatLiteral(util::to_of64(0.23124), None)
     );
     assert!(
-        parser.parse(false, "1.2222E100").unwrap()
+        parser.parse("1.2222E100").unwrap().unspanned()
             == ast::Expression::FloatLiteral(util::to_of64(1.2222E100), None)
     );
     // Err FloatLiteral
-    assert!(parser.parse(false, "00.9").is_err());
-    assert!(parser.parse(false, "4.").is_err());
-    assert!(parser.parse(false, "0.5689eE2").is_err());
-    assert!(parser.parse(false, "12.888e").is_err());
-    assert!(parser.parse(false, "3.145r10").is_err());
-    assert!(parser.parse(false, "1.2.3.4").is_err());
-    assert!(parser.parse(false, "5 .0").is_err());
+    assert!(parser.parse("00.9").is_err());
+    assert!(parser.parse("4.").is_err());
+    assert!(parser.parse("0.5689eE2").is_err());
+    assert!(parser.parse("12.888e").is_err());
+    assert!(parser.parse("3.145r10").is_err());
+    assert!(parser.parse("1.2.3.4").is_err());
+    assert!(parser.parse("5 .0").is_err());
     // Ok StringLiteral
     assert!(
-        parser.parse(false, "\"hello there\"").unwrap()
+        parser.parse("\"hello there\"").unwrap().unspanned()
             == ast::Expression::StringLiteral("hello there".to_string(), None)
     );
     assert!(
-        parser.parse(false, "\"µß£££ç∑ 😎\"").unwrap()
+        parser.parse("\"µß£££ç∑ 😎\"").unwrap().unspanned()
             == ast::Expression::StringLiteral("µß£££ç∑ 😎".to_string(), None)
     );
     assert!(
-        parser.parse(false, "\"\"").unwrap()
+        parser.parse("\"\"").unwrap().unspanned()
             == ast::Expression::StringLiteral("".to_string(), None)
     );
     // Err StringLiteral
-    assert!(parser.parse(false, "\"hi there\"\"").is_err());
-    assert!(parser.parse(false, "\"bruh").is_err());
-    assert!(parser.parse(false, "no begin! \"").is_err());
+    assert!(parser.parse("\"hi there\"\"").is_err());
+    assert!(parser.parse("\"bruh").is_err());
+    assert!(parser.parse("no begin! \"").is_err());
 }
 
 #[test]
 fn test_parse_list() {
     let parser = grammar::ExpressionParser::new();
 
-    assert!(parser.parse(false, "[]").unwrap() == ast::Expression::List(vec![], None));
+    assert!(parser.parse("[]").unwrap().unspanned() == ast::Expression::List(vec![], None));
     assert!(
-        parser.parse(false, "[-1.0e6]").unwrap()
+        parser.parse("[-1.0e6]").unwrap().unspanned()
             == ast::Expression::List(
                 vec![ast::Expression::FloatLiteral(util::to_of64(-1.0e6), None)],
                 None
             )
     );
     assert!(
-        parser.parse(false, "[4, 5]").unwrap()
+        parser.parse("[4, 5]").unwrap().unspanned()
             == ast::Expression::List(
                 vec![
                     ast::Expression::IntLiteral(4, None),
@@ -87,8 +88,9 @@ fn test_parse_list() {
     );
     assert!(
         parser
-            .parse(false, "[\"buh\",4,5,7.0     , \t 8, \"⏰\"]")
+            .parse("[\"buh\",4,5,7.0     , \t 8, \"⏰\"]")
             .unwrap()
+            .unspanned()
             == ast::Expression::List(
                 vec![
                     ast::Expression::StringLiteral("buh".to_string(), None),
@@ -104,8 +106,9 @@ fn test_parse_list() {
     // parser doesn't do type checking
     assert!(
         parser
-            .parse(false, r#"[1, "wow ಣ", 1.0, (2), [46, 47, -9.85], (-52, )]"#)
+            .parse(r#"[1, "wow ಣ", 1.0, (2), [46, 47, -9.85], (-52, )]"#)
             .unwrap()
+            .unspanned()
             == ast::Expression::List(
                 vec![
                     ast::Expression::IntLiteral(1, None),
@@ -126,7 +129,7 @@ fn test_parse_list() {
             )
     );
     assert!(
-        parser.parse(false, "[x, 4]").unwrap()
+        parser.parse("[x, 4]").unwrap().unspanned()
             == ast::Expression::List(
                 vec![
                     ast::Expression::Identifier("x".to_string(), None),
@@ -136,27 +139,27 @@ fn test_parse_list() {
             )
     );
 
-    assert!(parser.parse(false, "[,]").is_err());
-    assert!(parser.parse(false, "[,7]").is_err());
-    assert!(parser.parse(false, "[7,]").is_err());
-    assert!(parser.parse(false, "[4, 5,]").is_err());
-    assert!(parser.parse(false, "[4, -6").is_err());
-    assert!(parser.parse(false, "x, 7.0, ]").is_err());
-    assert!(parser.parse(false, "[").is_err());
-    assert!(parser.parse(false, "]").is_err());
+    assert!(parser.parse("[,]").is_err());
+    assert!(parser.parse("[,7]").is_err());
+    assert!(parser.parse("[7,]").is_err());
+    assert!(parser.parse("[4, 5,]").is_err());
+    assert!(parser.parse("[4, -6").is_err());
+    assert!(parser.parse("x, 7.0, ]").is_err());
+    assert!(parser.parse("[").is_err());
+    assert!(parser.parse("]").is_err());
 }
 
 #[test]
 fn test_parse_tuple() {
     let parser = grammar::ExpressionParser::new();
 
-    assert!(parser.parse(false, "(-4)").unwrap() == ast::Expression::IntLiteral(-4, None));
+    assert!(parser.parse("(-4)").unwrap().unspanned() == ast::Expression::IntLiteral(-4, None));
     assert!(
-        parser.parse(false, "(-4,)").unwrap()
+        parser.parse("(-4,)").unwrap().unspanned()
             == ast::Expression::Tuple(vec![ast::Expression::IntLiteral(-4, None)], None)
     );
     assert!(
-        parser.parse(false, "(5, 6, )").unwrap()
+        parser.parse("(5, 6, )").unwrap().unspanned()
             == ast::Expression::Tuple(
                 vec![
                     ast::Expression::IntLiteral(5, None),
@@ -166,7 +169,7 @@ fn test_parse_tuple() {
             )
     );
     assert!(
-        parser.parse(false, "(3, -7.25)").unwrap()
+        parser.parse("(3, -7.25)").unwrap().unspanned()
             == ast::Expression::Tuple(
                 vec![
                     ast::Expression::IntLiteral(3, None),
@@ -176,10 +179,10 @@ fn test_parse_tuple() {
             )
     );
 
-    assert!(parser.parse(false, "(").is_err());
-    assert!(parser.parse(false, ")").is_err());
-    assert!(parser.parse(false, "(4, 6, \"yah!\"").is_err());
-    assert!(parser.parse(false, "5, 6, 3)").is_err());
+    assert!(parser.parse("(").is_err());
+    assert!(parser.parse(")").is_err());
+    assert!(parser.parse("(4, 6, \"yah!\"").is_err());
+    assert!(parser.parse("5, 6, 3)").is_err());
 }
 
 #[test]
@@ -187,7 +190,7 @@ fn test_parse_record_expr() {
     let parser = grammar::ExpressionParser::new();
 
     assert!(
-        parser.parse(false, "{field: Field.feeld}").unwrap()
+        parser.parse("{field: Field.feeld}").unwrap().unspanned()
             == ast::Expression::Record(
                 vec![(
                     "field".to_string(),
@@ -200,7 +203,6 @@ fn test_parse_record_expr() {
     assert!(
         parser
             .parse(
-                false,
                 "{
         bint: 3,
         jint: [2],
@@ -209,6 +211,7 @@ fn test_parse_record_expr() {
     }"
             )
             .unwrap()
+            .unspanned()
             == ast::Expression::Record(
                 vec![
                     (
@@ -239,7 +242,7 @@ fn test_parse_record_expr() {
             )
     );
     assert!(
-        parser.parse(false, "({one: 2, three: 4})").unwrap()
+        parser.parse("({one: 2, three: 4})").unwrap().unspanned()
             == ast::Expression::Record(
                 vec![
                     (
@@ -258,7 +261,7 @@ fn test_parse_record_expr() {
     );
 
     assert!(
-        parser.parse(false, "({one:2,three:4},)").unwrap()
+        parser.parse("({one:2,three:4},)").unwrap().unspanned()
             == ast::Expression::Tuple(
                 vec![ast::Expression::Record(
                     vec![
@@ -279,13 +282,13 @@ fn test_parse_record_expr() {
             )
     );
 
-    assert!(parser.parse(false, "{}").is_err());
-    assert!(parser.parse(false, "{super(pub): 4}").is_err());
-    assert!(parser.parse(false, "{super: 4,}").is_err());
-    assert!(parser.parse(false, "{int: 4}").is_err());
-    assert!(parser.parse(false, "{4: thing}").is_err());
-    assert!(parser.parse(false, "unclosed: curly}").is_err());
-    assert!(parser.parse(false, "{one: two three: four}").is_err());
+    assert!(parser.parse("{}").is_err());
+    assert!(parser.parse("{super(pub): 4}").is_err());
+    assert!(parser.parse("{super: 4,}").is_err());
+    assert!(parser.parse("{int: 4}").is_err());
+    assert!(parser.parse("{4: thing}").is_err());
+    assert!(parser.parse("unclosed: curly}").is_err());
+    assert!(parser.parse("{one: two three: four}").is_err());
 }
 
 #[test]
@@ -293,63 +296,67 @@ fn test_parse_identifier() {
     let parser = grammar::ExpressionParser::new();
 
     assert!(
-        parser.parse(false, "x").unwrap() == ast::Expression::Identifier("x".to_string(), None)
+        parser.parse("x").unwrap().unspanned()
+            == ast::Expression::Identifier("x".to_string(), None)
     );
     assert!(
-        parser.parse(false, "identif").unwrap()
+        parser.parse("identif").unwrap().unspanned()
             == ast::Expression::Identifier("identif".to_string(), None)
     );
     assert!(
-        parser.parse(false, "hElO_").unwrap()
+        parser.parse("hElO_").unwrap().unspanned()
             == ast::Expression::Identifier("hElO_".to_string(), None)
     );
     assert!(
-        parser.parse(false, "_a0001").unwrap()
+        parser.parse("_a0001").unwrap().unspanned()
             == ast::Expression::Identifier("_a0001".to_string(), None)
     );
     assert!(
-        parser.parse(false, "Hello").unwrap()
+        parser.parse("Hello").unwrap().unspanned()
             == ast::Expression::Identifier("Hello".to_string(), None)
     );
     assert!(
-        parser.parse(false, "__Option").unwrap()
+        parser.parse("__Option").unwrap().unspanned()
             == ast::Expression::Identifier("__Option".to_string(), None)
     );
     assert!(
-        parser.parse(false, "Ty6_Var68__iant_").unwrap()
+        parser.parse("Ty6_Var68__iant_").unwrap().unspanned()
             == ast::Expression::Identifier("Ty6_Var68__iant_".to_string(), None)
     );
     assert!(
-        parser.parse(false, "___01").unwrap()
+        parser.parse("___01").unwrap().unspanned()
             == ast::Expression::Identifier("___01".to_string(), None)
     );
     assert!(
-        parser.parse(false, "___").unwrap() == ast::Expression::Identifier("___".to_string(), None)
+        parser.parse("___").unwrap().unspanned()
+            == ast::Expression::Identifier("___".to_string(), None)
     );
     assert!(
-        parser.parse(false, "(<)").unwrap() == ast::Expression::BinaryOp(ast::BinaryOp::Lt, None)
+        parser.parse("(<)").unwrap().unspanned()
+            == ast::Expression::BinaryOp(ast::BinaryOp::Lt, None)
     );
     assert!(
-        parser.parse(false, "(+)").unwrap() == ast::Expression::BinaryOp(ast::BinaryOp::Add, None)
+        parser.parse("(+)").unwrap().unspanned()
+            == ast::Expression::BinaryOp(ast::BinaryOp::Add, None)
     );
     assert!(
-        parser.parse(false, "(//)").unwrap()
+        parser.parse("(//)").unwrap().unspanned()
             == ast::Expression::BinaryOp(ast::BinaryOp::FloorDiv, None)
     );
 
-    assert!(parser.parse(false, "string").is_err());
-    assert!(parser.parse(false, "with").is_err());
-    assert!(parser.parse(false, "int").is_err());
-    assert!(parser.parse(false, "<").is_err());
-    assert!(parser.parse(false, "(-").is_err());
-    assert!(parser.parse(false, "a*").is_err());
-    assert!(parser.parse(false, "//)").is_err());
-    assert!(parser.parse(false, "yel⏰o").is_err());
-    assert!(parser.parse(false, "31232abcd").is_err());
-    assert!(parser.parse(false, "Hel)lo").is_err());
-    assert!(parser.parse(false, "31232_AA").is_err());
-    assert!(parser.parse(false, "_Yel⏰o").is_err());
-    assert!(parser.parse(false, "aபாதை").is_err());
+    assert!(parser.parse("string").is_err());
+    assert!(parser.parse("with").is_err());
+    assert!(parser.parse("int").is_err());
+    assert!(parser.parse("<").is_err());
+    assert!(parser.parse("(-").is_err());
+    assert!(parser.parse("a*").is_err());
+    assert!(parser.parse("//)").is_err());
+    assert!(parser.parse("yel⏰o").is_err());
+    assert!(parser.parse("31232abcd").is_err());
+    assert!(parser.parse("Hel)lo").is_err());
+    assert!(parser.parse("31232_AA").is_err());
+    assert!(parser.parse("_Yel⏰o").is_err());
+    assert!(parser.parse("aபாதை").is_err());
 }
 
 #[test]
@@ -357,12 +364,12 @@ fn test_parse_enum_variant() {
     let parser = grammar::ExpressionParser::new();
 
     assert!(
-        parser.parse(false, "Card.King").unwrap()
+        parser.parse("Card.King").unwrap().unspanned()
             == ast::Expression::Projection("Card".to_string(), "King".to_string(), None)
     );
 
     assert!(
-        parser.parse(false, "Option.Some with 4").unwrap()
+        parser.parse("Option.Some with 4").unwrap().unspanned()
             == ast::Expression::EnumVariant {
                 enum_id: "Option".to_string(),
                 variant: "Some".to_string(),
@@ -373,7 +380,7 @@ fn test_parse_enum_variant() {
 
     // I'm thinking that
     assert!(
-        parser.parse(false, "(Thing.thing with 3)").unwrap()
+        parser.parse("(Thing.thing with 3)").unwrap().unspanned()
             == ast::Expression::EnumVariant {
                 enum_id: "Thing".to_string(),
                 variant: "thing".to_string(),
@@ -385,7 +392,6 @@ fn test_parse_enum_variant() {
     assert!(
         parser
             .parse(
-                false,
                 "Tree.Node with (
             (Tree.Node with (Tree.Leaf, Tree.Leaf, -2.5)),
             Tree.Leaf,
@@ -393,6 +399,7 @@ fn test_parse_enum_variant() {
         )"
             )
             .unwrap()
+            .unspanned()
             == ast::Expression::EnumVariant {
                 enum_id: "Tree".to_string(),
                 variant: "Node".to_string(),
@@ -429,8 +436,9 @@ fn test_parse_enum_variant() {
     );
     assert!(
         parser
-            .parse(false, "Listy.Listy with [1, \"hell⏰\"]")
+            .parse("Listy.Listy with [1, \"hell⏰\"]")
             .unwrap()
+            .unspanned()
             == ast::Expression::EnumVariant {
                 enum_id: "Listy".to_string(),
                 variant: "Listy".to_string(),
@@ -445,7 +453,10 @@ fn test_parse_enum_variant() {
             }
     );
     assert!(
-        parser.parse(false, "Tupy.MaybeTuple with (-5.2)").unwrap()
+        parser
+            .parse("Tupy.MaybeTuple with (-5.2)")
+            .unwrap()
+            .unspanned()
             == ast::Expression::EnumVariant {
                 enum_id: "Tupy".to_string(),
                 variant: "MaybeTuple".to_string(),
@@ -457,7 +468,6 @@ fn test_parse_enum_variant() {
     // Missing parenthesis
     assert!(parser
         .parse(
-            false,
             "Tree.Node with (
             (Tree.Node with (Tree.Leaf, Tree.Leaf, -2.5),
             Tree.Leaf,
@@ -466,36 +476,34 @@ fn test_parse_enum_variant() {
         )
         .is_err());
     // No projection
-    assert!(parser.parse(false, "Listy with [1, \"hell⏰\"])").is_err());
+    assert!(parser.parse("Listy with [1, \"hell⏰\"])").is_err());
     // Trailing unmatched parenthesis
-    assert!(parser
-        .parse(false, "Listy.Listy with [1, \"hell⏰\"])")
-        .is_err());
+    assert!(parser.parse("Listy.Listy with [1, \"hell⏰\"])").is_err());
 
     assert!(
-        parser.parse(false, "x.y").unwrap()
+        parser.parse("x.y").unwrap().unspanned()
             == ast::Expression::Projection("x".to_string(), "y".to_string(), None)
     );
-    assert!(parser.parse(false, "0xy.var").is_err());
+    assert!(parser.parse("0xy.var").is_err());
     assert!(
-        parser.parse(false, "xy0.__xy").unwrap()
+        parser.parse("xy0.__xy").unwrap().unspanned()
             == ast::Expression::Projection("xy0".to_string(), "__xy".to_string(), None)
     );
     assert!(
-        parser.parse(false, "__9._a5").unwrap()
+        parser.parse("__9._a5").unwrap().unspanned()
             == ast::Expression::Projection("__9".to_string(), "_a5".to_string(), None)
     );
-    assert!(parser.parse(false, "xs*.bruh").is_err());
-    assert!(parser.parse(false, "x.8").is_err());
-    assert!(parser.parse(false, "Yu.p with [8, 78").is_err());
-    assert!(parser.parse(false, "Option.Some int").is_err());
-    assert!(parser.parse(false, "He)i.k with 4").is_err());
+    assert!(parser.parse("xs*.bruh").is_err());
+    assert!(parser.parse("x.8").is_err());
+    assert!(parser.parse("Yu.p with [8, 78").is_err());
+    assert!(parser.parse("Option.Some int").is_err());
+    assert!(parser.parse("He)i.k with 4").is_err());
     // Tokens should have at least a space between them
     // Collect spans to check collision
-    assert!(parser.parse(true, "(a_9.u8)with \"hi\"").is_err());
+    assert!(parser.parse("(a_9.u8)with \"hi\"").is_err());
     assert!(matches!(
-        parser.parse(true, "  thingy.thing with\"hi\"").err().unwrap(),
+        parser.parse("  thingy.thing with\"hi\"").err().unwrap(),
         ParseError::User { error: (e, s) }
-        if e.contains("Space required") && s == Some(Span::new(15, 23))
+        if e.contains("Space required") && s == Span::new(15, 23)
     ));
 }

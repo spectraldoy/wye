@@ -1,12 +1,13 @@
 use super::ast;
-use super::span::{OptionSpanned, OptionSpan, Span};
+use super::util;
+use super::span::{Spanned, Span};
 use ordered_float::OrderedFloat;
 use lalrpop_util::ParseError;
 
-grammar(collect_spans: bool);
+grammar;
 
 extern {
-    type Error = (&'static str, OptionSpan);
+    type Error = (&'static str, Span);
 }
 
 // ****************************************
@@ -36,11 +37,7 @@ PolytypeVar: ast::PolytypeDecl =
         ast::PolytypeDecl {
             name,
             bound,
-            span: if collect_spans {
-                Some(Span {start, end })
-            } else {
-                None
-            }
+            span: Some(Span {start, end })
         };
 
 /// Integer literal
@@ -97,28 +94,28 @@ RecordTypeMember: (String, ast::Type) = {
 // Expression building
 // ****************************************
 
-SpRecordExprField: OptionSpanned<(String, ast::Expression)> =
+SpRecordExprField: Spanned<(String, ast::Expression)> =
     Sp<RecordField<Expression>>;
 
 AtomicExpr: ast::Expression = {
-    <n: Sp<"nothing">> => ast::Expression::Nothing(n.span),
-    <i: Sp<IntLiteral>> => ast::Expression::IntLiteral(i.value, i.span),
-    <f: Sp<FloatLiteral>> => ast::Expression::FloatLiteral(f.value, f.span),
-    <s: Sp<StringLiteral>> => ast::Expression::StringLiteral(s.value, s.span),
-    <id: Sp<Identifier>> => ast::Expression::Identifier(id.value, id.span),
+    <n: Sp<"nothing">> => ast::Expression::Nothing(Some(n.span)),
+    <i: Sp<IntLiteral>> => ast::Expression::IntLiteral(i.value, Some(i.span)),
+    <f: Sp<FloatLiteral>> => ast::Expression::FloatLiteral(f.value, Some(f.span)),
+    <s: Sp<StringLiteral>> => ast::Expression::StringLiteral(s.value, Some(s.span)),
+    <id: Sp<Identifier>> => ast::Expression::Identifier(id.value, Some(id.span)),
     // TODO(WYE-4): this can more generally be expressions, instead of just strings
-    <proj: Sp<Projection>> => ast::Expression::Projection(proj.value.0, proj.value.1, proj.span),
-    <bop: Sp<PostfixBinaryOp>> => ast::Expression::BinaryOp(bop.value, bop.span),
-    <p: Sp<"print">> => ast::Expression::Print(p.span),
-    <f: Sp<"fail">> => ast::Expression::Fail(f.span),
-    <lst: Sp<r"\[\s*\]">> => ast::Expression::List(vec![], lst.span),
-    <lst: Sp<NonemptyList<Expression>>> => ast::Expression::List(lst.value, lst.span),
-    <t: Sp<WyeTuple<Expression>>> => ast::Expression::Tuple(t.value, t.span),
+    <proj: Sp<Projection>> => ast::Expression::Projection(proj.value.0, proj.value.1, Some(proj.span)),
+    <bop: Sp<PostfixBinaryOp>> => ast::Expression::BinaryOp(bop.value, Some(bop.span)),
+    <p: Sp<"print">> => ast::Expression::Print(Some(p.span)),
+    <f: Sp<"fail">> => ast::Expression::Fail(Some(f.span)),
+    <lst: Sp<r"\[\s*\]">> => ast::Expression::List(vec![], Some(lst.span)),
+    <lst: Sp<NonemptyList<Expression>>> => ast::Expression::List(lst.value, Some(lst.span)),
+    <t: Sp<WyeTuple<Expression>>> => ast::Expression::Tuple(t.value, Some(t.span)),
     <r: Sp<WyeRecord<SpRecordExprField>>> => {
-        let record_span = r.span;
-        // spanned_string_expr: OptionSpanned<(String, Expression)>
+        let record_span = Some(r.span);
+        // spanned_string_expr: Spanned<(String, Expression)>
         let record_elems = r.value.iter().map(|spanned_string_expr| {
-            (spanned_string_expr.value.0.clone(), spanned_string_expr.value.1.clone(), spanned_string_expr.span.clone())
+            (spanned_string_expr.value.0.clone(), spanned_string_expr.value.1.clone(), Some(spanned_string_expr.span.clone()))
         }).collect::<Vec<_>>();
         ast::Expression::Record(record_elems, record_span)
     },
@@ -128,24 +125,31 @@ AtomicExpr: ast::Expression = {
 // TODO(WYE-3): Make error reporting consistent
 pub Expression: ast::Expression = {
     AtomicExpr,
+    // Enum variant with field
     <evar: Sp<Projection>> <with: Sp<"with">> <field: Sp<AtomicExpr>> =>? {
-        if evar.start() == with.end() && collect_spans {
+        if evar.span.start == with.span.end {
             Err(ParseError::User {
-                error: ("Space required between enum variant and `with` token", Span::maybe_new(evar.start(), with.end()))
+                error: ("Space required between enum variant and `with` token", Span::new(evar.span.start, with.span.end))
             })
-        } else if with.end() == field.start() && collect_spans {
+        } else if with.span.end == field.span.start {
             Err(ParseError::User {
-                error: ("Space required between `with` token and enum field", Span::maybe_new(with.start(), field.end()))
+                error: ("Space required between `with` token and enum field", Span::new(with.span.start, field.span.end))
             })
         } else {
             Ok(ast::Expression::EnumVariant {
                 enum_id: evar.clone().value.0,
                 variant: evar.clone().value.1,
                 field: Box::new(field.clone().value),
-                span: Span::maybe_new(evar.start(), field.end()),
+                span: Some(Span::new(evar.span.start, field.span.end)),
             })
         }
     },
+    // Function application: collect args instead of currying here, but can still support
+    // currying and partial application during execution
+    // #[assoc(side="left")]
+    // <func: Sp<AtomicExpr>> <args: Sp<AtomicExpr>+> =>? {
+    //     if util::spans_overlap()
+    // }
 // <func: Sp<AtomicExpr>> <args: Sp<AtomicExpr>+> =>? match util::collect_function::<ast::Expression>(
 //         func,
 //         args,
@@ -459,15 +463,8 @@ pub Type: ast::Type = {
 // ****************************************
 
 /// Match `Rule` and extract the match's span.
-Sp<Rule>: OptionSpanned<Rule> = {
-    <start: @L> <value: Rule> <end: @R> => {
-        if collect_spans {
-            OptionSpanned { value, span: Some(Span::new(start, end)) }
-        } else {
-            OptionSpanned { value, span: None }
-        }
-    }
-}
+Sp<Rule>: Spanned<Rule> =
+    <start: @L> <value: Rule> <end: @R> => Spanned { value, span: Span { start, end }};
 
 /// A sequence of `T` nodes separated by `Sep` tokens, with at least one element.
 /// Used for matching lists.

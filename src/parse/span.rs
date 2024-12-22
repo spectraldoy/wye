@@ -13,13 +13,6 @@ impl Span {
     pub fn new(start: usize, end: usize) -> Self {
         Self { start, end }
     }
-
-    pub fn maybe_new(start: Option<usize>, end: Option<usize>) -> Option<Self> {
-        match (start, end) {
-            (None, _) | (_, None) => None,
-            (Some(start), Some(end)) => Some(Self { start, end }),
-        }
-    }
 }
 
 pub type OptionSpan = Option<Span>;
@@ -30,24 +23,20 @@ pub struct Spanned<T: Clone + PartialEq + Eq> {
     pub span: Span,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OptionSpanned<T: Clone + PartialEq + Eq> {
-    pub value: T,
-    pub span: OptionSpan,
+impl<T: Clone + PartialEq + Eq> Spanned<T> {
+    pub fn start(&self) -> usize {
+        self.span.start
+    }
+
+    pub fn end(&self) -> usize {
+        self.span.end
+    }
 }
 
-impl<T: Clone + PartialEq + Eq> OptionSpanned<T> {
-    pub fn start(&self) -> Option<usize> {
-        match &self.span {
-            None => None,
-            Some(span) => Some(span.start),
-        }
-    }
+pub trait UnSpan {
+    fn unspanned(&self) -> Self;
+}
 
-    pub fn end(&self) -> Option<usize> {
-        match &self.span {
-            None => None,
-            Some(span) => Some(span.end),
-        }
-    }
+pub fn unspanned_vec<T: UnSpan>(vec: &Vec<T>) -> Vec<T> {
+    vec.iter().map(|elem| elem.unspanned()).collect()
 }

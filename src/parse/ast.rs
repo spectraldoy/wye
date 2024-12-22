@@ -1,4 +1,5 @@
-use super::span::OptionSpan;
+use super::span::{unspanned_vec, OptionSpan, UnSpan};
+use super::util::OptionBox;
 use ordered_float::OrderedFloat;
 
 /// This file describes the Abstract Syntax Tree for Wye. A Wye program is, at
@@ -52,7 +53,7 @@ pub enum Statement {
     InterfaceImpl {
         // name and type vars
         for_struct: (String, OptionSpan, Vec<PolytypeDecl>),
-        implemented_interface: Option<(String, OptionSpan, Vec<PolytypeDecl>)>,
+        impl_interface: Option<(String, OptionSpan, Vec<PolytypeDecl>)>,
         attr_sets: Vec<AttrSet>,
         // id, arguments, expression
         method_impls: Vec<VarWithValue>,
@@ -61,16 +62,8 @@ pub enum Statement {
     Main(Expression),
 }
 
-// You could make spans optional
-// and then have a parser argument, depending on which we
-// collect spans or not
-// you still have to have unspans right, where you replace
-// all the spans with Nones
-// and apart from that, you also need to have equality checks
-
 /// Expressions describe some kind of computation that evaluates to a value,
 /// which can be stored in a variable, or used in further expressions.
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
     Nothing(OptionSpan),
@@ -99,17 +92,17 @@ pub enum Expression {
     Projection(String, String, OptionSpan),
     // <Id>#<Id>
     MethodAccess(String, String, OptionSpan),
-    // <Expr> <Expr>
-    FuncApplication(Box<Expression>, Box<Expression>, OptionSpan),
+    // <Expr> args
+    FuncApplication(Box<Expression>, Vec<Expression>, OptionSpan),
     // match <Expr> { <Pat> => <Expr>, ... , <Pat> => <Expr> }
-    MatchConstruct {
+    Match {
         matchand: Box<Expression>,
         arms: Vec<(Pattern, Expression)>,
         span: OptionSpan,
     },
-    // \ <identifier>* -> Expr
+    // \ <identifier> -> Expr
     Lambda {
-        args: Vec<(String, OptionSpan)>,
+        arg: String,
         expr: Box<Expression>,
         span: OptionSpan,
     },
@@ -147,7 +140,8 @@ pub enum Type {
         name: String,
         bound: Option<String>,
     },
-    Function(Box<Type>, Box<Type>),
+    // a -> b -> ...
+    Function(Vec<Type>),
     // Type to be inferred
     Hole,
 }
@@ -191,7 +185,7 @@ pub struct VarWithValue {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttrSet {
     pub entity: (String, OptionSpan),
-    pub attribute: (String, OptionSpan),
+    pub attr: (String, OptionSpan),
     pub new_expr: (Box<Expression>, OptionSpan),
 }
 
@@ -212,9 +206,10 @@ pub enum Pattern {
     StringLiteral(String, OptionSpan),
     Identifier(String, OptionSpan),
     // TypeId (with Identifier)?
-    TypeVariant(String, Option<String>, OptionSpan),
+    // TypeId (with Pattern)
+    TypeVariant(String, OptionBox<Pattern>, OptionSpan),
     // x :: xs
-    ListConstruction(String, String, OptionSpan),
+    ListCons(String, String, OptionSpan),
     EmptyList(OptionSpan),
     Union(Vec<Pattern>, OptionSpan),
     Complement(Box<Pattern>, OptionSpan),
@@ -223,11 +218,214 @@ pub enum Pattern {
     // <pat> if <guard_expr> - take this only if pat matches and guard(pat) is true
     Guarded {
         pattern: Box<Pattern>,
-        guard_expr: Expression,
+        guard: Expression,
         span: OptionSpan,
     },
     // case <e>; e must evaluate to boolean
     Case(Expression, OptionSpan),
+}
+
+impl UnSpan for Statement {
+    fn unspanned(&self) -> Self {
+        match self {
+            Self::Expression(e) => Self::Expression(e.unspanned()),
+            Self::EnumDecl {
+                name,
+                polytype_vars,
+                variants,
+            } => Self::EnumDecl {
+                name: (name.0.clone(), None),
+                polytype_vars: unspanned_vec(&polytype_vars),
+                variants: variants
+                    .iter()
+                    .map(|v| (v.0.clone(), v.1.clone(), None))
+                    .collect(),
+            },
+            Self::StructDecl {
+                name,
+                polytype_vars,
+                members,
+            } => Self::StructDecl {
+                name: (name.0.clone(), None),
+                polytype_vars: unspanned_vec(&polytype_vars),
+                members: members
+                    .iter()
+                    .map(|m| (m.0.clone(), m.1.clone(), None))
+                    .collect(),
+            },
+            Self::InterfaceDecl {
+                name,
+                polytype_vars,
+                requires,
+                impl_methods,
+                spec_methods,
+                values,
+            } => Self::InterfaceDecl {
+                name: (name.0.clone(), None),
+                polytype_vars: unspanned_vec(&polytype_vars),
+                requires: requires
+                    .iter()
+                    .map(|r| (r.0.clone(), None, unspanned_vec(&r.2)))
+                    .collect(),
+                impl_methods: unspanned_vec(&impl_methods),
+                spec_methods: spec_methods
+                    .iter()
+                    .map(|m| (m.0.clone(), m.1.clone(), None))
+                    .collect(),
+                values: values
+                    .iter()
+                    .map(|v| (v.0.clone(), v.1.clone(), None))
+                    .collect(),
+            },
+            Self::InterfaceImpl {
+                for_struct,
+                impl_interface,
+                attr_sets,
+                method_impls,
+            } => Self::InterfaceImpl {
+                for_struct: (for_struct.0.clone(), None, unspanned_vec(&for_struct.2)),
+                impl_interface: match impl_interface {
+                    Some((name, _, polytype_vars)) => {
+                        Some((name.clone(), None, unspanned_vec(&polytype_vars)))
+                    }
+                    None => None,
+                },
+                attr_sets: unspanned_vec(&attr_sets),
+                method_impls: unspanned_vec(&method_impls),
+            },
+            Self::Main(e) => Self::Main(e.unspanned()),
+        }
+    }
+}
+
+impl UnSpan for Expression {
+    fn unspanned(&self) -> Self {
+        match &self {
+            Self::Nothing(_) => Self::Nothing(None),
+            Self::IntLiteral(i, _) => Self::IntLiteral(*i, None),
+            Self::FloatLiteral(f, _) => Self::FloatLiteral(*f, None),
+            Self::StringLiteral(s, _) => Self::StringLiteral(s.clone(), None),
+            Self::List(lst, _) => Self::List(unspanned_vec(&lst), None),
+            Self::Tuple(tup, _) => Self::Tuple(unspanned_vec(&tup), None),
+            Self::Record(rec, _) => Self::Record(
+                rec.iter()
+                    .map(|r| (r.0.clone(), r.1.unspanned(), None))
+                    .collect(),
+                None,
+            ),
+            Self::Identifier(id, _) => Self::Identifier(id.clone(), None),
+            Self::BinaryOp(binop, _) => Self::BinaryOp(binop.clone(), None),
+            Self::Print(_) => Self::Print(None),
+            Self::Fail(_) => Self::Fail(None),
+            Self::EnumVariant {
+                enum_id,
+                variant,
+                field,
+                span: _,
+            } => Self::EnumVariant {
+                enum_id: enum_id.clone(),
+                variant: variant.clone(),
+                field: Box::new(field.unspanned()),
+                span: None,
+            },
+            Self::Projection(id1, id2, _) => Self::Projection(id1.clone(), id2.clone(), None),
+            Self::MethodAccess(id1, id2, _) => Self::MethodAccess(id1.clone(), id2.clone(), None),
+            Self::FuncApplication(e1, args, _) => {
+                Self::FuncApplication(Box::new(e1.unspanned()), unspanned_vec(&args), None)
+            }
+            Self::Match {
+                matchand,
+                arms,
+                span: _,
+            } => Self::Match {
+                matchand: Box::new(matchand.unspanned()),
+                arms: arms
+                    .iter()
+                    .map(|(p, e)| (p.unspanned(), e.unspanned()))
+                    .collect(),
+                span: None,
+            },
+            Self::Lambda { arg, expr, span: _ } => Self::Lambda {
+                arg: arg.clone(),
+                expr: Box::new(expr.unspanned()),
+                span: None,
+            },
+            Self::Let(v, _) => Self::Let(v.unspanned(), None),
+            Self::LetIn(v, _, e) => Self::LetIn(v.unspanned(), None, Box::new(e.unspanned())),
+            Self::Set(a, _) => Self::Set(a.unspanned(), None),
+            Self::SetIn(a, _, e) => Self::SetIn(a.unspanned(), None, Box::new(e.unspanned())),
+        }
+    }
+}
+
+impl UnSpan for VarWithValue {
+    fn unspanned(&self) -> Self {
+        Self {
+            name: (self.name.0.clone(), None),
+            args: self
+                .args
+                .iter()
+                .map(|v| (v.0.clone(), v.1.clone(), None))
+                .collect(),
+            out_type: (self.out_type.0.clone(), None),
+            expr: (Box::new(self.expr.0.unspanned()), None),
+        }
+    }
+}
+
+impl UnSpan for AttrSet {
+    fn unspanned(&self) -> Self {
+        Self {
+            entity: (self.entity.0.clone(), None),
+            attr: (self.attr.0.clone(), None),
+            new_expr: (Box::new(self.new_expr.0.unspanned()), None),
+        }
+    }
+}
+
+impl UnSpan for PolytypeDecl {
+    fn unspanned(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            bound: self.bound.clone(),
+            span: None,
+        }
+    }
+}
+
+impl UnSpan for Pattern {
+    fn unspanned(&self) -> Self {
+        match &self {
+            Self::Wildcard(_) => Self::Wildcard(None),
+            Self::IntLiteral(i, _) => Self::IntLiteral(*i, None),
+            Self::FloatLiteral(f, _) => Self::FloatLiteral(*f, None),
+            Self::StringLiteral(s, _) => Self::StringLiteral(s.clone(), None),
+            Self::Identifier(id, _) => Self::Identifier(id.clone(), None),
+            Self::TypeVariant(tid, field, _) => {
+                let field = match &field {
+                    Some(p) => Some(Box::new(p.unspanned())),
+                    _ => None,
+                };
+                Self::TypeVariant(tid.clone(), field, None)
+            }
+            Self::ListCons(s1, s2, _) => Self::ListCons(s1.clone(), s2.clone(), None),
+            Self::EmptyList(_) => Self::EmptyList(None),
+            Self::Union(pv, _) => Self::Union(unspanned_vec(&pv), None),
+            Self::Complement(p, _) => Self::Complement(Box::new(p.unspanned()), None),
+            Self::List(pv, _) => Self::List(unspanned_vec(&pv), None),
+            Self::Tuple(pv, _) => Self::Tuple(unspanned_vec(&pv), None),
+            Self::Guarded {
+                pattern,
+                guard,
+                span: _,
+            } => Self::Guarded {
+                pattern: Box::new(pattern.unspanned()),
+                guard: guard.unspanned(),
+                span: None,
+            },
+            Self::Case(e, _) => Self::Case(e.unspanned(), None),
+        }
+    }
 }
 
 // TODO: What are the easter eggs in the grammar?

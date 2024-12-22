@@ -1,3 +1,23 @@
+use super::span::Span;
+
+pub type OptionBox<T> = Option<Box<T>>;
+
+pub fn spans_overlap(spans: &Vec<Span>) -> Result<(), &'static str> {
+    if spans.len() == 0 {
+        return Ok(());
+    }
+
+    for i in 0..(spans.len() - 1) {
+        let cur_end = spans[i].end;
+        let next_start = spans[i + 1].start;
+        if next_start <= cur_end {
+            return Err("Spans overlap");
+        }
+    }
+
+    return Ok(());
+}
+
 // pub fn spans_overlap(spans: &Vec<(usize, usize)>) -> bool {
 //     if spans.len() == 0 {
 //         return false;
