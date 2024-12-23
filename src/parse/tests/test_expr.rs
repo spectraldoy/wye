@@ -550,3 +550,37 @@ fn test_parse_enum_variant() {
         if e.contains("Space required") && s == Span::new(15, 23)
     ));
 }
+
+#[test]
+fn test_parse_func_application() {
+    let parser = grammar::ExpressionParser::new();
+
+    assert!(
+        parser.parse("hello a=4.5 br=8").unwrap().unspanned()
+            == ast::Expression::NamedArgsFuncApp(
+                Box::new(ast::Expression::Identifier("hello".to_string(), None)),
+                vec![
+                    (
+                        "a".to_string(),
+                        ast::Expression::FloatLiteral(util::to_of64(4.5), None),
+                        None
+                    ),
+                    ("br".to_string(), ast::Expression::IntLiteral(8, None), None)
+                ],
+                None
+            )
+    );
+
+    assert!(
+        parser.parse("X.Y 3").unwrap().unspanned()
+            == ast::Expression::FuncApplication(
+                Box::new(ast::Expression::Projection(
+                    Box::new(ast::Expression::Identifier("X".to_string(), None)),
+                    "Y".to_string(),
+                    None,
+                )),
+                vec![ast::Expression::IntLiteral(3, None)],
+                None
+            )
+    );
+}

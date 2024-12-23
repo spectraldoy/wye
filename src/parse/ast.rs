@@ -94,6 +94,12 @@ pub enum Expression {
     MethodAccess(Box<Expression>, String, OptionSpan),
     // <Expr> args
     FuncApplication(Box<Expression>, Vec<Expression>, OptionSpan),
+    // <Expr> arg1=e1 arg2=e2 ...
+    NamedArgsFuncApp(
+        Box<Expression>,
+        Vec<(String, Expression, OptionSpan)>,
+        OptionSpan,
+    ),
     // match <Expr> { <Pat> => <Expr>, ... , <Pat> => <Expr> }
     Match {
         matchand: Box<Expression>,
@@ -334,9 +340,16 @@ impl UnSpan for Expression {
             Self::MethodAccess(e, id, _) => {
                 Self::MethodAccess(Box::new(e.unspanned()), id.clone(), None)
             }
-            Self::FuncApplication(e1, args, _) => {
-                Self::FuncApplication(Box::new(e1.unspanned()), unspanned_vec(&args), None)
+            Self::FuncApplication(e, args, _) => {
+                Self::FuncApplication(Box::new(e.unspanned()), unspanned_vec(&args), None)
             }
+            Self::NamedArgsFuncApp(e, args, _) => Self::NamedArgsFuncApp(
+                Box::new(e.unspanned()),
+                args.iter()
+                    .map(|(name, arg, _)| (name.clone(), arg.unspanned(), None))
+                    .collect(),
+                None,
+            ),
             Self::Match {
                 matchand,
                 arms,

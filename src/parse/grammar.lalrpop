@@ -122,7 +122,7 @@ AtomicExpr: ast::Expression = {
     <r: Sp<WyeRecord<SpRecordExprField>>> => {
         let record_span = Some(r.span);
         // spanned_string_expr: Spanned<(String, Expression)>
-        let record_elems = r.value.iter().map(|spanned_string_expr| {
+        let record_elems = r.value.into_iter().map(|spanned_string_expr| {
             (spanned_string_expr.value.0.clone(), spanned_string_expr.value.1.clone(), Some(spanned_string_expr.span.clone()))
         }).collect::<Vec<_>>();
         ast::Expression::Record(record_elems, record_span)
@@ -130,6 +130,9 @@ AtomicExpr: ast::Expression = {
     ProjectedExpr,
     "(" <e: Expression> ")" => e,
 }
+
+SpNamedFuncArg: (String, ast::Expression, Span) =
+    <start:@L> <id: Identifier> "=" <e: AtomicExpr> <end:@R> => (id, e, Span { start, end });
 
 pub(crate) Expression: ast::Expression = {
     AtomicExpr,
@@ -154,10 +157,39 @@ pub(crate) Expression: ast::Expression = {
     },
     // Function application: collect args instead of currying here, but can still support
     // currying and partial application during execution
-    // #[assoc(side="left")]
-    // <func: Sp<AtomicExpr>> <args: Sp<AtomicExpr>+> =>? {
-    //     if util::spans_overlap()
-    // }
+    <func: Sp<AtomicExpr>> <args: Sp<AtomicExpr>+> =>? {
+        let app_span = Span::new(func.span.start, args.last().unwrap().span.end);
+        let mut spans = vec![func.span];
+        spans.extend(args.iter().map(|a| a.span.clone()).collect::<Vec<_>>());
+        if util::spans_overlap(&spans) {
+            Err(ParseError::User {
+                error: ("Function overlaps with arguments", app_span)
+            })
+        } else {
+            Ok(ast::Expression::FuncApplication(
+                Box::new(func.value),
+                args.into_iter().map(|a| a.value).collect(),
+                Some(app_span)
+            ))
+        }
+    },
+    // Function application with named arguments
+    <func: Sp<AtomicExpr>> <args: SpNamedFuncArg+> =>? {
+        let app_span = Span::new(func.span.start, args.last().unwrap().2.end);
+        let mut spans = vec![func.span];
+        spans.extend(args.iter().map(|a| a.2.clone()).collect::<Vec<_>>());
+        if util::spans_overlap(&spans) {
+            Err(ParseError::User {
+                error: ("Function overlaps with arguments", app_span)
+            })
+        } else {
+            Ok(ast::Expression::NamedArgsFuncApp(
+                Box::new(func.value),
+                args.into_iter().map(|(id, e, s)| (id, e, Some(s))).collect(),
+                Some(app_span),
+            ))
+        }
+    }
 // <func: Sp<AtomicExpr>> <args: Sp<AtomicExpr>+> =>? match util::collect_function::<ast::Expression>(
 //         func,
 //         args,
