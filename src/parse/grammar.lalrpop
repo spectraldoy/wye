@@ -67,17 +67,17 @@ BinaryOp: ast::BinaryOp = {
     "::" => ast::BinaryOp::Cons,
 }
 
-/// Builtin binary operator for postfix notation.
-PostfixBinaryOp: ast::BinaryOp =
-    "(" <bop: BinaryOp> ")" => bop;
-
-
-/// Projection: TODO(WYE-4)
-Projection: (String, String) =
+/// Single
+SingleProjection: (String, String) =
     <r"[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*"> => {
         let res = <>.split(".").map(str::to_string).collect::<Vec<String>>();
         (res[0].clone(), res[1].clone())
     };
+
+/// Builtin binary operator for postfix notation.
+PostfixBinaryOp: ast::BinaryOp =
+    "(" <bop: BinaryOp> ")" => bop;
+
 
 RecordTypeMethod: (String, ast::Type) = 
     "method" <m: Identifier> ":" <t: Type> => (m, t);
@@ -97,14 +97,22 @@ RecordTypeMember: (String, ast::Type) = {
 SpRecordExprField: Spanned<(String, ast::Expression)> =
     Sp<RecordField<Expression>>;
 
+ProjectedExpr: ast::Expression = {
+    <id: Sp<Identifier>> => ast::Expression::Identifier(id.value, Some(id.span)),
+    <sp: Sp<SingleProjection>> => ast::Expression::Projection(
+        Box::new(ast::Expression::Identifier(sp.value.0.clone(), Some(Span::new(sp.span.start, sp.span.start + sp.value.0.len())))),
+        sp.value.1,
+        Some(Span::new(sp.span.start + sp.value.0.len(), sp.span.end)),
+    ),
+    <p: Sp<ProjectedExpr>> "." <id: Sp<Identifier>> =>
+        ast::Expression::Projection(Box::new(p.value), id.value, Some(Span::new(p.span.start, id.span.end)))
+}
+
 AtomicExpr: ast::Expression = {
     <n: Sp<"nothing">> => ast::Expression::Nothing(Some(n.span)),
     <i: Sp<IntLiteral>> => ast::Expression::IntLiteral(i.value, Some(i.span)),
     <f: Sp<FloatLiteral>> => ast::Expression::FloatLiteral(f.value, Some(f.span)),
     <s: Sp<StringLiteral>> => ast::Expression::StringLiteral(s.value, Some(s.span)),
-    <id: Sp<Identifier>> => ast::Expression::Identifier(id.value, Some(id.span)),
-    // TODO(WYE-4): this can more generally be expressions, instead of just strings
-    <proj: Sp<Projection>> => ast::Expression::Projection(proj.value.0, proj.value.1, Some(proj.span)),
     <bop: Sp<PostfixBinaryOp>> => ast::Expression::BinaryOp(bop.value, Some(bop.span)),
     <p: Sp<"print">> => ast::Expression::Print(Some(p.span)),
     <f: Sp<"fail">> => ast::Expression::Fail(Some(f.span)),
@@ -119,14 +127,14 @@ AtomicExpr: ast::Expression = {
         }).collect::<Vec<_>>();
         ast::Expression::Record(record_elems, record_span)
     },
+    ProjectedExpr,
     "(" <e: Expression> ")" => e,
 }
 
-// TODO(WYE-3): Make error reporting consistent
-pub Expression: ast::Expression = {
+pub(crate) Expression: ast::Expression = {
     AtomicExpr,
     // Enum variant with field
-    <evar: Sp<Projection>> <with: Sp<"with">> <field: Sp<AtomicExpr>> =>? {
+    <evar: Sp<SingleProjection>> <with: Sp<"with">> <field: Sp<AtomicExpr>> =>? {
         if evar.span.start == with.span.end {
             Err(ParseError::User {
                 error: ("Space required between enum variant and `with` token", Span::new(evar.span.start, with.span.end))
@@ -206,7 +214,7 @@ AtomicType: ast::Type = {
     "(" <t: Type> ")" => t,
 }
 
-pub Type: ast::Type = {
+pub(crate) Type: ast::Type = {
     AtomicType,
     // TODO (WYE-6): records, functions, polymorphic
 }

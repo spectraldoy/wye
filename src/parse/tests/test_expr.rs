@@ -194,7 +194,11 @@ fn test_parse_record_expr() {
             == ast::Expression::Record(
                 vec![(
                     "field".to_string(),
-                    ast::Expression::Projection("Field".to_string(), "feeld".to_string(), None),
+                    ast::Expression::Projection(
+                        Box::new(ast::Expression::Identifier("Field".to_string(), None)),
+                        "feeld".to_string(),
+                        None
+                    ),
                     None
                 )],
                 None
@@ -365,7 +369,24 @@ fn test_parse_enum_variant() {
 
     assert!(
         parser.parse("Card.King").unwrap().unspanned()
-            == ast::Expression::Projection("Card".to_string(), "King".to_string(), None)
+            == ast::Expression::Projection(
+                Box::new(ast::Expression::Identifier("Card".to_string(), None)),
+                "King".to_string(),
+                None
+            )
+    );
+
+    assert!(
+        parser.parse("a.b.c").unwrap().unspanned()
+            == ast::Expression::Projection(
+                Box::new(ast::Expression::Projection(
+                    Box::new(ast::Expression::Identifier("a".to_string(), None)),
+                    "b".to_string(),
+                    None
+                )),
+                "c".to_string(),
+                None,
+            )
     );
 
     assert!(
@@ -413,12 +434,18 @@ fn test_parse_enum_variant() {
                             field: Box::new(ast::Expression::Tuple(
                                 vec![
                                     ast::Expression::Projection(
-                                        "Tree".to_string(),
+                                        Box::new(ast::Expression::Identifier(
+                                            "Tree".to_string(),
+                                            None
+                                        )),
                                         "Leaf".to_string(),
                                         None
                                     ),
                                     ast::Expression::Projection(
-                                        "Tree".to_string(),
+                                        Box::new(ast::Expression::Identifier(
+                                            "Tree".to_string(),
+                                            None
+                                        )),
                                         "Leaf".to_string(),
                                         None
                                     ),
@@ -427,7 +454,11 @@ fn test_parse_enum_variant() {
                                 None
                             ))
                         },
-                        ast::Expression::Projection("Tree".to_string(), "Leaf".to_string(), None),
+                        ast::Expression::Projection(
+                            Box::new(ast::Expression::Identifier("Tree".to_string(), None)),
+                            "Leaf".to_string(),
+                            None
+                        ),
                         ast::Expression::IntLiteral(7, None),
                     ],
                     None
@@ -482,16 +513,28 @@ fn test_parse_enum_variant() {
 
     assert!(
         parser.parse("x.y").unwrap().unspanned()
-            == ast::Expression::Projection("x".to_string(), "y".to_string(), None)
+            == ast::Expression::Projection(
+                Box::new(ast::Expression::Identifier("x".to_string(), None)),
+                "y".to_string(),
+                None
+            )
     );
     assert!(parser.parse("0xy.var").is_err());
     assert!(
         parser.parse("xy0.__xy").unwrap().unspanned()
-            == ast::Expression::Projection("xy0".to_string(), "__xy".to_string(), None)
+            == ast::Expression::Projection(
+                Box::new(ast::Expression::Identifier("xy0".to_string(), None)),
+                "__xy".to_string(),
+                None
+            )
     );
     assert!(
         parser.parse("__9._a5").unwrap().unspanned()
-            == ast::Expression::Projection("__9".to_string(), "_a5".to_string(), None)
+            == ast::Expression::Projection(
+                Box::new(ast::Expression::Identifier("__9".to_string(), None)),
+                "_a5".to_string(),
+                None
+            )
     );
     assert!(parser.parse("xs*.bruh").is_err());
     assert!(parser.parse("x.8").is_err());

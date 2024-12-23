@@ -89,9 +89,9 @@ pub enum Expression {
         span: OptionSpan,
     },
     // <Id>.<Id>: could be enum or struct
-    Projection(String, String, OptionSpan),
+    Projection(Box<Expression>, String, OptionSpan),
     // <Id>#<Id>
-    MethodAccess(String, String, OptionSpan),
+    MethodAccess(Box<Expression>, String, OptionSpan),
     // <Expr> args
     FuncApplication(Box<Expression>, Vec<Expression>, OptionSpan),
     // match <Expr> { <Pat> => <Expr>, ... , <Pat> => <Expr> }
@@ -328,8 +328,12 @@ impl UnSpan for Expression {
                 field: Box::new(field.unspanned()),
                 span: None,
             },
-            Self::Projection(id1, id2, _) => Self::Projection(id1.clone(), id2.clone(), None),
-            Self::MethodAccess(id1, id2, _) => Self::MethodAccess(id1.clone(), id2.clone(), None),
+            Self::Projection(e, id, _) => {
+                Self::Projection(Box::new(e.unspanned()), id.clone(), None)
+            }
+            Self::MethodAccess(e, id, _) => {
+                Self::MethodAccess(Box::new(e.unspanned()), id.clone(), None)
+            }
             Self::FuncApplication(e1, args, _) => {
                 Self::FuncApplication(Box::new(e1.unspanned()), unspanned_vec(&args), None)
             }
