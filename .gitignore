@@ -8,3 +8,4 @@
 .DS_Store
 .pat*
 *.vsix
+.vscode

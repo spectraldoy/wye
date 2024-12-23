@@ -88,9 +88,9 @@ pub enum Expression {
         field: Box<Expression>,
         span: OptionSpan,
     },
-    // <Id>.<Id>: could be enum or struct
+    // <Id>.<Id>: could be enum or struct or attribute
     Projection(Box<Expression>, String, OptionSpan),
-    // <Id>#<Id>
+    // <Expr>#<Id>
     MethodAccess(Box<Expression>, String, OptionSpan),
     // <Expr> args
     FuncApplication(Box<Expression>, Vec<Expression>, OptionSpan),

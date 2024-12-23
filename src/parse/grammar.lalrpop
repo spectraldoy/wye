@@ -67,13 +67,6 @@ BinaryOp: ast::BinaryOp = {
     "::" => ast::BinaryOp::Cons,
 }
 
-/// Single
-SingleProjection: (String, String) =
-    <r"[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*"> => {
-        let res = <>.split(".").map(str::to_string).collect::<Vec<String>>();
-        (res[0].clone(), res[1].clone())
-    };
-
 /// Builtin binary operator for postfix notation.
 PostfixBinaryOp: ast::BinaryOp =
     "(" <bop: BinaryOp> ")" => bop;
@@ -99,11 +92,6 @@ SpRecordExprField: Spanned<(String, ast::Expression)> =
 
 ProjectedExpr: ast::Expression = {
     <id: Sp<Identifier>> => ast::Expression::Identifier(id.value, Some(id.span)),
-    <sp: Sp<SingleProjection>> => ast::Expression::Projection(
-        Box::new(ast::Expression::Identifier(sp.value.0.clone(), Some(Span::new(sp.span.start, sp.span.start + sp.value.0.len())))),
-        sp.value.1,
-        Some(Span::new(sp.span.start + sp.value.0.len(), sp.span.end)),
-    ),
     <p: Sp<ProjectedExpr>> "." <id: Sp<Identifier>> =>
         ast::Expression::Projection(Box::new(p.value), id.value, Some(Span::new(p.span.start, id.span.end)))
 }
@@ -137,23 +125,43 @@ SpNamedFuncArg: (String, ast::Expression, Span) =
 pub(crate) Expression: ast::Expression = {
     AtomicExpr,
     // Enum variant with field
-    <evar: Sp<SingleProjection>> <with: Sp<"with">> <field: Sp<AtomicExpr>> =>? {
-        if evar.span.start == with.span.end {
-            Err(ParseError::User {
+    <evar: Sp<ProjectedExpr>> <with: Sp<"with">> <field: Sp<AtomicExpr>> =>? {
+        if evar.span.end == with.span.start {
+            return Err(ParseError::User {
                 error: ("Space required between enum variant and `with` token", Span::new(evar.span.start, with.span.end))
-            })
+            });
         } else if with.span.end == field.span.start {
-            Err(ParseError::User {
+            return Err(ParseError::User {
                 error: ("Space required between `with` token and enum field", Span::new(with.span.start, field.span.end))
-            })
-        } else {
-            Ok(ast::Expression::EnumVariant {
-                enum_id: evar.clone().value.0,
-                variant: evar.clone().value.1,
-                field: Box::new(field.clone().value),
-                span: Some(Span::new(evar.span.start, field.span.end)),
-            })
+            });
         }
+        let proj_res = util::flatten_projection(&evar.value);
+        if proj_res.is_err() {
+            return Err(ParseError::User {
+                error: (proj_res.err().unwrap(), evar.span)
+            });
+        }
+        let proj = proj_res.unwrap();
+        if proj.len() != 2 {
+            return Err(ParseError::User {
+                error: ("Only enum variants can have `with` fields, and variants are of the form <Id>.<Id>", evar.span)
+            });
+        }
+        let (enum_id, variant) = match (&proj[0], &proj[1]) {
+            (ast::Expression::Identifier(eid, _), ast::Expression::Identifier(var, _)) => (eid.clone(), var.clone()),
+            _ => {
+                return Err(ParseError::User {
+                    error: ("Only enum variants can have `with` fields, not arbitrary projected expressions", evar.span)
+                })
+            }
+        };
+
+        Ok(ast::Expression::EnumVariant {
+            enum_id,
+            variant,
+            field: Box::new(field.clone().value),
+            span: Some(Span::new(evar.span.start, field.span.end)),
+        })
     },
     // Function application: collect args instead of currying here, but can still support
     // currying and partial application during execution

@@ -1,8 +1,9 @@
+use super::ast;
 use super::span::Span;
 
 pub type OptionBox<T> = Option<Box<T>>;
 
-/// TODO
+/// TODO(WYE-5)
 pub fn spans_overlap(spans: &Vec<Span>) -> bool {
     if spans.len() == 0 {
         return false;
@@ -19,20 +20,23 @@ pub fn spans_overlap(spans: &Vec<Span>) -> bool {
     return false;
 }
 
-// pub fn spans_overlap(spans: &Vec<(usize, usize)>) -> bool {
-//     if spans.len() == 0 {
-//         return false;
-//     }
-
-//     for i in 0..(spans.len() - 1) {
-//         let (_, cur_end) = spans[i];
-//         let (nxt_start, _) = spans[i + 1];
-//         if nxt_start <= cur_end {
-//             return true;
-//         }
-//     }
-//     return false;
-// }
+/// TODO(WYE-5)
+pub fn flatten_projection(expr: &ast::Expression) -> Result<Vec<ast::Expression>, &'static str> {
+    match &expr {
+        ast::Expression::Identifier(_, _) => Ok(vec![expr.clone()]),
+        ast::Expression::Projection(p, id, _) => {
+            let prior_projections = flatten_projection(&p);
+            if prior_projections.is_err() {
+                return prior_projections;
+            }
+            let mut projections = prior_projections.unwrap();
+            projections.push(ast::Expression::Identifier(id.clone(), None));
+            Ok(projections)
+        }
+        // TODO(WYE-9): Use String for errors
+        _ => Err("Called flatten_projection on non-Projection Expression"),
+    }
+}
 
 // // Collects an expression of the form func arg1 arg2 ...arg_n
 // // into the evaluation order ( ... ( (func arg1) arg2 )...) arg_n)
