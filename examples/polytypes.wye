@@ -1,0 +1,54 @@
+# call it type instead of enum? enum is fine
+
+enum 'a Option = Some with 'a | None;;
+
+enum 't 'e Result = Ok with 't | Err with 'e;;
+
+nominal 'a Vector
+    data: ['a]
+;;
+
+# Declares a function that returns a matrix struct
+struct 'a Matrix =
+    data: [['a]]
+;;
+
+# <: or :
+let x (a <: Matrix) -> int = ;
+
+# Keep impls outside of structs
+# <: means that every subtype of matrix inherits this implementation
+# with this syntax, would that be a nightmare to debug? structural implementations
+# there's also no overloading in Wye
+impl 'a Matrix <: Num;;
+
+let y (x: 'Num a) (z: 'Bruh b) -> j = ;
+
+# This syntax is weird
+# How can I bound an interface?
+let x (y: Num'a) = 
+
+impl [`Num 'a `Add 'b] Matrix : 'a Shl;;
+
+struct Num 'a Matrix
+
+struct Matrix
+    data: [[Num'a]]
+;;
+
+impl Num'a Matrix
+
+struct Num 'a  Matrix
+
+struct Num'a Matrix;;
+
+impl Num'a Matrix: 'a Shl;;
+
+sig Num'a Shl;;
+
+sig Add requires Num + Plus;;
+
+sig 'a Shl =
+;;
+
+impl 'a Matrix: 'Add

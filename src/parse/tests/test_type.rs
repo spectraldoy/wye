@@ -4,7 +4,7 @@ use ast::Type::*;
 #[test]
 fn test_parse_literal() {
     let parser = grammar::TypeParser::new();
-    assert!(parser.parse("none").unwrap() == ast::Type::None);
+    assert!(parser.parse("none").unwrap() == None);
     assert!(parser.parse("int").unwrap() == Int);
     assert!(parser.parse("float").unwrap() == Float);
     assert!(parser.parse("string").unwrap() == String);
@@ -60,7 +60,17 @@ fn test_parse_list_tuple_type() {
 }
 
 #[test]
-fn test_parse_polymorphic_type() {}
+fn test_parse_polymorphic_type() {
+    let parser = grammar::TypeParser::new();
+
+    assert!(
+        parser.parse("'a").unwrap()
+            == Poly {
+                name: "a".to_string(),
+                bound: Option::None
+            }
+    );
+}
 
 // TODO(WYE-6) uncomment these and test_parse_enum types and record types
 // note that record types can have polytype variables to handle structs/interfaces

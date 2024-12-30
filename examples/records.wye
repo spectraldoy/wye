@@ -1,0 +1,31 @@
+
+{structural}
+{|nominal|}
+
+
+let x = {|
+    u: 3,
+    j: 42,
+    x: { hey: 8 },
+    m: Matrix data=[],
+|};
+
+let y = {| u: 8 |};
+
+# a struct is a function for generating objects that
+# have structural type. A nomin is a function for
+# generating objects that have nominal type
+
+# Objects have the same type
+# signature as records and can be substituted for them
+# but objects are not records. Records cannot store state
+# Objects can store state.
+# Records can be implicitly cast to objects
+
+records have a type <r>
+Matrix is a struct object of type Matrix <r>
+- there is a cast implicit when something of
+- an expected object type is set to a record
+- if no types are specified, it's all records
+- an object can be substituted for an expected
+  struct type always

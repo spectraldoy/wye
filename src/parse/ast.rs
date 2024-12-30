@@ -113,7 +113,7 @@ pub enum Expression {
     // Evaluate an expression and store in a variable of a type
     // let <id> (arguments & type-annotation) = <expression>
     Let(VarWithValue, OptionSpan),
-    // Polymorphic let-in construct
+    // Poly let-in construct
     // let <id> (arguments & type-annotation) = <expr> in <expr>
     LetIn(VarWithValue, OptionSpan, Box<Expression>),
     // Change the value of a variable. This is only allowed in struct methods.
@@ -132,17 +132,21 @@ pub enum Type {
     String,
     // (name, polytypes). Could be enum or struct, this is not known at parse-time
     TypeId(String, Vec<PolytypeVar>),
+    // Identifier for polymorphic type and optional interface bound.
+    Poly {
+        name: String,
+        bound: Option<String>,
+    },
     List(Box<Type>),
     Tuple(Vec<Type>),
     // { method? <id>: <type> }
-    Record {
+    NominalRecord {
         methods: Vec<(String, Type)>,
         values: Vec<(String, Type)>,
     },
-    // Identifier for polymorphic type and optional interface bound.
-    Polymorphic {
-        name: String,
-        bound: Option<String>,
+    StructRecord {
+        methods: Vec<(String, Type)>,
+        values: Vec<(String, Type)>,
     },
     // a -> b -> ...
     Function(Vec<Type>),

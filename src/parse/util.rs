@@ -38,6 +38,11 @@ pub fn flatten_projection(expr: &ast::Expression) -> Result<Vec<ast::Expression>
     }
 }
 
+pub enum RecordMemberness {
+    Value,
+    Method,
+}
+
 // // Collects an expression of the form func arg1 arg2 ...arg_n
 // // into the evaluation order ( ... ( (func arg1) arg2 )...) arg_n)
 // // TODO: this needs to be better. Also is the mapper necessary?

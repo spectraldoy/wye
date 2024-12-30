@@ -80,17 +80,8 @@ BinaryOp: ast::BinaryOp = {
 PostfixBinaryOp: ast::BinaryOp =
     "(" <bop: BinaryOp> ")" => bop;
 
-
-RecordTypeMethod: (String, ast::Type) = 
-    "method" <m: Identifier> ":" <t: Type> => (m, t);
-
 // TODO(WYE-2): parse record method declarations
 // Also allow definition of methods with type annotations
-
-RecordTypeMember: (String, ast::Type) = {
-    RecordField<Type>,
-    RecordTypeMethod,
-}
 
 // ****************************************
 // Expression building
@@ -119,9 +110,9 @@ AtomicExpr: ast::Expression = {
     <r: Sp<WyeRecord<SpRecordExprField>>> => {
         let record_span = Some(r.span);
         // spanned_string_expr: Spanned<(String, Expression)>
-        let record_elems = r.value.into_iter().map(|spanned_string_expr| {
+        let record_elems = r.value.into_iter().map(|spanned_string_expr|
             (spanned_string_expr.value.0.clone(), spanned_string_expr.value.1.clone(), Some(spanned_string_expr.span.clone()))
-        }).collect::<Vec<_>>();
+        ).collect::<Vec<_>>();
         ast::Expression::Record(record_elems, record_span)
     },
     ProjectedExpr,
@@ -295,6 +286,14 @@ pub Program: ast::Program = {
 // Types
 // ****************************************
 
+RecordTypeMethod: (String, ast::Type, util::RecordMemberness) = 
+    "method" <m: Identifier> ":" <t: Type> => (m, t, util::RecordMemberness::Method);
+
+RecordTypeMember: (String, ast::Type, util::RecordMemberness) = {
+    <r: RecordField<Type>> => (r.0, r.1, util::RecordMemberness::Value),
+    RecordTypeMethod,
+}
+
 // The parser can build a list of declared types
 AtomicType: ast::Type = {
     "none" => ast::Type::None,
@@ -304,8 +303,36 @@ AtomicType: ast::Type = {
     <i: Identifier> => ast::Type::TypeId(i, vec![]),
     "[" <t: Type> "]" => ast::Type::List(Box::new(t)),
     <tup: WyeTuple<Type>> => ast::Type::Tuple(tup),
+    <p: PolytypeVar> => ast::Type::Poly { name: p.name, bound: p.bound },
+    <r: WyeRecord<RecordTypeMember>> => {
+        let mut methods = vec![];
+        let mut values = vec![];
+
+        let _ = r.into_iter().map(|(name, typ, memberness)| {
+            match memberness {
+                util::RecordMemberness::Method => methods.push((name, typ)),
+                util::RecordMemberness::Value => values.push((name, typ)),
+            }
+        });
+
+        ast::Type::StructRecord { methods, values }
+    },
+    <r: NomRecord<RecordTypeMember>> => {
+        let mut methods = vec![];
+        let mut values = vec![];
+
+        let _ = r.into_iter().map(|(name, typ, memberness)| {
+            match memberness {
+                util::RecordMemberness::Method => methods.push((name, typ)),
+                util::RecordMemberness::Value => values.push((name, typ)),
+            }
+        });
+        ast::Type::NominalRecord { methods, values }
+    },
     "(" <t: Type> ")" => t,
 }
+
+// TODO: record types, function types, enum types, struct type, nom type, sig
 
 pub(crate) Type: ast::Type = {
     AtomicType,
@@ -602,6 +629,17 @@ SepTuple<T, Sep>: Vec<T> = {
     }
 }
 
+SepSeqOptSuffix<T, Sep>: Vec<T> = {
+    <t: T> Sep? => vec![t],
+    // This is just SepTupleAtLeastTwo
+    // but putting that here tries to reduce to it
+    <prefix: T> <mut v: (Sep <T>)+> Sep? => {
+        let mut out = vec![prefix];
+        out.append(&mut v);
+        out
+    },
+}
+
 /// Used to match a Wye tuple, as notated within `(` `)` and separated with commas.
 /// Distinct from the SepTuple rule above, which is used to match arbitrary sequences
 /// that appear in tuple-style separation notation.
@@ -621,7 +659,10 @@ RecordField<T>: (String, T) =
     <i: Identifier> ":" <t: T> => (i, t);
 
 WyeRecord<MemberType>: Vec<MemberType> =
-    "{" <n: SepSeqAtLeastOne<MemberType, ",">> "}" => n;
+    "{" <n: SepSeqOptSuffix<MemberType, ",">> "}" => n;
+
+NomRecord<MemberType>: Vec<MemberType> =
+    "{|" <n: SepSeqOptSuffix<MemberType, ",">> "|}" => n;
 
 
 /// An identifier with a type annotation.
