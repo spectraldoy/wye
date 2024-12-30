@@ -18,8 +18,8 @@ match {
     r"\s+" => { },
     // Skip `%` comments
     r"%[^\n\r]*[\n\r]*" => { },
-    // Skip `(* ... *)` comments
-    r#"\(\*[^*]*\*+(?:[^\)*][^*]*\*+)*\)"# => { },
+    // Skip `[% ... %]` comments
+    r#"\[%[^%]*%+(?:[^\]*][^%]*\%+)%\]"# => { },
 } else {
     _
 }
@@ -32,13 +32,22 @@ match {
 Identifier: String = <r"[a-zA-Z_][a-zA-Z0-9_]*"> => String::from(<>);
 
 /// Potentially bounded polymorphic type variable
-PolytypeVar: ast::PolytypeDecl =
-    <start: @L> "'" <bound: Identifier?> <name: Identifier> <end: @R> =>
-        ast::PolytypeDecl {
-            name,
-            bound,
-            span: Some(Span {start, end })
-        };
+PolytypeVar: ast::PolytypeVar= {
+    <start: @L> <s: r"'[a-zA-Z_][a-zA-Z0-9_]*"> <end: @R> => 
+        ast::PolytypeVar {
+            name: s[1..].to_string(),
+            bound: None,
+            span: Some(Span {start, end})
+        },
+    <start: @L>  <s: r"[a-zA-Z_][a-zA-Z0-9_]*'[a-zA-Z_][a-zA-Z0-9_]*">  <end: @R> => {
+        let bound_and_name = s.split("'").map(str::to_string).collect::<Vec<String>>();
+        ast::PolytypeVar {
+            name: bound_and_name[1].clone(),
+            bound: Some(bound_and_name[0].clone()),
+            span: Some(Span {start, end})
+        }
+    }
+}
 
 /// Integer literal
 IntLiteral: i64 = <r"-?([0-9]|[1-9][0-9]*)"> => <>.parse::<i64>().unwrap();
@@ -122,7 +131,7 @@ AtomicExpr: ast::Expression = {
 SpNamedFuncArg: (String, ast::Expression, Span) =
     <start:@L> <id: Identifier> "=" <e: AtomicExpr> <end:@R> => (id, e, Span { start, end });
 
-pub(crate) Expression: ast::Expression = {
+Expression: ast::Expression = {
     AtomicExpr,
     // Enum variant with field
     <evar: Sp<ProjectedExpr>> <with: Sp<"with">> <field: Sp<AtomicExpr>> =>? {
@@ -238,16 +247,60 @@ pub(crate) Expression: ast::Expression = {
 //     },
 }
 
-pub Program: ast::Program = {
-    ".*" => vec![],
+// ****************************************
+// Enum declarations
+// ****************************************
+
+// <tid: Identifier> => (tid, None),
+//     <tid: Sp<Identifier>> <with: Sp<"with">> <field_t: Sp<TypeExpression>> =>? {
+//         if tid.end == with.start {
+//             Err(ParseError::User {
+//                 error: "Type of variant with argument requires space between TypeId and `with` token"
+//             })
+//         } else if with.end == field_t.start {
+//             Err(ParseError::User {
+//                 error: "Type of variant with argument requires space between `with` token and field type"
+//             })
+//         } else {
+//             Ok((tid.value, Some(field_t.value)))
+//         }
+//     }
+
+// get polytype parsing working
+// then this should be pretty easy
+
+// TODO(WYE-1): Enum variant parsing
+// EnumVariant: ()
+
+// EnumDecl: ast::Statement = {
+//     "enum" <eid: Sp<Identifier>> <p: Sp<PolytypeVar>+> "=" <variants: SepSeqAtLeastOne<EnumVariant, "|">> => {
+
+//     }
+// }
+
+// ****************************************
+// Wye Program
+// ****************************************
+
+pub(crate) Statement: ast::Statement = {
+    <e: Expression> => ast::Statement::Expression(e),
+    // EnumDecl,
 }
+
+pub Program: ast::Program = {
+    <s: (Statement ";")+> => s.into_iter().map(|(stmt, _)| stmt).collect::<Vec<_>>(),
+}
+
+// ****************************************
+// Types
+// ****************************************
 
 // The parser can build a list of declared types
 AtomicType: ast::Type = {
     "none" => ast::Type::None,
-    "string" => ast::Type::String,
     "int" => ast::Type::Int,
     "float" => ast::Type::Float,
+    "string" => ast::Type::String,
     <i: Identifier> => ast::Type::TypeId(i, vec![]),
     "[" <t: Type> "]" => ast::Type::List(Box::new(t)),
     <tup: WyeTuple<Type>> => ast::Type::Tuple(tup),

@@ -28,20 +28,20 @@ pub enum Statement {
     // These, unlike Expressions, are not recursive structures
     EnumDecl {
         name: (String, OptionSpan),
-        polytype_vars: Vec<PolytypeDecl>,
+        polytype_vars: Vec<PolytypeVar>,
         variants: Vec<(String, Option<Type>, OptionSpan)>,
     },
     // struct <Id> <polytype var>* { <Id>: type,+ }
     StructDecl {
         name: (String, OptionSpan),
-        polytype_vars: Vec<PolytypeDecl>,
+        polytype_vars: Vec<PolytypeVar>,
         members: Vec<(String, Type, OptionSpan)>,
     },
     // interface <Id> <polytype var>* (requires (<Id> | (<Id> <polytype var>+))+)? { (method|val): type|methodimpl }
     InterfaceDecl {
         name: (String, OptionSpan),
-        polytype_vars: Vec<PolytypeDecl>,
-        requires: Vec<(String, OptionSpan, Vec<PolytypeDecl>)>,
+        polytype_vars: Vec<PolytypeVar>,
+        requires: Vec<(String, OptionSpan, Vec<PolytypeVar>)>,
         // Implemented methods
         // name, args, output type, expression
         impl_methods: Vec<VarWithValue>,
@@ -52,14 +52,12 @@ pub enum Statement {
     // impl <Id>: <Id> { (AttrSet|MethodImpl)+ }
     InterfaceImpl {
         // name and type vars
-        for_struct: (String, OptionSpan, Vec<PolytypeDecl>),
-        impl_interface: Option<(String, OptionSpan, Vec<PolytypeDecl>)>,
+        for_struct: (String, OptionSpan, Vec<PolytypeVar>),
+        impl_interface: Option<(String, OptionSpan, Vec<PolytypeVar>)>,
         attr_sets: Vec<AttrSet>,
         // id, arguments, expression
         method_impls: Vec<VarWithValue>,
     },
-    // Main is just an expression in Wye
-    Main(Expression),
 }
 
 /// Expressions describe some kind of computation that evaluates to a value,
@@ -133,7 +131,7 @@ pub enum Type {
     Float,
     String,
     // (name, polytypes). Could be enum or struct, this is not known at parse-time
-    TypeId(String, Vec<PolytypeDecl>),
+    TypeId(String, Vec<PolytypeVar>),
     List(Box<Type>),
     Tuple(Vec<Type>),
     // { method? <id>: <type> }
@@ -197,7 +195,7 @@ pub struct AttrSet {
 
 /// ' (bound)? name
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PolytypeDecl {
+pub struct PolytypeVar {
     pub name: String,
     pub bound: Option<String>,
     pub span: OptionSpan,
@@ -299,7 +297,6 @@ impl UnSpan for Statement {
                 attr_sets: unspanned_vec(&attr_sets),
                 method_impls: unspanned_vec(&method_impls),
             },
-            Self::Main(e) => Self::Main(e.unspanned()),
         }
     }
 }
@@ -400,7 +397,7 @@ impl UnSpan for AttrSet {
     }
 }
 
-impl UnSpan for PolytypeDecl {
+impl UnSpan for PolytypeVar {
     fn unspanned(&self) -> Self {
         Self {
             name: self.name.clone(),

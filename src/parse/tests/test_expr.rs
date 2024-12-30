@@ -1,42 +1,39 @@
-use super::ast::Expression;
+use super::ast;
+use super::ast::Expression::*;
+use super::ast::Statement::Expression;
 use super::span::{Span, UnSpan};
 use super::*;
 use lalrpop_util::ParseError;
 use util;
 
+fn parse(parser: &grammar::StatementParser, inp: &'static str) -> ast::Expression {
+    let out = parser.parse(inp).unwrap().unspanned();
+    if let Expression(e) = out {
+        e
+    } else {
+        panic!("Input is not an expression")
+    }
+}
+
 // Expressions
 #[test]
 fn test_parse_literal() {
-    let parser = grammar::ExpressionParser::new();
+    let parser = grammar::StatementParser::new();
 
     // Ok IntLiteral
-    assert!(parser.parse("nothing").unwrap().unspanned() == Expression::Nothing(None));
-    assert!(parser.parse("4").unwrap().unspanned() == Expression::IntLiteral(4, None));
-    assert!(parser.parse("52").unwrap().unspanned() == Expression::IntLiteral(52, None));
-    assert!(
-        parser.parse("-1787234").unwrap().unspanned() == Expression::IntLiteral(-1787234, None)
-    );
-    assert!(parser.parse("675").unwrap().unspanned() == Expression::IntLiteral(675, None));
+    assert!(parse(&parser, "nothing") == Nothing(None));
+    assert!(parse(&parser, "4") == IntLiteral(4, None));
+    assert!(parse(&parser, "52") == IntLiteral(52, None));
+    assert!(parse(&parser, "-1787234") == IntLiteral(-1787234, None));
+    assert!(parse(&parser, "675") == IntLiteral(675, None));
     // Err IntLiteral
     assert!(parser.parse("0527").is_err());
     assert!(parser.parse("-000343").is_err());
     // Ok FloatLiteral
-    assert!(
-        parser.parse("5.0").unwrap().unspanned()
-            == Expression::FloatLiteral(util::to_of64(5.0), None)
-    );
-    assert!(
-        parser.parse("1.0e-9").unwrap().unspanned()
-            == Expression::FloatLiteral(util::to_of64(1e-9), None)
-    );
-    assert!(
-        parser.parse("0.23124").unwrap().unspanned()
-            == Expression::FloatLiteral(util::to_of64(0.23124), None)
-    );
-    assert!(
-        parser.parse("1.2222E100").unwrap().unspanned()
-            == Expression::FloatLiteral(util::to_of64(1.2222E100), None)
-    );
+    assert!(parse(&parser, "5.0") == FloatLiteral(util::to_of64(5.0), None));
+    assert!(parse(&parser, "1.0e-9") == FloatLiteral(util::to_of64(1e-9), None));
+    assert!(parse(&parser, "0.23124") == FloatLiteral(util::to_of64(0.23124), None));
+    assert!(parse(&parser, "1.2222E100") == FloatLiteral(util::to_of64(1.2222E100), None));
     // Err FloatLiteral
     assert!(parser.parse("00.9").is_err());
     assert!(parser.parse("4.").is_err());
@@ -45,20 +42,10 @@ fn test_parse_literal() {
     assert!(parser.parse("3.145r10").is_err());
     assert!(parser.parse("1.2.3.4").is_err());
     assert!(parser.parse("5 .0").is_err());
-    // Ok StringLiteral
-    assert!(
-        parser.parse("\"hello there\"").unwrap().unspanned()
-            == Expression::StringLiteral("hello there".to_string(), None)
-    );
-    assert!(
-        parser.parse("\"µß£££ç∑ 😎\"").unwrap().unspanned()
-            == Expression::StringLiteral("µß£££ç∑ 😎".to_string(), None)
-    );
-    assert!(
-        parser.parse("\"\"").unwrap().unspanned()
-            == Expression::StringLiteral("".to_string(), None)
-    );
-    // Err StringLiteral
+
+    assert!(parse(&parser, "\"hello there\"") == StringLiteral("hello there".to_string(), None));
+    assert!(parse(&parser, "\"µß£££ç∑ 😎\"") == StringLiteral("µß£££ç∑ 😎".to_string(), None));
+    assert!(parse(&parser, "\"\"") == StringLiteral("".to_string(), None));
     assert!(parser.parse("\"hi there\"\"").is_err());
     assert!(parser.parse("\"bruh").is_err());
     assert!(parser.parse("no begin! \"").is_err());
@@ -66,75 +53,57 @@ fn test_parse_literal() {
 
 #[test]
 fn test_parse_list() {
-    let parser = grammar::ExpressionParser::new();
+    let parser = grammar::StatementParser::new();
 
-    assert!(parser.parse("[]").unwrap().unspanned() == Expression::List(vec![], None));
+    assert!(parse(&parser, "[]") == List(vec![], None));
     assert!(
-        parser.parse("[-1.0e6]").unwrap().unspanned()
-            == Expression::List(
-                vec![Expression::FloatLiteral(util::to_of64(-1.0e6), None)],
-                None
-            )
+        parse(&parser, "[-1.0e6]") == List(vec![FloatLiteral(util::to_of64(-1.0e6), None)], None)
     );
     assert!(
-        parser.parse("[4, 5]").unwrap().unspanned()
-            == Expression::List(
-                vec![
-                    Expression::IntLiteral(4, None),
-                    Expression::IntLiteral(5, None),
-                ],
-                None
-            )
+        parse(&parser, "[4, 5]") == List(vec![IntLiteral(4, None), IntLiteral(5, None),], None)
     );
     assert!(
-        parser
-            .parse("[\"buh\",4,5,7.0     , \t 8, \"⏰\"]")
-            .unwrap()
-            .unspanned()
-            == Expression::List(
+        parse(&parser, "[\"buh\",4,5,7.0     , \t 8, \"⏰\"]")
+            == List(
                 vec![
-                    Expression::StringLiteral("buh".to_string(), None),
-                    Expression::IntLiteral(4, None),
-                    Expression::IntLiteral(5, None),
-                    Expression::FloatLiteral(util::to_of64(7.0), None),
-                    Expression::IntLiteral(8, None),
-                    Expression::StringLiteral("⏰".to_string(), None)
+                    StringLiteral("buh".to_string(), None),
+                    IntLiteral(4, None),
+                    IntLiteral(5, None),
+                    FloatLiteral(util::to_of64(7.0), None),
+                    IntLiteral(8, None),
+                    StringLiteral("⏰".to_string(), None)
                 ],
                 None
             )
     );
     // parser doesn't do type checking
     assert!(
-        parser
-            .parse(r#"[1, "wow ಣ", 1.0, (2), [46, 47, -9.85], (-52, )]"#)
-            .unwrap()
-            .unspanned()
-            == Expression::List(
-                vec![
-                    Expression::IntLiteral(1, None),
-                    Expression::StringLiteral("wow ಣ".to_string(), None),
-                    Expression::FloatLiteral(util::to_of64(1.0), None),
-                    Expression::IntLiteral(2, None),
-                    Expression::List(
-                        vec![
-                            Expression::IntLiteral(46, None),
-                            Expression::IntLiteral(47, None),
-                            Expression::FloatLiteral(util::to_of64(-9.85), None),
-                        ],
-                        None
-                    ),
-                    Expression::Tuple(vec![Expression::IntLiteral(-52, None)], None)
-                ],
-                None
-            )
+        parse(
+            &parser,
+            r#"[1, "wow ಣ", 1.0, (2), [46, 47, -9.85], (-52, )]"#
+        ) == List(
+            vec![
+                IntLiteral(1, None),
+                StringLiteral("wow ಣ".to_string(), None),
+                FloatLiteral(util::to_of64(1.0), None),
+                IntLiteral(2, None),
+                List(
+                    vec![
+                        IntLiteral(46, None),
+                        IntLiteral(47, None),
+                        FloatLiteral(util::to_of64(-9.85), None),
+                    ],
+                    None
+                ),
+                Tuple(vec![IntLiteral(-52, None)], None)
+            ],
+            None
+        )
     );
     assert!(
-        parser.parse("[x, 4]").unwrap().unspanned()
-            == Expression::List(
-                vec![
-                    Expression::Identifier("x".to_string(), None),
-                    Expression::IntLiteral(4, None)
-                ],
+        parse(&parser, "[x, 4]")
+            == List(
+                vec![Identifier("x".to_string(), None), IntLiteral(4, None)],
                 None
             )
     );
@@ -151,29 +120,19 @@ fn test_parse_list() {
 
 #[test]
 fn test_parse_tuple() {
-    let parser = grammar::ExpressionParser::new();
+    let parser = grammar::StatementParser::new();
 
-    assert!(parser.parse("(-4)").unwrap().unspanned() == Expression::IntLiteral(-4, None));
+    assert!(parse(&parser, "(-4)") == IntLiteral(-4, None));
+    assert!(parse(&parser, "(-4,)") == Tuple(vec![IntLiteral(-4, None)], None));
     assert!(
-        parser.parse("(-4,)").unwrap().unspanned()
-            == Expression::Tuple(vec![Expression::IntLiteral(-4, None)], None)
+        parse(&parser, "(5, 6, )") == Tuple(vec![IntLiteral(5, None), IntLiteral(6, None)], None)
     );
     assert!(
-        parser.parse("(5, 6, )").unwrap().unspanned()
-            == Expression::Tuple(
+        parse(&parser, "(3, -7.25)")
+            == Tuple(
                 vec![
-                    Expression::IntLiteral(5, None),
-                    Expression::IntLiteral(6, None)
-                ],
-                None
-            )
-    );
-    assert!(
-        parser.parse("(3, -7.25)").unwrap().unspanned()
-            == Expression::Tuple(
-                vec![
-                    Expression::IntLiteral(3, None),
-                    Expression::FloatLiteral(util::to_of64(-7.25), None)
+                    IntLiteral(3, None),
+                    FloatLiteral(util::to_of64(-7.25), None)
                 ],
                 None
             )
@@ -187,15 +146,15 @@ fn test_parse_tuple() {
 
 #[test]
 fn test_parse_record_expr() {
-    let parser = grammar::ExpressionParser::new();
+    let parser = grammar::StatementParser::new();
 
     assert!(
-        parser.parse("{field: Field.feeld}").unwrap().unspanned()
-            == Expression::Record(
+        parse(&parser, "{field: Field.feeld}")
+            == Record(
                 vec![(
                     "field".to_string(),
-                    Expression::Projection(
-                        Box::new(Expression::Identifier("Field".to_string(), None)),
+                    Projection(
+                        Box::new(Identifier("Field".to_string(), None)),
                         "feeld".to_string(),
                         None
                     ),
@@ -205,56 +164,50 @@ fn test_parse_record_expr() {
             )
     );
     assert!(
-        parser
-            .parse(
-                "{
+        parse(
+            &parser,
+            "{
         bint: 3,
         jint: [2],
         cidnt: (1),
         lint: (\"hi\",)
     }"
-            )
-            .unwrap()
-            .unspanned()
-            == Expression::Record(
-                vec![
-                    ("bint".to_string(), Expression::IntLiteral(3, None), None),
-                    (
-                        "jint".to_string(),
-                        Expression::List(vec![Expression::IntLiteral(2, None)], None),
-                        None
-                    ),
-                    ("cidnt".to_string(), Expression::IntLiteral(1, None), None),
-                    (
-                        "lint".to_string(),
-                        Expression::Tuple(
-                            vec![Expression::StringLiteral("hi".to_string(), None)],
-                            None
-                        ),
-                        None
-                    )
-                ],
-                None
-            )
+        ) == Record(
+            vec![
+                ("bint".to_string(), IntLiteral(3, None), None),
+                (
+                    "jint".to_string(),
+                    List(vec![IntLiteral(2, None)], None),
+                    None
+                ),
+                ("cidnt".to_string(), IntLiteral(1, None), None),
+                (
+                    "lint".to_string(),
+                    Tuple(vec![StringLiteral("hi".to_string(), None)], None),
+                    None
+                )
+            ],
+            None
+        )
     );
     assert!(
-        parser.parse("({one: 2, three: 4})").unwrap().unspanned()
-            == Expression::Record(
+        parse(&parser, "({one: 2, three: 4})")
+            == Record(
                 vec![
-                    ("one".to_string(), Expression::IntLiteral(2, None), None),
-                    ("three".to_string(), Expression::IntLiteral(4, None), None)
+                    ("one".to_string(), IntLiteral(2, None), None),
+                    ("three".to_string(), IntLiteral(4, None), None)
                 ],
                 None
             )
     );
 
     assert!(
-        parser.parse("({one:2,three:4},)").unwrap().unspanned()
-            == Expression::Tuple(
-                vec![Expression::Record(
+        parse(&parser, "({one:2,three:4},)")
+            == Tuple(
+                vec![Record(
                     vec![
-                        ("one".to_string(), Expression::IntLiteral(2, None), None),
-                        ("three".to_string(), Expression::IntLiteral(4, None), None)
+                        ("one".to_string(), IntLiteral(2, None), None),
+                        ("three".to_string(), IntLiteral(4, None), None)
                     ],
                     None
                 )],
@@ -273,52 +226,20 @@ fn test_parse_record_expr() {
 
 #[test]
 fn test_parse_identifier() {
-    let parser = grammar::ExpressionParser::new();
+    let parser = grammar::StatementParser::new();
 
-    assert!(
-        parser.parse("x").unwrap().unspanned() == Expression::Identifier("x".to_string(), None)
-    );
-    assert!(
-        parser.parse("identif").unwrap().unspanned()
-            == Expression::Identifier("identif".to_string(), None)
-    );
-    assert!(
-        parser.parse("hElO_").unwrap().unspanned()
-            == Expression::Identifier("hElO_".to_string(), None)
-    );
-    assert!(
-        parser.parse("_a0001").unwrap().unspanned()
-            == Expression::Identifier("_a0001".to_string(), None)
-    );
-    assert!(
-        parser.parse("Hello").unwrap().unspanned()
-            == Expression::Identifier("Hello".to_string(), None)
-    );
-    assert!(
-        parser.parse("__Option").unwrap().unspanned()
-            == Expression::Identifier("__Option".to_string(), None)
-    );
-    assert!(
-        parser.parse("Ty6_Var68__iant_").unwrap().unspanned()
-            == Expression::Identifier("Ty6_Var68__iant_".to_string(), None)
-    );
-    assert!(
-        parser.parse("___01").unwrap().unspanned()
-            == Expression::Identifier("___01".to_string(), None)
-    );
-    assert!(
-        parser.parse("___").unwrap().unspanned() == Expression::Identifier("___".to_string(), None)
-    );
-    assert!(
-        parser.parse("(<)").unwrap().unspanned() == Expression::BinaryOp(ast::BinaryOp::Lt, None)
-    );
-    assert!(
-        parser.parse("(+)").unwrap().unspanned() == Expression::BinaryOp(ast::BinaryOp::Add, None)
-    );
-    assert!(
-        parser.parse("(//)").unwrap().unspanned()
-            == Expression::BinaryOp(ast::BinaryOp::FloorDiv, None)
-    );
+    assert!(parse(&parser, "x") == Identifier("x".to_string(), None));
+    assert!(parse(&parser, "identif") == Identifier("identif".to_string(), None));
+    assert!(parse(&parser, "hElO_") == Identifier("hElO_".to_string(), None));
+    assert!(parse(&parser, "_a0001") == Identifier("_a0001".to_string(), None));
+    assert!(parse(&parser, "Hello") == Identifier("Hello".to_string(), None));
+    assert!(parse(&parser, "__Option") == Identifier("__Option".to_string(), None));
+    assert!(parse(&parser, "Ty6_Var68__iant_") == Identifier("Ty6_Var68__iant_".to_string(), None));
+    assert!(parse(&parser, "___01") == Identifier("___01".to_string(), None));
+    assert!(parse(&parser, "___") == Identifier("___".to_string(), None));
+    assert!(parse(&parser, "(<)") == BinaryOp(ast::BinaryOp::Lt, None));
+    assert!(parse(&parser, "(+)") == BinaryOp(ast::BinaryOp::Add, None));
+    assert!(parse(&parser, "(//)") == BinaryOp(ast::BinaryOp::FloorDiv, None));
 
     assert!(parser.parse("string").is_err());
     assert!(parser.parse("with").is_err());
@@ -337,31 +258,31 @@ fn test_parse_identifier() {
 
 #[test]
 fn test_parse_enum_variant() {
-    let parser = grammar::ExpressionParser::new();
+    let parser = grammar::StatementParser::new();
 
     assert!(
-        parser.parse("Card.King").unwrap().unspanned()
-            == Expression::Projection(
-                Box::new(Expression::Identifier("Card".to_string(), None)),
+        parse(&parser, "Card.King")
+            == Projection(
+                Box::new(Identifier("Card".to_string(), None)),
                 "King".to_string(),
                 None
             )
     );
 
     assert!(
-        parser.parse("Card . King").unwrap().unspanned()
-            == Expression::Projection(
-                Box::new(Expression::Identifier("Card".to_string(), None)),
+        parse(&parser, "Card . King")
+            == Projection(
+                Box::new(Identifier("Card".to_string(), None)),
                 "King".to_string(),
                 None
             )
     );
 
     assert!(
-        parser.parse("a.b.c").unwrap().unspanned()
-            == Expression::Projection(
-                Box::new(Expression::Projection(
-                    Box::new(Expression::Identifier("a".to_string(), None)),
+        parse(&parser, "a.b.c")
+            == Projection(
+                Box::new(Projection(
+                    Box::new(Identifier("a".to_string(), None)),
                     "b".to_string(),
                     None
                 )),
@@ -371,19 +292,19 @@ fn test_parse_enum_variant() {
     );
 
     assert!(
-        parser.parse("Option.Some with 4").unwrap().unspanned()
-            == Expression::EnumVariant {
+        parse(&parser, "Option.Some with 4")
+            == EnumVariant {
                 enum_id: "Option".to_string(),
                 variant: "Some".to_string(),
-                field: Box::new(Expression::IntLiteral(4, None)),
+                field: Box::new(IntLiteral(4, None)),
                 span: None
             }
     );
 
     assert!(
-        parser.parse("hello. there").unwrap().unspanned()
-            == Expression::Projection(
-                Box::new(Expression::Identifier("hello".to_string(), None)),
+        parse(&parser, "hello. there")
+            == Projection(
+                Box::new(Identifier("hello".to_string(), None)),
                 "there".to_string(),
                 None,
             )
@@ -395,103 +316,94 @@ fn test_parse_enum_variant() {
     assert!(parser.parse("Option.Some.Other with 3").is_err());
 
     assert!(
-        parser.parse("Option .Some with 4").unwrap().unspanned()
-            == Expression::EnumVariant {
+        parse(&parser, "Option .Some with 4")
+            == EnumVariant {
                 enum_id: "Option".to_string(),
                 variant: "Some".to_string(),
-                field: Box::new(Expression::IntLiteral(4, None)),
+                field: Box::new(IntLiteral(4, None)),
                 span: None
             }
     );
 
     // I'm thinking that
     assert!(
-        parser.parse("(Thing.thing with 3)").unwrap().unspanned()
-            == Expression::EnumVariant {
+        parse(&parser, "(Thing.thing with 3)")
+            == EnumVariant {
                 enum_id: "Thing".to_string(),
                 variant: "thing".to_string(),
-                field: Box::new(Expression::IntLiteral(3, None)),
+                field: Box::new(IntLiteral(3, None)),
                 span: None,
             }
     );
 
     assert!(
-        parser
-            .parse(
-                "Tree.Node with (
+        parse(
+            &parser,
+            "Tree.Node with (
             (Tree.Node with (Tree.Leaf, Tree.Leaf, -2.5)),
             Tree.Leaf,
             7
         )"
-            )
-            .unwrap()
-            .unspanned()
-            == Expression::EnumVariant {
-                enum_id: "Tree".to_string(),
-                variant: "Node".to_string(),
-                span: None,
-                field: Box::new(Expression::Tuple(
-                    vec![
-                        Expression::EnumVariant {
-                            enum_id: "Tree".to_string(),
-                            variant: "Node".to_string(),
-                            span: None,
-                            field: Box::new(Expression::Tuple(
-                                vec![
-                                    Expression::Projection(
-                                        Box::new(Expression::Identifier("Tree".to_string(), None)),
-                                        "Leaf".to_string(),
-                                        None
-                                    ),
-                                    Expression::Projection(
-                                        Box::new(Expression::Identifier("Tree".to_string(), None)),
-                                        "Leaf".to_string(),
-                                        None
-                                    ),
-                                    Expression::FloatLiteral(util::to_of64(-2.5), None)
-                                ],
-                                None
-                            ))
-                        },
-                        Expression::Projection(
-                            Box::new(Expression::Identifier("Tree".to_string(), None)),
-                            "Leaf".to_string(),
+        ) == EnumVariant {
+            enum_id: "Tree".to_string(),
+            variant: "Node".to_string(),
+            span: None,
+            field: Box::new(Tuple(
+                vec![
+                    EnumVariant {
+                        enum_id: "Tree".to_string(),
+                        variant: "Node".to_string(),
+                        span: None,
+                        field: Box::new(Tuple(
+                            vec![
+                                Projection(
+                                    Box::new(Identifier("Tree".to_string(), None)),
+                                    "Leaf".to_string(),
+                                    None
+                                ),
+                                Projection(
+                                    Box::new(Identifier("Tree".to_string(), None)),
+                                    "Leaf".to_string(),
+                                    None
+                                ),
+                                FloatLiteral(util::to_of64(-2.5), None)
+                            ],
                             None
-                        ),
-                        Expression::IntLiteral(7, None),
-                    ],
-                    None
-                ))
-            }
+                        ))
+                    },
+                    Projection(
+                        Box::new(Identifier("Tree".to_string(), None)),
+                        "Leaf".to_string(),
+                        None
+                    ),
+                    IntLiteral(7, None),
+                ],
+                None
+            ))
+        }
     );
     assert!(
-        parser
-            .parse("Listy.Listy with [1, \"hell⏰\"]")
-            .unwrap()
-            .unspanned()
-            == Expression::EnumVariant {
+        parse(&parser, "Listy.Listy with [1, \"hell⏰\"]")
+            == EnumVariant {
                 enum_id: "Listy".to_string(),
                 variant: "Listy".to_string(),
                 span: None,
-                field: Box::new(Expression::List(
+                field: Box::new(List(
                     vec![
-                        Expression::IntLiteral(1, None),
-                        Expression::StringLiteral("hell⏰".to_string(), None),
+                        IntLiteral(1, None),
+                        StringLiteral("hell⏰".to_string(), None),
                     ],
                     None
                 ))
             }
     );
     assert!(
-        parser
-            .parse("Tupy.MaybeTuple with (-5.2)")
-            .unwrap()
-            .unspanned()
-            == Expression::EnumVariant {
+        parse(&parser, "Tupy.MaybeTuple with (-5.2)")
+            == EnumVariant {
                 enum_id: "Tupy".to_string(),
                 variant: "MaybeTuple".to_string(),
                 span: None,
-                field: Box::new(Expression::FloatLiteral(util::to_of64(-5.2), None))
+                field: Box::new(FloatLiteral(util::to_of64(-5.2), None))
             }
     );
 
@@ -511,26 +423,26 @@ fn test_parse_enum_variant() {
     assert!(parser.parse("Listy.Listy with [1, \"hell⏰\"])").is_err());
 
     assert!(
-        parser.parse("x.y").unwrap().unspanned()
-            == Expression::Projection(
-                Box::new(Expression::Identifier("x".to_string(), None)),
+        parse(&parser, "x.y")
+            == Projection(
+                Box::new(Identifier("x".to_string(), None)),
                 "y".to_string(),
                 None
             )
     );
     assert!(parser.parse("0xy.var").is_err());
     assert!(
-        parser.parse("xy0.__xy").unwrap().unspanned()
-            == Expression::Projection(
-                Box::new(Expression::Identifier("xy0".to_string(), None)),
+        parse(&parser, "xy0.__xy")
+            == Projection(
+                Box::new(Identifier("xy0".to_string(), None)),
                 "__xy".to_string(),
                 None
             )
     );
     assert!(
-        parser.parse("__9._a5").unwrap().unspanned()
-            == Expression::Projection(
-                Box::new(Expression::Identifier("__9".to_string(), None)),
+        parse(&parser, "__9._a5")
+            == Projection(
+                Box::new(Identifier("__9".to_string(), None)),
                 "_a5".to_string(),
                 None
             )
@@ -553,72 +465,69 @@ fn test_parse_enum_variant() {
 
 #[test]
 fn test_parse_func_application() {
-    let parser = grammar::ExpressionParser::new();
+    let parser = grammar::StatementParser::new();
 
     assert!(
-        parser.parse("hello a=4.5 br=8").unwrap().unspanned()
-            == Expression::NamedArgsFuncApp(
-                Box::new(Expression::Identifier("hello".to_string(), None)),
+        parse(&parser, "hello a=4.5 br=8")
+            == NamedArgsFuncApp(
+                Box::new(Identifier("hello".to_string(), None)),
                 vec![
                     (
                         "a".to_string(),
-                        Expression::FloatLiteral(util::to_of64(4.5), None),
+                        FloatLiteral(util::to_of64(4.5), None),
                         None
                     ),
-                    ("br".to_string(), Expression::IntLiteral(8, None), None)
+                    ("br".to_string(), IntLiteral(8, None), None)
                 ],
                 None
             )
     );
 
     assert!(
-        parser.parse("X.Y 3").unwrap().unspanned()
-            == Expression::FuncApplication(
-                Box::new(Expression::Projection(
-                    Box::new(Expression::Identifier("X".to_string(), None)),
+        parse(&parser, "X.Y 3")
+            == FuncApplication(
+                Box::new(Projection(
+                    Box::new(Identifier("X".to_string(), None)),
                     "Y".to_string(),
                     None,
                 )),
-                vec![Expression::IntLiteral(3, None)],
+                vec![IntLiteral(3, None)],
                 None
             )
     );
 
     assert!(
-        parser.parse("f g").unwrap().unspanned()
-            == Expression::FuncApplication(
-                Box::new(Expression::Identifier("f".to_string(), None)),
-                vec![Expression::Identifier("g".to_string(), None)],
+        parse(&parser, "f g")
+            == FuncApplication(
+                Box::new(Identifier("f".to_string(), None)),
+                vec![Identifier("g".to_string(), None)],
                 None
             )
     );
 
     assert!(
-        parser.parse("f -7.9").unwrap().unspanned()
-            == Expression::FuncApplication(
-                Box::new(Expression::Identifier("f".to_string(), None)),
-                vec![Expression::FloatLiteral(util::to_of64(-7.9), None)],
+        parse(&parser, "f -7.9")
+            == FuncApplication(
+                Box::new(Identifier("f".to_string(), None)),
+                vec![FloatLiteral(util::to_of64(-7.9), None)],
                 None
             )
     );
 
     assert!(
-        parser.parse("f -4 2").unwrap().unspanned()
-            == Expression::FuncApplication(
-                Box::new(Expression::Identifier("f".to_string(), None)),
-                vec![
-                    Expression::IntLiteral(-4, None),
-                    Expression::IntLiteral(2, None)
-                ],
+        parse(&parser, "f -4 2")
+            == FuncApplication(
+                Box::new(Identifier("f".to_string(), None)),
+                vec![IntLiteral(-4, None), IntLiteral(2, None)],
                 None
             )
     );
 
     assert!(
-        parser.parse("(g 5)").unwrap().unspanned()
-            == Expression::FuncApplication(
-                Box::new(Expression::Identifier("g".to_string(), None)),
-                vec![Expression::IntLiteral(5, None)],
+        parse(&parser, "(g 5)")
+            == FuncApplication(
+                Box::new(Identifier("g".to_string(), None)),
+                vec![IntLiteral(5, None)],
                 None
             )
     );
@@ -628,41 +537,41 @@ fn test_parse_func_application() {
             .parse("(g 4 \"hi\" (f bruh = 2))")
             .unwrap()
             .unspanned()
-            == Expression::FuncApplication(
-                Box::new(Expression::Identifier("g".to_string(), None)),
+            == Expression(FuncApplication(
+                Box::new(Identifier("g".to_string(), None)),
                 vec![
-                    Expression::IntLiteral(4, None),
-                    Expression::StringLiteral("hi".to_string(), None),
-                    Expression::NamedArgsFuncApp(
-                        Box::new(Expression::Identifier("f".to_string(), None)),
-                        vec![("bruh".to_string(), Expression::IntLiteral(2, None), None),],
+                    IntLiteral(4, None),
+                    StringLiteral("hi".to_string(), None),
+                    NamedArgsFuncApp(
+                        Box::new(Identifier("f".to_string(), None)),
+                        vec![("bruh".to_string(), IntLiteral(2, None), None),],
                         None,
                     )
                 ],
                 None
-            )
+            ))
     );
 
     assert!(
-        parser.parse("(+) 4").unwrap().unspanned()
-            == Expression::FuncApplication(
-                Box::new(Expression::BinaryOp(ast::BinaryOp::Add, None)),
-                vec![Expression::IntLiteral(4, None)],
+        parse(&parser, "(+) 4")
+            == FuncApplication(
+                Box::new(BinaryOp(ast::BinaryOp::Add, None)),
+                vec![IntLiteral(4, None)],
                 None,
             )
     );
 
     assert!(
-        parser.parse("(f 2) (g 3)").unwrap().unspanned()
-            == Expression::FuncApplication(
-                Box::new(Expression::FuncApplication(
-                    Box::new(Expression::Identifier("f".to_string(), None)),
-                    vec![Expression::IntLiteral(2, None)],
+        parse(&parser, "(f 2) (g 3)")
+            == FuncApplication(
+                Box::new(FuncApplication(
+                    Box::new(Identifier("f".to_string(), None)),
+                    vec![IntLiteral(2, None)],
                     None,
                 )),
-                vec![Expression::FuncApplication(
-                    Box::new(Expression::Identifier("g".to_string(), None)),
-                    vec![Expression::IntLiteral(3, None)],
+                vec![FuncApplication(
+                    Box::new(Identifier("g".to_string(), None)),
+                    vec![IntLiteral(3, None)],
                     None,
                 )],
                 None
@@ -674,13 +583,13 @@ fn test_parse_func_application() {
             .parse("[f g.e.t, x.y -5.6, Option.Some with 4]")
             .unwrap()
             .unspanned()
-            == Expression::List(
+            == Expression(List(
                 vec![
-                    Expression::FuncApplication(
-                        Box::new(Expression::Identifier("f".to_string(), None)),
-                        vec![Expression::Projection(
-                            Box::new(Expression::Projection(
-                                Box::new(Expression::Identifier("g".to_string(), None)),
+                    FuncApplication(
+                        Box::new(Identifier("f".to_string(), None)),
+                        vec![Projection(
+                            Box::new(Projection(
+                                Box::new(Identifier("g".to_string(), None)),
                                 "e".to_string(),
                                 None,
                             )),
@@ -689,34 +598,34 @@ fn test_parse_func_application() {
                         )],
                         None,
                     ),
-                    Expression::FuncApplication(
-                        Box::new(Expression::Projection(
-                            Box::new(Expression::Identifier("x".to_string(), None)),
+                    FuncApplication(
+                        Box::new(Projection(
+                            Box::new(Identifier("x".to_string(), None)),
                             "y".to_string(),
                             None,
                         )),
-                        vec![Expression::FloatLiteral(util::to_of64(-5.6), None)],
+                        vec![FloatLiteral(util::to_of64(-5.6), None)],
                         None
                     ),
-                    Expression::EnumVariant {
+                    EnumVariant {
                         enum_id: "Option".to_string(),
                         variant: "Some".to_string(),
-                        field: Box::new(Expression::IntLiteral(4, None)),
+                        field: Box::new(IntLiteral(4, None)),
                         span: None
                     }
                 ],
                 None
-            )
+            ))
     );
 
     assert!(parser.parse("f Option.Some with 4").is_err());
     assert!(parser.parse("f (Option.Some with 4)").is_ok());
     // As far as parsing is concerned, this is not an error.
     assert!(
-        parser.parse("4 g").unwrap().unspanned()
-            == ast::Expression::FuncApplication(
-                Box::new(Expression::IntLiteral(4, None)),
-                vec![Expression::Identifier("g".to_string(), None)],
+        parse(&parser, "4 g")
+            == FuncApplication(
+                Box::new(IntLiteral(4, None)),
+                vec![Identifier("g".to_string(), None)],
                 None,
             )
     );
@@ -724,10 +633,10 @@ fn test_parse_func_application() {
     assert!(parser.parse("f(g=8)").is_err());
     assert!(parser.parse("f (g=8)").is_err());
     assert!(
-        parser.parse("f g=(8)").unwrap().unspanned()
-            == Expression::NamedArgsFuncApp(
-                Box::new(Expression::Identifier("f".to_string(), None)),
-                vec![("g".to_string(), Expression::IntLiteral(8, None), None)],
+        parse(&parser, "f g=(8)")
+            == NamedArgsFuncApp(
+                Box::new(Identifier("f".to_string(), None)),
+                vec![("g".to_string(), IntLiteral(8, None), None)],
                 None,
             )
     );

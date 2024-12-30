@@ -36,11 +36,13 @@
 \definecolor{darkgreen}{rgb}{0.125, 0.73828125, 0.421875}
 
 \lstdefinelanguage{wye}{
-  keywords={let, type, where, with, if, then, else, match, print, error},
+  keywords={let, type, with, if, then, else, match, print, error},
   keywordstyle=\color{darkgreen}\bfseries,
   keywords=[2]{int, string, float},
   keywordstyle=[2]\color{blue},
-  comment=[l]{;},
+  keywords=[3]{struct, record, nom, impl, sig}
+  keywordstyle=[3]\color{orange},
+  comment=[l]{\%},
   commentstyle=\color{gray},
   identifierstyle=\color{black},
   stringstyle=\color{red},
@@ -63,7 +65,7 @@
 \newcommand{\sepbar}{\: | \:}	% separated bar
 \newcommand{\substo}{\quad\rightarrow\quad}
 \newcommand{\uscore}{\underline{\hspace{0.3cm}}}
-\newcommand{\version}{2.0.0}
+\newcommand{\version}{2.1.0}
 \newcommand{\dedrule}[2]{\begin{align*}\frac{$1}{$2}\end{align*}}
 \newcommand{\free}{\text{free}}
 \renewcommand{\tt}{\texttt}
@@ -71,16 +73,37 @@
 \newcommand{\ra}{\rangle}
 
 % --- Document ---
+\iffalse
+Abstract: origin of Wye, what it is
+1 Introduction: 
+- Basic description of language features and type system
+
+2 Syntax
+- Grammar
+
+3 Semantics
+one by one
+
+4 Type system
+Hindley Milner but with some cool stuff
+
+5 Intermediate representation
+- using LLVM, it will be compilable
+
+Appendix:
+- Features that Wye does not have
+\fi
+
 \allowdisplaybreaks
 \begin{document}
 
 % --- Title ---
 \title{
-\textsc{Wye: an Interface-Oriented Language} \\
+\textsc{Wye: A Compiled,, Functional, Object-Oriented Language} \\
 \vspace{2ex}
 \large{\textsc{Version \version}}\\
-\vspace{2ex}}
-
+\vspace{2ex}
+}
 \author{\normalsize\textsc{Aditya Gomatam} \\ 
 \normalsize{\today\vspace{2ex}}}
 \date{}
@@ -90,69 +113,17 @@
 
 % --- Abstract --- 
 \begin{abstract}
-Wye started out as a project to learn more about compilers. It turned into an
-epic journey through the beautiful areas of type theory, the lambda calculus,
-and programming language design. Though originally intended to be a compiled,
-pure-functional language, Wye succumbed to my ideas about
-``interface-orientation," as opposed to object-orientation. Wye retains features
-of functional languages such as its basis in the lambda calculus, fast type
-inference, and a focus on functional rather than imperative design.
-Nevertheless, its functional origins are indicated in its name, as $\mathsf{y}$
-is $\lambda$ upside-down.
+One day, I thought to myself, ``I'm going to write a compiler." But, for what?
+This document answers that question.
 
-This document compiles the specification of Wye: its syntax, semantics, type
-system, intermediate representation, register allocation, and finally its
-translation into an assembly language of choice.
+Wye is a statically-, strongly-, and structurally-typed, functional, object-oriented language,
+heavily inspired by Haskell, Rust, and OCaml. Wye tries to prevent some of the nuisances
+that arise in modern industry-grade languages. Nevertheless, it retains a firm basis in functional
+programming, indeed alluding in its name to the upside-down \texttt{y} of the lambda calculus.
+
+This document compiles the full specification of the Wye language: its syntax, semantics,
+type system, and intermediate representation.
 \end{abstract}
-
-% --- Body ---
-\section{Introduction}
-Wye is a statically-typed, interface-oriented, functional language. Wye is
-heavily inspired by Rust, Haskell, and OCaml, as well as object-oriented
-languages like C++. It utilizes a Hindley-Milner type system augmented with
-basic record types (\tt{struct}s), bounded interfaces, enumerations, pattern
-matching, and so on. Wye's ``interface-orientation'' combined with its
-underlying Hindley-Milner type system, enables perfect type-inference
-simultaneously with encapsulation and code-sharing, while preventing as much as
-possible the the messiness that OOP can become.
-
-For clarity of your code, and to aid the compiler, Wye allows the annotation of
-types of variables.
-
-\subsection{Features that Wye does not have}
-
-\subsubsection{List Comprehension}
-List comprehension should not be too hard to implement compared to the rest of
-this project, but it will require some additions to the grammar, and is not
-a strong focus of the initial versions of Wye.
-
-\subsubsection{User Input}
-In Wye version \version{}, users may only output to the screen. Taking user
-input is slightly more complicated and is thus deferred to a future version of
-Wye.
-
-\subsubsection{Type Aliases}
-Similar to TypeScript, it would be nice if the user could do something like the
-following to create an abbreviation for a type:
-\begin{lstlisting}{wye}
-; just a tuple-type of length 2
-type Pair 'a 'b = ('a, 'b);
-\end{lstlisting}
-
-\section{Syntax}
-A Wye program is stored in a \tt{.wye} file and is, in its most abstract
-view, simply a sequence of Wye statements.
-
-Written below in Backus-Naur form is roughly the Wye grammar. The start symbol is
-$Program$. Nonterminals start with a capital letter. Terminals are written in
-\tt{this font}. $pat*$ denotes the Kleene star: zero or more repetitions of
-the pattern $pat$. $pat+$ is a shorthand for $pat\: pat*$. $pat?$ denotes that
-$pat$ may or may not occur. $( pat_1\:...\: pat_n )$ groups $pat_1, ..., pat_n$
-into a new pattern in which each $pat_i$ is to occur in the specified sequence.
-$pat1 | pat2$ means that exactly one of $pat1$ or $pat2$ may occur. Beware that
-\tt{|} and $|$ are different -- the first is a Wye token. $\la$These
-brackets$\ra$ are used to annotate certain grammar rules. $\symbol{92}n$ refers
-to a newline or carriage return.
 
 % WYE: only structs can hold state. You cannot define methods on anon records
 % anon records should not be allowed to change state with methods. If you want
@@ -167,13 +138,55 @@ to a newline or carriage return.
 % impl 'Ordered X
 % There should also be a builtin Indexable interface - lists should be indexable
 
+% <: for subtype syntax
+
+
+% --- Body ---
+\section{Introduction}
+A programming language should enable the programmer, not hinder them. Overly permissive
+language constructs such as inheritance and duck typing can make programs behave in
+unexpected ways; clunky syntax, such as fully-qualified names, simply distract from and obstruct the
+design process, preventing programmers from focusing on their work. Wye strives to avoid these
+encumbrances, to be simple yet still useful.
+
+To this end, Wye features straightforward syntax, emphasizing functional over
+object-oriented programming. Wye invests heavily in its type system, as powerful and expressive
+types not only accelerate  the development of correct programs, but also showcase the true
+beauty of type theory. Wye extends the Hindley-Milner type system (which
+underlies languages like OCaml and Haskell), with abstract data types, nominal and structural
+records, and bounded interfaces, all while retaining perfect type inference.
+
+Wye does not innovate anything. It is not intended to push the envelope
+or to be at the bleeding edge of programming language research. Even though it originates
+from deep study of programming language and type theory, Wye emphasizes usability over
+theoretical significance.
+It does not include esoteric types, nor language constructs that are
+sparingly useful, and is kept in check by real-world programming use-cases.
+
+Most importantly, Wye was designed to be compiled. Not to be compiled \textit{efficiently} --
+just to be compiled. This project is considered incomplete, or proceeding in the wrong direction,
+as long as Wye has no working compiler.
+
+\section{Syntax}
+A Wye program is stored in a \tt{.wye} file and is, in its most abstract
+view, simply a sequence of Wye statements.
+
+Written below in Backus-Naur form is roughly the Wye grammar. The start symbol is
+$Program$. Nonterminals start with a capital letter. Terminals are written in
+\tt{this font}. $pat*$ denotes the Kleene star: zero or more repetitions of
+the pattern $pat$. $pat+$ is a shorthand for $pat\: pat*$. $pat?$ denotes that
+$pat$ may or may not occur. $( pat_1\:...\: pat_n )$ groups $pat_1, ..., pat_n$
+into a new pattern in which each $pat_i$ is to occur in the specified sequence.
+$pat1 | pat2$ means that exactly one of $pat1$ or $pat2$ may occur. Beware that
+\tt{|} and $|$ are different -- the first is a Wye token. $\la$These
+brackets$\ra$ are used to annotate certain grammar rules.
+
 \subsection{Grammar}
 \subsubsection{Top-level non-terminals}
 \begin{align*}
 Program \substo& Statement+\\
 Statement \substo& Expr \sepbar EnumDecl \sepbar StructDecl\\
-&\sepbar InterfaceDecl \sepbar ImplBlock \sepbar Main\\
-Main \substo& \tt{main \symbol{92}n}\: Expr \: \tt{end}
+&\sepbar SigDecl \sepbar ImplBlock
 \end{align*}
 \subsubsection{Expressions}
 \begin{align*}
@@ -210,12 +223,12 @@ LetExpr \substo& \tt{let}\: Id \:(\tt{:} Type)? \: \tt{=} \: Expr\\
 &\sepbar \tt{let}\: Id \: (\: \tt{(} Id\tt{:} Type \tt{)}\: \tt{->} \:)+ Type \: \tt{=}\: Expr\\
 AttrSet \substo& \tt{set}\: Id\tt{.}Id\: \tt{=} \:Expr\\
 \end{align*}
-\subsubsection{Structures and interfaces}
+\subsubsection{Records and Signatures}
 \begin{align*}
 EnumDecl \substo& \tt{enum}\: TypeId \: (\tt{'}\: TypeId?\: Id)* \: \texttt{=} \: (TypeId \: (\texttt{with}\: Type)?)\\
 &(\texttt{|}\:TypeId \: (\texttt{with}\: Type)?)*\\
 StructDecl \substo& \tt{struct}\: Id \: (\tt{'}\: TypeId?\: Id)*\: \tt{\symbol{92}n} \: (Id\tt{:} Type\: \tt{\symbol{92}n})+\: \tt{end}\\
-InterfaceDecl \substo& \tt{interface}\: Id\: ( \tt{requires} \: (Id \: \tt{+})*\: Id)? \:  \tt{\symbol{92}n}\\
+SigDecl \substo& \tt{sig}\: Id\: ( \tt{implies} \: (Id \: \tt{+})*\: Id)? \:  \tt{\symbol{92}n}\\
 &(ValDecl \sepbar MethodImpl \sepbar MethodDecl)+\: \tt{end}\\
 ImplBlock \substo& \tt{impl}\: Id (\tt{'}\: TypeId?\: Id)* \: \tt{:} Id (\tt{'}\: TypeId?\: Id)* \: \tt{\symbol{92}n}\\
 &(AttrSet \sepbar MethodImpl)+\: \tt{end} \\
@@ -250,9 +263,9 @@ with each other within their scope.
 Notice that \tt{bool} is not a builtin type. This is because the
 $TypeDeclaration$ system of Wye is used to define it in the Wye prelude.
 
-One-line Wye comments begin with \tt{;} and mark all following text until
+One-line Wye comments begin with \tt{\%} and mark all following text until
 the next carriage return or newline as whitespace. Multiline Wye comments begin
-with \tt{(*} and end with \tt{*)}.
+with \tt{\[\%} and end with \tt{\%\]}.
 
 In Wye, the application of functions is always written in postfix notation,
 except for certain reserved binary operators (such as \tt{+} and
@@ -261,11 +274,13 @@ under the hood, translated into postfix notation.
 
 \section{Semantics}
 
+A Wye program is parsed, as noted earlier, as a sequence of Wye statements. A Wye
+program is then executed top-to-bottom. The semantics of each line of the grammar are
+described in the subsections of this section.
+
 \subsection{Expressions}
 
 \subsubsection{Patterns}
-
-\subsubsection{Main}
 
 \subsection{Enums}
 
@@ -275,6 +290,36 @@ Methods that define shared code cannot be overridden. If you want to override th
 actually want to implement a different interface than what is being shared. That is, your code either
 should not be shared, or the implementation you want to provide in the override should have a
 different name.
+
+\section{Future plans}
+
+\subsection{Type Aliases}
+Similar to TypeScript, it would be nice if the user could do something like the
+following to create an abbreviation for a type:
+\begin{lstlisting}{wye}
+; just a tuple-type of length 2
+type Pair 'a 'b = ('a, 'b);
+\end{lstlisting}
+
+\subsection{Dependent types}
+Introduce a \texttt{'a val} type that can be used to compile-time create conditions
+for typing dependent on that value. The value should not be computed via an expression
+but should be listed explicitly - there will have to be a notion of an "explicit" expression.
+
+
+\subsection{List Comprehension}
+List comprehension should not be too hard to implement compared to the rest of
+this project, but it will require some additions to the grammar, and is not
+a strong focus of the initial versions of Wye.
+
+\subsection{Modules}
+
+\subsection{Intersection and Union types}
+
+\subsection{User Input}
+In Wye version \version{}, users may only output to the screen. Taking user
+input is slightly more complicated and is thus deferred to a future version of
+Wye.
 
 \pagebreak
 \section{Acknowledgements}

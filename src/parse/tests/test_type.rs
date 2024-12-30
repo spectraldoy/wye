@@ -1,17 +1,18 @@
 use super::*;
+use ast::Type::*;
 
 #[test]
 fn test_parse_literal() {
     let parser = grammar::TypeParser::new();
     assert!(parser.parse("none").unwrap() == ast::Type::None);
-    assert!(parser.parse("int").unwrap() == ast::Type::Int);
-    assert!(parser.parse("float").unwrap() == ast::Type::Float);
-    assert!(parser.parse("string").unwrap() == ast::Type::String);
-    assert!(parser.parse("iNT").unwrap() == ast::Type::TypeId("iNT".to_string(), vec![]));
-    assert!(parser.parse("_x").unwrap() == ast::Type::TypeId("_x".to_string(), vec![]));
-    assert!(parser.parse("flot").unwrap() == ast::Type::TypeId("flot".to_string(), vec![]));
-    assert!(parser.parse("(int)").unwrap() == ast::Type::Int);
-    assert!(parser.parse("(xello)").unwrap() == ast::Type::TypeId("xello".to_string(), vec![]));
+    assert!(parser.parse("int").unwrap() == Int);
+    assert!(parser.parse("float").unwrap() == Float);
+    assert!(parser.parse("string").unwrap() == String);
+    assert!(parser.parse("iNT").unwrap() == TypeId("iNT".to_string(), vec![]));
+    assert!(parser.parse("_x").unwrap() == TypeId("_x".to_string(), vec![]));
+    assert!(parser.parse("flot").unwrap() == TypeId("flot".to_string(), vec![]));
+    assert!(parser.parse("(int)").unwrap() == Int);
+    assert!(parser.parse("(xello)").unwrap() == TypeId("xello".to_string(), vec![]));
     // Err literal type
     assert!(parser.parse("Un[").is_err());
     assert!(parser.parse("()").is_err());
@@ -24,37 +25,30 @@ fn test_parse_literal() {
 #[test]
 fn test_parse_list_tuple_type() {
     let parser = grammar::TypeParser::new();
-    assert!(parser.parse("[int]").unwrap() == ast::Type::List(Box::new(ast::Type::Int)));
+    assert!(parser.parse("[int]").unwrap() == List(Box::new(Int)));
     assert!(
-        parser.parse("[Option]").unwrap()
-            == ast::Type::List(Box::new(ast::Type::TypeId("Option".to_string(), vec![])))
+        parser.parse("[Option]").unwrap() == List(Box::new(TypeId("Option".to_string(), vec![])))
     );
-    assert!(parser.parse("[(int)]").unwrap() == ast::Type::List(Box::new(ast::Type::Int)));
+    assert!(parser.parse("[(int)]").unwrap() == List(Box::new(Int)));
     assert!(
         parser.parse("[(int, Option)]").unwrap()
-            == ast::Type::List(Box::new(ast::Type::Tuple(vec![
-                ast::Type::Int,
-                ast::Type::TypeId("Option".to_string(), vec![])
+            == List(Box::new(Tuple(vec![
+                Int,
+                TypeId("Option".to_string(), vec![])
             ])))
     );
-    assert!(
-        parser.parse("[[int]]").unwrap()
-            == ast::Type::List(Box::new(ast::Type::List(Box::new(ast::Type::Int))))
-    );
+    assert!(parser.parse("[[int]]").unwrap() == List(Box::new(List(Box::new(Int)))));
     assert!(parser.parse("[int").is_err());
     assert!(parser.parse("[int, string]").is_err());
     assert!(parser.parse("hel]o").is_err());
-    assert!(
-        parser.parse("(int, string, float)").unwrap()
-            == ast::Type::Tuple(vec![ast::Type::Int, ast::Type::String, ast::Type::Float])
-    );
+    assert!(parser.parse("(int, string, float)").unwrap() == Tuple(vec![Int, String, Float]));
     assert!(
         parser.parse("(none, int, Option, string)").unwrap()
-            == ast::Type::Tuple(vec![
+            == Tuple(vec![
                 ast::Type::None,
-                ast::Type::Int,
-                ast::Type::TypeId("Option".to_string(), vec![]),
-                ast::Type::String
+                Int,
+                TypeId("Option".to_string(), vec![]),
+                String
             ])
     );
     assert!(parser.parse("()").is_err());
@@ -65,28 +59,31 @@ fn test_parse_list_tuple_type() {
     assert!(parser.parse("int string").is_err());
 }
 
+#[test]
+fn test_parse_polymorphic_type() {}
+
 // TODO(WYE-6) uncomment these and test_parse_enum types and record types
 // note that record types can have polytype variables to handle structs/interfaces
 // that are parametrized with polytype variables
 
 // #[test]
 // fn test_parse_polymorphic_type() {
-//     assert!(parser.parse("'a").unwrap() == ast::Type::UniversalType("a".to_string()));
+//     assert!(parser.parse("'a").unwrap() == UniversalType("a".to_string()));
 //     assert!(
 //         parser.parse("'_yusdf").unwrap()
-//             == ast::Type::UniversalType("_yusdf".to_string())
+//             == UniversalType("_yusdf".to_string())
 //     );
 //     assert!(
 //         parser.parse("'aAbABBB").unwrap()
-//             == ast::Type::UniversalType("aAbABBB".to_string())
+//             == UniversalType("aAbABBB".to_string())
 //     );
-//     assert!(parser.parse("'v1").unwrap() == ast::Type::UniversalType("v1".to_string()));
+//     assert!(parser.parse("'v1").unwrap() == UniversalType("v1".to_string()));
 //     assert!(
-//         parser.parse("'Type").unwrap() == ast::Type::UniversalType("Type".to_string())
+//         parser.parse("'Type").unwrap() == UniversalType("Type".to_string())
 //     );
 //     assert!(
 //         parser.parse("'___Type").unwrap()
-//             == ast::Type::UniversalType("___Type".to_string())
+//             == UniversalType("___Type".to_string())
 //     );
 //     assert!(parser.parse("''").is_err());
 //     assert!(parser.parse("'hello'").is_err());
@@ -100,31 +97,31 @@ fn test_parse_list_tuple_type() {
 //     // Ok function type
 //     assert!(
 //         parser.parse("int -> float").unwrap()
-//             == ast::Type::FunctionType(
-//                 Box::new(ast::Type::Int),
-//                 Box::new(ast::Type::Float)
+//             == FunctionType(
+//                 Box::new(Int),
+//                 Box::new(Float)
 //             )
 //     );
 //     assert!(
 //         parser.parse("(int -> float)").unwrap()
-//             == ast::Type::FunctionType(
-//                 Box::new(ast::Type::Int),
-//                 Box::new(ast::Type::Float)
+//             == FunctionType(
+//                 Box::new(Int),
+//                 Box::new(Float)
 //             )
 //     );
 //     assert!(
 //         parser
 //             .parse("(int->float->        string ->Option)")
 //             .unwrap()
-//             == ast::Type::FunctionType(
-//                 Box::new(ast::Type::FunctionType(
-//                     Box::new(ast::Type::FunctionType(
-//                         Box::new(ast::Type::Int),
-//                         Box::new(ast::Type::Float)
+//             == FunctionType(
+//                 Box::new(FunctionType(
+//                     Box::new(FunctionType(
+//                         Box::new(Int),
+//                         Box::new(Float)
 //                     )),
-//                     Box::new(ast::Type::String)
+//                     Box::new(String)
 //                 )),
-//                 Box::new(ast::Type::DeclaredType(
+//                 Box::new(DeclaredType(
 //                     "Option".to_string(),
 //                     vec![]
 //                 ))
@@ -132,38 +129,38 @@ fn test_parse_list_tuple_type() {
 //     );
 //     assert!(
 //         parser.parse("'a -> 'b -> (int)").unwrap()
-//             == ast::Type::FunctionType(
-//                 Box::new(ast::Type::FunctionType(
-//                     Box::new(ast::Type::UniversalType("a".to_string())),
-//                     Box::new(ast::Type::UniversalType("b".to_string()))
+//             == FunctionType(
+//                 Box::new(FunctionType(
+//                     Box::new(UniversalType("a".to_string())),
+//                     Box::new(UniversalType("b".to_string()))
 //                 )),
-//                 Box::new(ast::Type::Int)
+//                 Box::new(Int)
 //             )
 //     );
 //     assert!(
 //         parser.parse("string -> Option int -> float").unwrap()
-//             == ast::Type::FunctionType(
-//                 Box::new(ast::Type::FunctionType(
-//                     Box::new(ast::Type::String),
-//                     Box::new(ast::Type::DeclaredType(
+//             == FunctionType(
+//                 Box::new(FunctionType(
+//                     Box::new(String),
+//                     Box::new(DeclaredType(
 //                         "Option".to_string(),
-//                         vec![ast::Type::Int]
+//                         vec![Int]
 //                     ))
 //                 )),
-//                 Box::new(ast::Type::Float)
+//                 Box::new(Float)
 //             )
 //     );
 //     assert!(
 //         parser.parse("'a -> ('a -> int) -> 'a").unwrap()
-//             == ast::Type::FunctionType(
-//                 Box::new(ast::Type::FunctionType(
-//                     Box::new(ast::Type::UniversalType("a".to_string())),
-//                     Box::new(ast::Type::FunctionType(
-//                         Box::new(ast::Type::UniversalType("a".to_string())),
-//                         Box::new(ast::Type::Int)
+//             == FunctionType(
+//                 Box::new(FunctionType(
+//                     Box::new(UniversalType("a".to_string())),
+//                     Box::new(FunctionType(
+//                         Box::new(UniversalType("a".to_string())),
+//                         Box::new(Int)
 //                     ))
 //                 )),
-//                 Box::new(ast::Type::UniversalType("a".to_string()))
+//                 Box::new(UniversalType("a".to_string()))
 //             )
 //     );
 //     // Err function type
@@ -182,32 +179,32 @@ fn test_parse_list_tuple_type() {
 //     // Ok declared type
 //     assert!(
 //         parser.parse("bool").unwrap()
-//             == ast::Type::DeclaredType("bool".to_string(), vec![])
+//             == DeclaredType("bool".to_string(), vec![])
 //     );
 //     assert!(
 //         parser.parse("Option int").unwrap()
-//             == ast::Type::DeclaredType(
+//             == DeclaredType(
 //                 "Option".to_string(),
-//                 vec![ast::Type::Int]
+//                 vec![Int]
 //             )
 //     );
 //     assert!(
 //         parser.parse("Tree (Tree) float").unwrap()
-//             == ast::Type::DeclaredType(
+//             == DeclaredType(
 //                 "Tree".to_string(),
 //                 vec![
-//                     ast::Type::DeclaredType("Tree".to_string(), vec![]),
-//                     ast::Type::Float
+//                     DeclaredType("Tree".to_string(), vec![]),
+//                     Float
 //                 ]
 //             )
 //     );
 //     assert!(
 //         parser.parse("Tree (Tree float)").unwrap()
-//             == ast::Type::DeclaredType(
+//             == DeclaredType(
 //                 "Tree".to_string(),
-//                 vec![ast::Type::DeclaredType(
+//                 vec![DeclaredType(
 //                     "Tree".to_string(),
-//                     vec![ast::Type::Float]
+//                     vec![Float]
 //                 )]
 //             )
 //     );
