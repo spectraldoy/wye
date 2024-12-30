@@ -303,7 +303,6 @@ AtomicType: ast::Type = {
     <i: Identifier> => ast::Type::TypeId(i, vec![]),
     "[" <t: Type> "]" => ast::Type::List(Box::new(t)),
     <tup: WyeTuple<Type>> => ast::Type::Tuple(tup),
-    <p: PolytypeVar> => ast::Type::Poly { name: p.name, bound: p.bound },
     <r: WyeRecord<RecordTypeMember>> => {
         let mut methods = vec![];
         let mut values = vec![];
@@ -329,14 +328,23 @@ AtomicType: ast::Type = {
         });
         ast::Type::NominalRecord { methods, values }
     },
+    <start: @L> <polytypes: PolytypeVar+> <tid: Identifier?> <end: @R> =>? {
+        if let Some(tid) = tid {
+            Ok(ast::Type::TypeId(tid, polytypes))
+        } else if polytypes.len() != 1 {
+            Err(ParseError::User {
+                error: ("Multiple polytypes that do not apply to any type constructor", Span {start, end})
+            })
+        } else {
+            Ok(ast::Type::Poly { name: polytypes[0].name.clone(), bound: polytypes[0].bound.clone() })
+        }
+    },
     "(" <t: Type> ")" => t,
 }
 
-// TODO: record types, function types, enum types, struct type, nom type, sig
-
 pub(crate) Type: ast::Type = {
     AtomicType,
-    // TODO (WYE-6): records, functions, polymorphic
+    <ftypes: SepSeqAtLeastTwo<AtomicType, "->" /*"*/>> => ast::Type::Function(ftypes),
 }
 
 // pub Expression: Spanned<ast::Expression> = {
@@ -453,47 +461,6 @@ pub(crate) Type: ast::Type = {
 //             Ok(ast::Pattern::Guarded(Box::new(pat.value), guard.value))
 //         }
 //     },
-// }
-
-// AtomicTypeExpr: ast::TypeExpression = {
-//     "int" => ast::TypeExpression::IntType,
-//     "float" => ast::TypeExpression::FloatType,
-//     "string" => ast::TypeExpression::StringType,
-//     "[" <te: TypeExpression> "]" => ast::TypeExpression::ListType(Box::new(te)),
-//     "(" <te: TypeExpression> ")" => te,
-//     "(" <tes: SepTuple<TypeExpression, ",">> ")" => ast::TypeExpression::TupleType(tes),
-//     <tvar: TypeVar> => ast::TypeExpression::UniversalType(tvar),
-// }
-
-// NonFuncTypeExpr: ast::TypeExpression = {
-//     AtomicTypeExpr,
-//     // <Declared TypeId> <TypeArgs>
-//     <t: Sp<Identifier>> <targs: Sp<AtomicTypeExpr>*> =>? {
-//         let mut texpr_spans = vec![(t.start, t.end)];
-//         let (targ_vals, mut targ_spans): (Vec<_>, Vec<_>) = targs.iter().map(|el| {
-//             (el.value.clone(), (el.start, el.end))
-//         }).unzip();
-//         texpr_spans.append(&mut targ_spans);
-//         if util::spans_overlap(&texpr_spans) {
-//             Err(ParseError::User {
-//                 error: "Space required between tokens here, cannot identify type arguments"
-//             })
-//         } else {
-//             Ok(ast::TypeExpression::DeclaredType(t.value, targ_vals))
-//         }
-//     },
-// }
-
-// pub TypeExpression: ast::TypeExpression = {
-//     NonFuncTypeExpr,
-//     <ftype: SepSeqAtLeastTwo<Sp<NonFuncTypeExpr>, "->" >> =>? match util::collect_function::<ast::TypeExpression>(
-//         ftype[0].clone(),
-//         ftype[1..].to_vec(),
-//         |t1, t2| ast::TypeExpression::FunctionType(Box::new(t1), Box::new(t2))
-//     ) {
-//         Ok(v) => Ok(v),
-//         Err(e) => Err(ParseError::User { error: e })
-//     }
 // }
 
 // // Program
