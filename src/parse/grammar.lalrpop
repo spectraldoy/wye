@@ -113,7 +113,15 @@ AtomicExpr: ast::Expression = {
         let record_elems = r.value.into_iter().map(|spanned_string_expr|
             (spanned_string_expr.value.0.clone(), spanned_string_expr.value.1.clone(), Some(spanned_string_expr.span.clone()))
         ).collect::<Vec<_>>();
-        ast::Expression::Record(record_elems, record_span)
+        ast::Expression::StructRecord(record_elems, record_span)
+    },
+    <r: Sp<NomRecord<SpRecordExprField>>> => {
+        let record_span = Some(r.span);
+        // spanned_string_expr: Spanned<(String, Expression)>
+        let record_elems = r.value.into_iter().map(|spanned_string_expr|
+            (spanned_string_expr.value.0.clone(), spanned_string_expr.value.1.clone(), Some(spanned_string_expr.span.clone()))
+        ).collect::<Vec<_>>();
+        ast::Expression::NominalRecord(record_elems, record_span)
     },
     ProjectedExpr,
     "(" <e: Expression> ")" => e,
@@ -198,14 +206,7 @@ Expression: ast::Expression = {
             ))
         }
     }
-// <func: Sp<AtomicExpr>> <args: Sp<AtomicExpr>+> =>? match util::collect_function::<ast::Expression>(
-//         func,
-//         args,
-//         |e1, e2| ast::Expression::FuncApplication(Box::new(e1), Box::new(e2))
-//     ) {
-//         Ok(v) => Ok(v),
-//         Err(e) => Err(ParseError::User { error: e })
-//     },
+
 //     // BuiltinOp
 //     <op1: AtomicExpr> <bop: BuiltinOp> <op2: AtomicExpr> => ast::Expression::FuncApplication(
 //         Box::new(ast::Expression::FuncApplication(
@@ -308,12 +309,12 @@ AtomicType: ast::Type = {
         let mut methods = vec![];
         let mut values = vec![];
 
-        let _ = r.into_iter().map(|(name, typ, memberness)| {
+        for (name, typ, memberness) in r {
             match memberness {
                 util::RecordMemberness::Method => methods.push((name, typ)),
                 util::RecordMemberness::Value => values.push((name, typ)),
             }
-        });
+        }
 
         ast::Type::StructRecord { methods, values }
     },
@@ -321,12 +322,12 @@ AtomicType: ast::Type = {
         let mut methods = vec![];
         let mut values = vec![];
 
-        let _ = r.into_iter().map(|(name, typ, memberness)| {
+        for (name, typ, memberness) in r {
             match memberness {
                 util::RecordMemberness::Method => methods.push((name, typ)),
                 util::RecordMemberness::Value => values.push((name, typ)),
             }
-        });
+        }
         ast::Type::NominalRecord { methods, values }
     },
     "(" <t: Type> ")" => t,

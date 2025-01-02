@@ -37,7 +37,7 @@ pub fn flatten_projection(expr: &ast::Expression) -> Result<Vec<ast::Expression>
         _ => Err("Called flatten_projection on non-Projection Expression"),
     }
 }
-
+#[derive(Debug)]
 pub enum RecordMemberness {
     Value,
     Method,

@@ -150,7 +150,7 @@ fn test_parse_record_expr() {
 
     assert!(
         parse(&parser, "{field: Field.feeld}")
-            == Record(
+            == StructRecord(
                 vec![(
                     "field".to_string(),
                     Projection(
@@ -172,7 +172,7 @@ fn test_parse_record_expr() {
         cidnt: (1),
         lint: (\"hi\",)
     }"
-        ) == Record(
+        ) == StructRecord(
             vec![
                 ("bint".to_string(), IntLiteral(3, None), None),
                 (
@@ -192,7 +192,7 @@ fn test_parse_record_expr() {
     );
     assert!(
         parse(&parser, "({one: 2, three: 4})")
-            == Record(
+            == StructRecord(
                 vec![
                     ("one".to_string(), IntLiteral(2, None), None),
                     ("three".to_string(), IntLiteral(4, None), None)
@@ -204,7 +204,7 @@ fn test_parse_record_expr() {
     assert!(
         parse(&parser, "({one:2,three:4},)")
             == Tuple(
-                vec![Record(
+                vec![StructRecord(
                     vec![
                         ("one".to_string(), IntLiteral(2, None), None),
                         ("three".to_string(), IntLiteral(4, None), None)
@@ -216,12 +216,18 @@ fn test_parse_record_expr() {
     );
     assert!(
         parse(&parser, "{super: 4,}")
-            == Record(vec![("super".to_string(), IntLiteral(4, None), None)], None)
+            == StructRecord(vec![("super".to_string(), IntLiteral(4, None), None)], None)
+    );
+    assert!(
+        parse(&parser, "{|x: 4|}")
+            == NominalRecord(vec![("x".to_string(), IntLiteral(4, None), None)], None)
     );
 
     assert!(parser.parse("{}").is_err());
+    assert!(parser.parse("{||}").is_err());
     assert!(parser.parse("{super(pub): 4}").is_err());
     assert!(parser.parse("{int: 4}").is_err());
+    assert!(parser.parse("{|int: 4|}").is_err());
     assert!(parser.parse("{4: thing}").is_err());
     assert!(parser.parse("unclosed: curly}").is_err());
     assert!(parser.parse("{one: two three: four}").is_err());

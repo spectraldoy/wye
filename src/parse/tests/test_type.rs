@@ -201,7 +201,6 @@ fn test_parse_type_identifier() {
     assert!(parser.parse("X with int").is_err());
 }
 
-// TODO: test parse record type,
 // TODO: convert these tests to tests on typed let = nothing expressions
 
 #[test]
@@ -284,4 +283,155 @@ fn test_parse_function_type() {
     assert!(parser.parse("(a) -> (4)").is_err());
     assert!(parser.parse("Option 'a -> int").is_err());
     assert!(parser.parse("(x: int) -> (y: float)").is_err());
+}
+
+#[test]
+fn test_parse_record_type() {
+    let parser = grammar::TypeParser::new();
+
+    assert!(
+        parser.parse("{a: int}").unwrap()
+            == StructRecord {
+                methods: vec![],
+                values: vec![("a".to_string(), Int)]
+            }
+    );
+    assert!(
+        parser.parse("{a: float, }").unwrap()
+            == StructRecord {
+                methods: vec![],
+                values: vec![("a".to_string(), Float)]
+            }
+    );
+
+    let optional_ending_comma_expected = StructRecord {
+        methods: vec![],
+        values: vec![
+            ("a".to_string(), Int),
+            (
+                "b".to_string(),
+                TypeId(
+                    "Option".to_string(),
+                    vec![Poly("a".to_string(), Option::None)],
+                ),
+            ),
+            ("c".to_string(), List(Box::new(Int))),
+        ],
+    };
+    assert!(
+        parser
+            .parse(
+                "{
+        a: int,
+        b: 'a Option,
+        c: [int]
+    }"
+            )
+            .unwrap()
+            == optional_ending_comma_expected
+    );
+    assert!(
+        parser
+            .parse(
+                "{
+        a: int,
+        b: 'a Option,
+        c: [int],
+    }"
+            )
+            .unwrap()
+            == optional_ending_comma_expected
+    );
+
+    assert!(parser
+        .parse(
+            "{
+        a: int b: float
+    }"
+        )
+        .is_err());
+    assert!(
+        parser
+            .parse(
+                "{|
+        mem1: float,
+        mem2: ({
+            a: Three,
+            method four: int
+        }),
+        mem4: [int],
+        mem3: {| y: (int, float, none, { method u: int }) |}
+    |}"
+            )
+            .unwrap()
+            == NominalRecord {
+                methods: vec![],
+                values: vec![
+                    ("mem1".to_string(), Float),
+                    (
+                        "mem2".to_string(),
+                        StructRecord {
+                            methods: vec![("four".to_string(), Int)],
+                            values: vec![("a".to_string(), TypeId("Three".to_string(), vec![])),]
+                        }
+                    ),
+                    ("mem4".to_string(), List(Box::new(Int))),
+                    (
+                        "mem3".to_string(),
+                        NominalRecord {
+                            methods: vec![],
+                            values: vec![(
+                                "y".to_string(),
+                                Tuple(vec![
+                                    Int,
+                                    Float,
+                                    None,
+                                    StructRecord {
+                                        methods: vec![("u".to_string(), Int)],
+                                        values: vec![]
+                                    }
+                                ])
+                            )]
+                        }
+                    )
+                ]
+            }
+    );
+    assert!(
+        parser
+            .parse(
+                "{|
+        method a: int,
+        method b: int -> int,
+        u: float -> { u: string }
+    |}"
+            )
+            .unwrap()
+            == NominalRecord {
+                methods: vec![
+                    ("a".to_string(), Int),
+                    ("b".to_string(), Function(vec![Int, Int])),
+                ],
+                values: vec![(
+                    "u".to_string(),
+                    Function(vec![
+                        Float,
+                        StructRecord {
+                            methods: vec![],
+                            values: vec![("u".to_string(), String)]
+                        }
+                    ])
+                )]
+            }
+    );
+
+    assert!(parser.parse("{4: int}").is_err());
+    assert!(parser.parse("{}").is_err());
+    assert!(parser.parse("{||}").is_err());
+    assert!(parser.parse("{a: [4]}").is_err());
+    assert!(parser.parse("{one: 2}").is_err());
+    assert!(parser.parse("{int: a}").is_err());
+    assert!(parser.parse("a: int").is_err());
+    assert!(parser.parse("{a: int},").is_err());
+    assert!(parser.parse("{int}").is_err());
 }

@@ -71,7 +71,9 @@ pub enum Expression {
     List(Vec<Expression>, OptionSpan),
     Tuple(Vec<Expression>, OptionSpan),
     // { <id>: value, ..., <id>: value }
-    Record(Vec<(String, Expression, OptionSpan)>, OptionSpan),
+    StructRecord(Vec<(String, Expression, OptionSpan)>, OptionSpan),
+    // {| <id>: value, ..., <id>: value |}
+    NominalRecord(Vec<(String, Expression, OptionSpan)>, OptionSpan),
     // Reference a variable or function from the environment.
     Identifier(String, OptionSpan),
     BinaryOp(BinaryOp, OptionSpan),
@@ -311,7 +313,13 @@ impl UnSpan for Expression {
             Self::StringLiteral(s, _) => Self::StringLiteral(s.clone(), None),
             Self::List(lst, _) => Self::List(unspanned_vec(&lst), None),
             Self::Tuple(tup, _) => Self::Tuple(unspanned_vec(&tup), None),
-            Self::Record(rec, _) => Self::Record(
+            Self::StructRecord(rec, _) => Self::StructRecord(
+                rec.iter()
+                    .map(|r| (r.0.clone(), r.1.unspanned(), None))
+                    .collect(),
+                None,
+            ),
+            Self::NominalRecord(rec, _) => Self::NominalRecord(
                 rec.iter()
                     .map(|r| (r.0.clone(), r.1.unspanned(), None))
                     .collect(),
