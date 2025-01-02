@@ -63,43 +63,31 @@ fn test_parse_list_tuple_type() {
 fn test_parse_polymorphic_type() {
     let parser = grammar::TypeParser::new();
 
+    assert!(parser.parse("'a").unwrap() == Poly("a".to_string(), Option::None));
+
+    assert!(parser.parse("'_yusdf").unwrap() == Poly("_yusdf".to_string(), Option::None));
+    assert!(parser.parse("'aAbB").unwrap() == Poly("aAbB".to_string(), Option::None));
+    assert!(parser.parse("'a_1").unwrap() == Poly("a_1".to_string(), Option::None));
+    assert!(parser.parse("'Type").unwrap() == Poly("Type".to_string(), Option::None));
+    assert!(parser.parse("'___type").unwrap() == Poly("___type".to_string(), Option::None));
+
+    // Bounded types
     assert!(
-        parser.parse("'a").unwrap()
-            == Poly {
-                name: "a".to_string(),
-                bound: Option::None
-            }
+        parser.parse("Bounded'a").unwrap() == Poly("a".to_string(), Some("Bounded".to_string()))
     );
+    assert!(parser.parse("__r9'a").unwrap() == Poly("a".to_string(), Some("__r9".to_string())));
+    assert!(parser.parse("95'a").is_err());
+
+    assert!(parser.parse("' tee").is_err());
+    assert!(parser.parse("bound 'a").is_err());
+    assert!(parser.parse(";df").is_err());
+    assert!(parser.parse("'hello'").is_err());
+    assert!(parser.parse("''").is_err());
+    assert!(parser.parse("'95x").is_err());
 }
 
-// TODO(WYE-6) uncomment these and test_parse_enum types and record types
-// note that record types can have polytype variables to handle structs/interfaces
-// that are parametrized with polytype variables
-
-// #[test]
-// fn test_parse_polymorphic_type() {
-//     assert!(parser.parse("'a").unwrap() == UniversalType("a".to_string()));
-//     assert!(
-//         parser.parse("'_yusdf").unwrap()
-//             == UniversalType("_yusdf".to_string())
-//     );
-//     assert!(
-//         parser.parse("'aAbABBB").unwrap()
-//             == UniversalType("aAbABBB".to_string())
-//     );
-//     assert!(parser.parse("'v1").unwrap() == UniversalType("v1".to_string()));
-//     assert!(
-//         parser.parse("'Type").unwrap() == UniversalType("Type".to_string())
-//     );
-//     assert!(
-//         parser.parse("'___Type").unwrap()
-//             == UniversalType("___Type".to_string())
-//     );
-//     assert!(parser.parse("''").is_err());
-//     assert!(parser.parse("'hello'").is_err());
-//     assert!(parser.parse("'950abc").is_err());
-//     assert!(parser.parse("'aபாதை").is_err());
-// }
+// TODO: test parse record type, function type, type constructors/identifiers
+// TODO: convert these tests to tests on typed let = nothing expressions
 
 // #[test]
 // fn test_parse_function_type() {
@@ -218,7 +206,7 @@ fn test_parse_polymorphic_type() {
 //                 )]
 //             )
 //     );
-//     // Err declared type
+
 //     assert!(parser.parse("Option \"hi\"").is_err());
 //     assert!(parser.parse("Tree Tree float").is_err());
 //     assert!(parser.parse("(Tree) float").is_err());

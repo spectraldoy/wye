@@ -133,10 +133,7 @@ pub enum Type {
     // (name, polytypes). Could be enum or struct, this is not known at parse-time
     TypeId(String, Vec<PolytypeVar>),
     // Identifier for polymorphic type and optional interface bound.
-    Poly {
-        name: String,
-        bound: Option<String>,
-    },
+    Poly(String, Option<String>),
     List(Box<Type>),
     Tuple(Vec<Type>),
     // { method? <id>: <type> }

@@ -336,7 +336,7 @@ AtomicType: ast::Type = {
                 error: ("Multiple polytypes that do not apply to any type constructor", Span {start, end})
             })
         } else {
-            Ok(ast::Type::Poly { name: polytypes[0].name.clone(), bound: polytypes[0].bound.clone() })
+            Ok(ast::Type::Poly(polytypes[0].name.clone(), polytypes[0].bound.clone()))
         }
     },
     "(" <t: Type> ")" => t,

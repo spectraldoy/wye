@@ -214,7 +214,10 @@ fn test_parse_record_expr() {
                 None
             )
     );
-    assert!(parse(&parser, "{super: 4,}") == Record(vec![("super".to_string(), IntLiteral(4, None), None)], None));
+    assert!(
+        parse(&parser, "{super: 4,}")
+            == Record(vec![("super".to_string(), IntLiteral(4, None), None)], None)
+    );
 
     assert!(parser.parse("{}").is_err());
     assert!(parser.parse("{super(pub): 4}").is_err());
