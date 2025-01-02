@@ -130,8 +130,8 @@ pub enum Type {
     Int,
     Float,
     String,
-    // (name, polytypes). Could be enum or struct, this is not known at parse-time
-    TypeId(String, Vec<PolytypeVar>),
+    // (name, type-params). Could be enum or struct, this is not known at parse-time
+    TypeId(String, Vec<Type>),
     // Identifier for polymorphic type and optional interface bound.
     Poly(String, Option<String>),
     List(Box<Type>),

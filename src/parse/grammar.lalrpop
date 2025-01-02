@@ -300,9 +300,10 @@ AtomicType: ast::Type = {
     "int" => ast::Type::Int,
     "float" => ast::Type::Float,
     "string" => ast::Type::String,
-    <i: Identifier> => ast::Type::TypeId(i, vec![]),
+    <tid: Identifier> => ast::Type::TypeId(tid, vec![]),
     "[" <t: Type> "]" => ast::Type::List(Box::new(t)),
     <tup: WyeTuple<Type>> => ast::Type::Tuple(tup),
+    <p: PolytypeVar> => ast::Type::Poly(p.name, p.bound),
     <r: WyeRecord<RecordTypeMember>> => {
         let mut methods = vec![];
         let mut values = vec![];
@@ -328,22 +329,12 @@ AtomicType: ast::Type = {
         });
         ast::Type::NominalRecord { methods, values }
     },
-    <start: @L> <polytypes: PolytypeVar+> <tid: Identifier?> <end: @R> =>? {
-        if let Some(tid) = tid {
-            Ok(ast::Type::TypeId(tid, polytypes))
-        } else if polytypes.len() != 1 {
-            Err(ParseError::User {
-                error: ("Multiple polytypes that do not apply to any type constructor", Span {start, end})
-            })
-        } else {
-            Ok(ast::Type::Poly(polytypes[0].name.clone(), polytypes[0].bound.clone()))
-        }
-    },
     "(" <t: Type> ")" => t,
 }
 
 pub(crate) Type: ast::Type = {
     AtomicType,
+    <tparams: AtomicType+> <tid: Identifier> => ast::Type::TypeId(tid, tparams),
     <ftypes: SepSeqAtLeastTwo<AtomicType, "->" /*"*/>> => ast::Type::Function(ftypes),
 }
 

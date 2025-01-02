@@ -1,5 +1,5 @@
+use super::ast::Type::*;
 use super::*;
-use ast::Type::*;
 
 #[test]
 fn test_parse_literal() {
@@ -86,7 +86,110 @@ fn test_parse_polymorphic_type() {
     assert!(parser.parse("'95x").is_err());
 }
 
-// TODO: test parse record type, function type, type constructors/identifiers
+#[test]
+fn test_parse_type_identifier() {
+    let parser = grammar::TypeParser::new();
+
+    assert!(parser.parse("X").unwrap() == TypeId("X".to_string(), vec![]));
+    assert!(
+        parser.parse("'a Y").unwrap()
+            == TypeId("Y".to_string(), vec![Poly("a".to_string(), Option::None)])
+    );
+    assert!(
+        parser.parse("'a 'b X").unwrap()
+            == TypeId(
+                "X".to_string(),
+                vec![
+                    Poly("a".to_string(), Option::None),
+                    Poly("b".to_string(), Option::None),
+                ]
+            )
+    );
+    assert!(
+        parser.parse("'a z'b X").unwrap()
+            == TypeId(
+                "X".to_string(),
+                vec![
+                    Poly("a".to_string(), Option::None),
+                    Poly("b".to_string(), Some("z".to_string())),
+                ]
+            )
+    );
+    assert!(
+        parser.parse("'a X 'b Y").unwrap()
+            == TypeId(
+                "Y".to_string(),
+                vec![
+                    Poly("a".to_string(), Option::None),
+                    TypeId("X".to_string(), vec![]),
+                    Poly("b".to_string(), Option::None)
+                ]
+            )
+    );
+
+    assert!(
+        parser.parse("Num'a Matrix").unwrap()
+            == TypeId(
+                "Matrix".to_string(),
+                vec![Poly("a".to_string(), Some("Num".to_string()))]
+            )
+    );
+
+    assert!(
+        parser.parse("Num'a Matrix Option").unwrap()
+            == TypeId(
+                "Option".to_string(),
+                vec![
+                    Poly("a".to_string(), Some("Num".to_string())),
+                    TypeId("Matrix".to_string(), vec![])
+                ]
+            )
+    );
+    assert!(
+        parser.parse("(Num'a Matrix) Option").unwrap()
+            == TypeId(
+                "Option".to_string(),
+                vec![TypeId(
+                    "Matrix".to_string(),
+                    vec![Poly("a".to_string(), Some("Num".to_string()))]
+                )]
+            )
+    );
+    assert!(
+        parser.parse("A B").unwrap()
+            == TypeId("B".to_string(), vec![TypeId("A".to_string(), vec![])])
+    );
+    assert!(parser.parse("int X").unwrap() == TypeId("X".to_string(), vec![Int]));
+    assert!(
+        parser.parse("Tree float X").unwrap()
+            == TypeId(
+                "X".to_string(),
+                vec![TypeId("Tree".to_string(), vec![]), Float]
+            )
+    );
+    assert!(
+        parser.parse("((float Tree) Tree) X").unwrap()
+            == TypeId(
+                "X".to_string(),
+                vec![TypeId(
+                    "Tree".to_string(),
+                    vec![TypeId("Tree".to_string(), vec![Float])]
+                )]
+            )
+    );
+    assert!(parser.parse("(int) X").unwrap() == TypeId("X".to_string(), vec![Int]));
+
+    assert!(parser.parse("Y 'a").is_err());
+    assert!(parser.parse("'a 9").is_err());
+    assert!(parser.parse("92__'a X").is_err());
+    assert!(parser.parse("\"hi\" Option").is_err());
+    assert!(parser.parse("(X Y").is_err());
+    assert!(parser.parse("int float").is_err());
+    assert!(parser.parse("int [y]").is_err());
+    assert!(parser.parse("X with int").is_err());
+}
+
+// TODO: test parse record type, function type,
 // TODO: convert these tests to tests on typed let = nothing expressions
 
 // #[test]
@@ -169,51 +272,4 @@ fn test_parse_polymorphic_type() {
 //     assert!(parser.parse("(int -> 4)").is_err());
 //     assert!(parser.parse("'a int -> int").is_err());
 //     assert!(parser.parse("x: int -> y: float -> string").is_err());
-// }
-
-// #[test]
-// fn test_parse_declared_type() {
-//     let parser = grammar::TypeParser::new();
-//     // Ok declared type
-//     assert!(
-//         parser.parse("bool").unwrap()
-//             == DeclaredType("bool".to_string(), vec![])
-//     );
-//     assert!(
-//         parser.parse("Option int").unwrap()
-//             == DeclaredType(
-//                 "Option".to_string(),
-//                 vec![Int]
-//             )
-//     );
-//     assert!(
-//         parser.parse("Tree (Tree) float").unwrap()
-//             == DeclaredType(
-//                 "Tree".to_string(),
-//                 vec![
-//                     DeclaredType("Tree".to_string(), vec![]),
-//                     Float
-//                 ]
-//             )
-//     );
-//     assert!(
-//         parser.parse("Tree (Tree float)").unwrap()
-//             == DeclaredType(
-//                 "Tree".to_string(),
-//                 vec![DeclaredType(
-//                     "Tree".to_string(),
-//                     vec![Float]
-//                 )]
-//             )
-//     );
-
-//     assert!(parser.parse("Option \"hi\"").is_err());
-//     assert!(parser.parse("Tree Tree float").is_err());
-//     assert!(parser.parse("(Tree) float").is_err());
-//     assert!(parser.parse("(Tree) 'a").is_err());
-//     assert!(parser.parse("bool'a").is_err());
-//     assert!(parser.parse("(yello").is_err());
-//     assert!(parser.parse("bool [int,]").is_err());
-//     assert!(parser.parse("(yello").is_err());
-//     assert!(parser.parse("X with int").is_err());
 // }
