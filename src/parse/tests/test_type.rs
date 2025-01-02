@@ -178,7 +178,19 @@ fn test_parse_type_identifier() {
             )
     );
     assert!(parser.parse("(int) X").unwrap() == TypeId("X".to_string(), vec![Int]));
+    assert!(
+        parser.parse("[int] Matrix").unwrap()
+            == TypeId("Matrix".to_string(), vec![List(Box::new(Int))])
+    );
+    assert!(
+        parser.parse("([int], float, none) X").unwrap()
+            == TypeId(
+                "X".to_string(),
+                vec![Tuple(vec![List(Box::new(Int)), Float, None])]
+            )
+    );
 
+    assert!(parser.parse("X [int]").is_err());
     assert!(parser.parse("Y 'a").is_err());
     assert!(parser.parse("'a 9").is_err());
     assert!(parser.parse("92__'a X").is_err());
@@ -189,87 +201,87 @@ fn test_parse_type_identifier() {
     assert!(parser.parse("X with int").is_err());
 }
 
-// TODO: test parse record type, function type,
+// TODO: test parse record type,
 // TODO: convert these tests to tests on typed let = nothing expressions
 
-// #[test]
-// fn test_parse_function_type() {
-//     let parser = grammar::TypeParser::new();
-//     // Ok function type
-//     assert!(
-//         parser.parse("int -> float").unwrap()
-//             == FunctionType(
-//                 Box::new(Int),
-//                 Box::new(Float)
-//             )
-//     );
-//     assert!(
-//         parser.parse("(int -> float)").unwrap()
-//             == FunctionType(
-//                 Box::new(Int),
-//                 Box::new(Float)
-//             )
-//     );
-//     assert!(
-//         parser
-//             .parse("(int->float->        string ->Option)")
-//             .unwrap()
-//             == FunctionType(
-//                 Box::new(FunctionType(
-//                     Box::new(FunctionType(
-//                         Box::new(Int),
-//                         Box::new(Float)
-//                     )),
-//                     Box::new(String)
-//                 )),
-//                 Box::new(DeclaredType(
-//                     "Option".to_string(),
-//                     vec![]
-//                 ))
-//             )
-//     );
-//     assert!(
-//         parser.parse("'a -> 'b -> (int)").unwrap()
-//             == FunctionType(
-//                 Box::new(FunctionType(
-//                     Box::new(UniversalType("a".to_string())),
-//                     Box::new(UniversalType("b".to_string()))
-//                 )),
-//                 Box::new(Int)
-//             )
-//     );
-//     assert!(
-//         parser.parse("string -> Option int -> float").unwrap()
-//             == FunctionType(
-//                 Box::new(FunctionType(
-//                     Box::new(String),
-//                     Box::new(DeclaredType(
-//                         "Option".to_string(),
-//                         vec![Int]
-//                     ))
-//                 )),
-//                 Box::new(Float)
-//             )
-//     );
-//     assert!(
-//         parser.parse("'a -> ('a -> int) -> 'a").unwrap()
-//             == FunctionType(
-//                 Box::new(FunctionType(
-//                     Box::new(UniversalType("a".to_string())),
-//                     Box::new(FunctionType(
-//                         Box::new(UniversalType("a".to_string())),
-//                         Box::new(Int)
-//                     ))
-//                 )),
-//                 Box::new(UniversalType("a".to_string()))
-//             )
-//     );
-//     // Err function type
-//     assert!(parser.parse("int ->").is_err());
-//     assert!(parser.parse("-> float").is_err());
-//     assert!(parser.parse("(int -> float").is_err());
-//     assert!(parser.parse("(int - > float)").is_err());
-//     assert!(parser.parse("(int -> 4)").is_err());
-//     assert!(parser.parse("'a int -> int").is_err());
-//     assert!(parser.parse("x: int -> y: float -> string").is_err());
-// }
+#[test]
+fn test_parse_function_type() {
+    let parser = grammar::TypeParser::new();
+
+    assert!(parser.parse("int -> float").unwrap() == Function(vec![Int, Float]));
+    assert!(
+        parser.parse("X -> Y").unwrap()
+            == Function(vec![
+                TypeId("X".to_string(), vec![]),
+                TypeId("Y".to_string(), vec![])
+            ])
+    );
+    assert!(parser.parse("int -> none -> string").unwrap() == Function(vec![Int, None, String]));
+    assert!(
+        parser.parse("'a Tree -> int").unwrap()
+            == Function(vec![
+                TypeId(
+                    "Tree".to_string(),
+                    vec![Poly("a".to_string(), Option::None)]
+                ),
+                Int
+            ])
+    );
+    assert!(parser.parse("(int) -> (float)").unwrap() == Function(vec![Int, Float]));
+    assert!(parser.parse("(int -> float)").unwrap() == Function(vec![Int, Float]));
+    assert!(
+        parser.parse("(int -> float) -> string").unwrap()
+            == Function(vec![Function(vec![Int, Float]), String])
+    );
+    assert!(
+        parser.parse("int->   float   ->string ->Option").unwrap()
+            == Function(vec![
+                Int,
+                Float,
+                String,
+                TypeId("Option".to_string(), vec![])
+            ])
+    );
+    assert!(
+        parser.parse("'a -> 'b -> c").unwrap()
+            == Function(vec![
+                Poly("a".to_string(), Option::None),
+                Poly("b".to_string(), Option::None),
+                TypeId("c".to_string(), vec![])
+            ])
+    );
+    assert!(
+        parser.parse("int -> (float -> string)").unwrap()
+            == Function(vec![Int, Function(vec![Float, String])])
+    );
+    assert!(
+        parser.parse("int -> Num'a Option -> string").unwrap()
+            == Function(vec![
+                Int,
+                TypeId(
+                    "Option".to_string(),
+                    vec![Poly("a".to_string(), Some("Num".to_string()))]
+                ),
+                String,
+            ])
+    );
+    assert!(
+        parser.parse("'a -> ('a -> 'a) -> 'a").unwrap()
+            == Function(vec![
+                Poly("a".to_string(), Option::None),
+                Function(vec![
+                    Poly("a".to_string(), Option::None),
+                    Poly("a".to_string(), Option::None)
+                ]),
+                Poly("a".to_string(), Option::None),
+            ])
+    );
+
+    assert!(parser.parse("int (->) float").is_err());
+    assert!(parser.parse("int -> 7").is_err());
+    assert!(parser.parse("int -> string ->").is_err());
+    assert!(parser.parse("int - > float").is_err());
+    assert!(parser.parse("(a) -> (4)").is_err());
+    assert!(parser.parse("Option 'a -> int").is_err());
+    assert!(parser.parse("(x: int) -> (y: float)").is_err());
+}

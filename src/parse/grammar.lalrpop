@@ -332,10 +332,14 @@ AtomicType: ast::Type = {
     "(" <t: Type> ")" => t,
 }
 
-pub(crate) Type: ast::Type = {
+NonFuncType: ast::Type = {
     AtomicType,
     <tparams: AtomicType+> <tid: Identifier> => ast::Type::TypeId(tid, tparams),
-    <ftypes: SepSeqAtLeastTwo<AtomicType, "->" /*"*/>> => ast::Type::Function(ftypes),
+}
+
+pub(crate) Type: ast::Type = {
+    NonFuncType,
+    <ftypes: SepSeqAtLeastTwo<NonFuncType, "->" /*"*/>> => ast::Type::Function(ftypes),
 }
 
 // pub Expression: Spanned<ast::Expression> = {
