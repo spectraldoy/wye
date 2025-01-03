@@ -1,6 +1,7 @@
 use super::ast;
 use super::ast::Expression::*;
 use super::ast::Statement::Expression;
+use super::ast::VarWithValue;
 use super::span::{Span, UnSpan};
 use super::*;
 use lalrpop_util::ParseError;
@@ -334,7 +335,6 @@ fn test_parse_enum_variant() {
             }
     );
 
-    // I'm thinking that
     assert!(
         parse(&parser, "(Thing.thing with 3)")
             == EnumVariant {
@@ -654,4 +654,75 @@ fn test_parse_func_application() {
     assert!(parser.parse("f\"hi\" 3").is_err());
 }
 
-// TODO(WYE-10): Parse infix binary operations
+#[test]
+fn test_parse_infix_binary_op() {
+    let parser = grammar::StatementParser::new();
+
+    assert!(
+        parse(&parser, "4 + 5 * 6")
+            == FuncApplication(
+                Box::new(BinaryOp(ast::BinaryOp::Add, None)),
+                vec![
+                    IntLiteral(4, None),
+                    FuncApplication(
+                        Box::new(BinaryOp(ast::BinaryOp::Mult, None)),
+                        vec![IntLiteral(5, None), IntLiteral(6, None)],
+                        None
+                    )
+                ],
+                None
+            )
+    );
+}
+
+#[test]
+fn test_parse_let() {
+    let parser = grammar::StatementParser::new();
+
+    assert!(
+        parse(&parser, "let x = 4")
+            == Let(
+                VarWithValue {
+                    name: ("x".to_string(), None),
+                    args: vec![],
+                    out_type: (ast::Type::Hole, None),
+                    recursive: false,
+                    expr: Box::new(IntLiteral(4, None))
+                },
+                None,
+                None,
+            )
+    );
+    assert!(
+        parse(&parser, "let y z = (x 4)")
+            == Let(
+                VarWithValue {
+                    name: ("y".to_string(), None),
+                    args: vec![("z".to_string(), ast::Type::Hole, None)],
+                    out_type: (ast::Type::Hole, None),
+                    recursive: false,
+                    expr: Box::new(FuncApplication(
+                        Box::new(Identifier("x".to_string(), None)),
+                        vec![IntLiteral(4, None)],
+                        None
+                    )),
+                },
+                None,
+                None,
+            )
+    );
+    assert!(
+        parse(&parser, "let rec mu = 3")
+            == Let(
+                VarWithValue {
+                    name: ("mu".to_string(), None),
+                    args: vec![],
+                    out_type: (ast::Type::Hole, None),
+                    recursive: true,
+                    expr: Box::new(IntLiteral(3, None))
+                },
+                None,
+                None
+            )
+    );
+}

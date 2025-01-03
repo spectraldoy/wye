@@ -168,7 +168,7 @@ mod util;
 //                     vec![String::from("double"), String::from("x")],
 //                     ast::Expression::FuncApplication(
 //                         Box::new(ast::Expression::FuncApplication(
-//                             Box::new(ast::Expression::BuiltinOp(ast::Operation::Multiply)),
+//                             Box::new(ast::Expression::BuiltinOp(ast::Operation::Mult)),
 //                             Box::new(ast::Expression::IntegerLiteral(2))
 //                         )),
 //                         Box::new(ast::Expression::Identifier(String::from("x")))

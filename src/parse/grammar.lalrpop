@@ -63,9 +63,9 @@ FloatLiteral: OrderedFloat<f64> =
 /// Builtin binary operators.
 BinaryOp: ast::BinaryOp = {
     "+"  => ast::BinaryOp::Add,
-    "-"  => ast::BinaryOp::Subtract,
-    "*"  => ast::BinaryOp::Multiply,
-    "/"  => ast::BinaryOp::Divide,
+    "-"  => ast::BinaryOp::Sub,
+    "*"  => ast::BinaryOp::Mult,
+    "/"  => ast::BinaryOp::Div,
     "//" => ast::BinaryOp::FloorDiv,
     "<"  => ast::BinaryOp::Lt,
     ">"  => ast::BinaryOp::Gt,
@@ -130,11 +130,92 @@ AtomicExpr: ast::Expression = {
 SpNamedFuncArg: (String, ast::Expression, Span) =
     <start:@L> <id: Identifier> "=" <e: AtomicExpr> <end:@R> => (id, e, Span { start, end });
 
+InfixExprHelper<BinOp>: (ast::Expression, ast::Expression, Span) = {
+    <op1: AtomicExpr> <s: Sp<BinOp>> <op2: InfixExpr> => (op1, op2, s.span),
+}
+
+InfixExpr: ast::Expression = {
+    #[precedence(level="0")]
+    AtomicExpr,
+
+    #[precedence(level="1")] #[assoc(side="left")]
+    <ie: Sp<InfixExprHelper<"*">>> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Mult, Some(ie.value.2))),
+        vec![ie.value.0, ie.value.1],
+        Some(ie.span),
+    ),
+    <ie: Sp<InfixExprHelper<"/">>> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Div, Some(ie.value.2))),
+        vec![ie.value.0, ie.value.1],
+        Some(ie.span),
+    ),
+    <ie: Sp<InfixExprHelper<"//">>> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::FloorDiv, Some(ie.value.2))),
+        vec![ie.value.0, ie.value.1],
+        Some(ie.span),
+    ),
+
+    #[precedence(level="2")] #[assoc(side="left")]
+    <ie: Sp<InfixExprHelper<"+">>> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Add, Some(ie.value.2))),
+        vec![ie.value.0, ie.value.1],
+        Some(ie.span),
+    ),
+    <ie: Sp<InfixExprHelper<"-">>> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Sub, Some(ie.value.2))),
+        vec![ie.value.0, ie.value.1],
+        Some(ie.span),
+    ),
+
+    #[precedence(level="3")]
+    <ie: Sp<InfixExprHelper<"==">>> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Eq, Some(ie.value.2))),
+        vec![ie.value.0, ie.value.1],
+        Some(ie.span),
+    ),
+    <ie: Sp<InfixExprHelper<"!=">>> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Neq, Some(ie.value.2))),
+        vec![ie.value.0, ie.value.1],
+        Some(ie.span),
+    ),
+
+    #[precedence(level="4")]
+    <ie: Sp<InfixExprHelper<"<">>> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Lt, Some(ie.value.2))),
+        vec![ie.value.0, ie.value.1],
+        Some(ie.span),
+    ),
+    <ie: Sp<InfixExprHelper<">" /*"*/>>> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Gt, Some(ie.value.2))),
+        vec![ie.value.0, ie.value.1],
+        Some(ie.span),
+    ),
+    <ie: Sp<InfixExprHelper<"<=">>> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Leq, Some(ie.value.2))),
+        vec![ie.value.0, ie.value.1],
+        Some(ie.span),
+    ),
+    <ie: Sp<InfixExprHelper<">=" /*"*/>>> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Geq, Some(ie.value.2))),
+        vec![ie.value.0, ie.value.1],
+        Some(ie.span),
+    ),
+
+    #[precedence(level="5")] #[assoc(side="left")]
+    <ie: Sp<InfixExprHelper<"::">>> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Cons, Some(ie.value.2))),
+        vec![ie.value.0, ie.value.1],
+        Some(ie.span),
+    ),
+}
+
+// / * //
+// + -
 
 NonLetExpr: ast::Expression = {
-    AtomicExpr,
+    InfixExpr,
     // Enum variant with field
-    <evar: Sp<ProjectedExpr>> <with: Sp<"with">> <field: Sp<AtomicExpr>> =>? {
+    <evar: Sp<ProjectedExpr>> <with: Sp<"with">> <field: Sp<NonLetExpr>> =>? {
         if evar.span.end == with.span.start {
             return Err(ParseError::User {
                 error: ("Space required between enum variant and `with` token", Span::new(evar.span.start, with.span.end))
@@ -246,20 +327,21 @@ NonLetExpr: ast::Expression = {
 InExpr: ast::Expression = "in" <e: Expression> => e;
 
 LetExpr: ast::Expression = {
-    <start: @L> "let" <var: Sp<Identifier>> <args: Sp<Identifier>*> "=" <e: NonLetExpr> <in_expr: InExpr?> <end: @R>  => {
+    <start: @L> "let" <rec: "rec"?> <var: Sp<Identifier>> <args: Sp<Identifier>*> "=" <e: NonLetExpr> <in_expr: InExpr?> <end: @R>  => {
         ast::Expression::Let(
             ast::VarWithValue {
                 name: (var.value, Some(var.span)),
                 args: args.into_iter().map(|a| (a.value, ast::Type::Hole, Some(a.span))).collect::<Vec<_>>(),
                 out_type: (ast::Type::Hole, None),
+                recursive: rec.is_some(),
                 expr: Box::new(e),
             },
-            Some(Span { start, end, }),
             if let Some(_) = in_expr {
                 Some(Box::new(in_expr.unwrap()))
             } else {
                 None
-            }
+            },
+            Some(Span { start, end, }),
         )
     },
 }
@@ -293,7 +375,7 @@ SpEnumVariant: (String, Option<ast::Type>, Span) = {
 EnumDecl: ast::Statement = {
     <start: @L> <enum_: "enum"> <p: PolytypeVar*> <eid: Sp<Identifier>> "=" <variants: SepSeqAtLeastOne<SpEnumVariant, "|">> <end: @R> => {
         ast::Statement::EnumDecl {
-            name: eid.value,
+            name: (eid.value, Some(eid.span)),
             polytype_vars: p,
             variants: variants.into_iter().map(|(name, typ, span)| (name, typ, Some(span))).collect::<Vec<_>>(),
             span: Some(Span { start, end })

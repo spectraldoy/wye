@@ -27,7 +27,7 @@ pub enum Statement {
     // variants have optional fields.
     // These, unlike Expressions, are not recursive structures
     EnumDecl {
-        name: String,
+        name: (String, OptionSpan),
         polytype_vars: Vec<PolytypeVar>,
         variants: Vec<(String, Option<Type>, OptionSpan)>,
         span: OptionSpan,
@@ -116,7 +116,7 @@ pub enum Expression {
     // Evaluate an expression and store in a variable of a type
     // Poly let-in construct
     // let <id> (arguments & type-annotation) = <expression> (in thing)?
-    Let(VarWithValue, OptionSpan, OptionBox<Expression>),
+    Let(VarWithValue, OptionBox<Expression>, OptionSpan),
     // Change the value of a variable. This is only allowed in object methods.
     // The set expression evaluates to nothing.
     // thing <- expr
@@ -157,9 +157,9 @@ pub enum Type {
 pub enum BinaryOp {
     /// Arithmetic operations.
     Add,
-    Subtract,
-    Multiply,
-    Divide,
+    Sub,
+    Mult,
+    Div,
     FloorDiv,
 
     /// Comparators.
@@ -182,6 +182,7 @@ pub struct VarWithValue {
     pub name: (String, OptionSpan),
     pub args: Vec<(String, Type, OptionSpan)>,
     pub out_type: (Type, OptionSpan),
+    pub recursive: bool,
     pub expr: Box<Expression>,
 }
 
@@ -373,13 +374,13 @@ impl UnSpan for Expression {
                 expr: Box::new(expr.unspanned()),
                 span: None,
             },
-            Self::Let(v, _, e) => {
+            Self::Let(v, e, _) => {
                 let new_e = if let Some(box_expr) = e {
                     Some(Box::new(box_expr.unspanned()))
                 } else {
                     None
                 };
-                Self::Let(v.unspanned(), None, new_e)
+                Self::Let(v.unspanned(), new_e, None)
             }
             Self::Set(a, _) => Self::Set(a.unspanned(), None),
         }
@@ -396,6 +397,7 @@ impl UnSpan for VarWithValue {
                 .map(|v| (v.0.clone(), v.1.clone(), None))
                 .collect(),
             out_type: (self.out_type.0.clone(), None),
+            recursive: self.recursive,
             expr: Box::new(self.expr.unspanned()),
         }
     }
