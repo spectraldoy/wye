@@ -27,9 +27,10 @@ pub enum Statement {
     // variants have optional fields.
     // These, unlike Expressions, are not recursive structures
     EnumDecl {
-        name: (String, OptionSpan),
+        name: String,
         polytype_vars: Vec<PolytypeVar>,
         variants: Vec<(String, Option<Type>, OptionSpan)>,
+        span: OptionSpan,
     },
     // struct <Id> <polytype var>* { <Id>: type,+ }
     StructDecl {
@@ -113,16 +114,13 @@ pub enum Expression {
         span: OptionSpan,
     },
     // Evaluate an expression and store in a variable of a type
-    // let <id> (arguments & type-annotation) = <expression>
-    Let(VarWithValue, OptionSpan),
     // Poly let-in construct
-    // let <id> (arguments & type-annotation) = <expr> in <expr>
-    LetIn(VarWithValue, OptionSpan, Box<Expression>),
-    // Change the value of a variable. This is only allowed in struct methods.
+    // let <id> (arguments & type-annotation) = <expression> (in thing)?
+    Let(VarWithValue, OptionSpan, OptionBox<Expression>),
+    // Change the value of a variable. This is only allowed in object methods.
     // The set expression evaluates to nothing.
+    // thing <- expr
     Set(AttrSet, OptionSpan),
-    // <attrset> in <expr>
-    SetIn(AttrSet, OptionSpan, Box<Expression>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -184,7 +182,7 @@ pub struct VarWithValue {
     pub name: (String, OptionSpan),
     pub args: Vec<(String, Type, OptionSpan)>,
     pub out_type: (Type, OptionSpan),
-    pub expr: (Box<Expression>, OptionSpan),
+    pub expr: Box<Expression>,
 }
 
 /// set <Id>.<Id> = Expr
@@ -193,7 +191,7 @@ pub struct VarWithValue {
 pub struct AttrSet {
     pub entity: (String, OptionSpan),
     pub attr: (String, OptionSpan),
-    pub new_expr: (Box<Expression>, OptionSpan),
+    pub new_expr: Box<Expression>,
 }
 
 /// ' (bound)? name
@@ -240,13 +238,15 @@ impl UnSpan for Statement {
                 name,
                 polytype_vars,
                 variants,
+                span: _,
             } => Self::EnumDecl {
-                name: (name.0.clone(), None),
+                name: name.clone(),
                 polytype_vars: unspanned_vec(&polytype_vars),
                 variants: variants
                     .iter()
                     .map(|v| (v.0.clone(), v.1.clone(), None))
                     .collect(),
+                span: None,
             },
             Self::StructDecl {
                 name,
@@ -373,10 +373,15 @@ impl UnSpan for Expression {
                 expr: Box::new(expr.unspanned()),
                 span: None,
             },
-            Self::Let(v, _) => Self::Let(v.unspanned(), None),
-            Self::LetIn(v, _, e) => Self::LetIn(v.unspanned(), None, Box::new(e.unspanned())),
+            Self::Let(v, _, e) => {
+                let new_e = if let Some(box_expr) = e {
+                    Some(Box::new(box_expr.unspanned()))
+                } else {
+                    None
+                };
+                Self::Let(v.unspanned(), None, new_e)
+            }
             Self::Set(a, _) => Self::Set(a.unspanned(), None),
-            Self::SetIn(a, _, e) => Self::SetIn(a.unspanned(), None, Box::new(e.unspanned())),
         }
     }
 }
@@ -391,7 +396,7 @@ impl UnSpan for VarWithValue {
                 .map(|v| (v.0.clone(), v.1.clone(), None))
                 .collect(),
             out_type: (self.out_type.0.clone(), None),
-            expr: (Box::new(self.expr.0.unspanned()), None),
+            expr: Box::new(self.expr.unspanned()),
         }
     }
 }
@@ -401,7 +406,7 @@ impl UnSpan for AttrSet {
         Self {
             entity: (self.entity.0.clone(), None),
             attr: (self.attr.0.clone(), None),
-            new_expr: (Box::new(self.new_expr.0.unspanned()), None),
+            new_expr: Box::new(self.new_expr.unspanned()),
         }
     }
 }

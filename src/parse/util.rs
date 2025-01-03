@@ -4,20 +4,23 @@ use super::span::Span;
 pub type OptionBox<T> = Option<Box<T>>;
 
 /// TODO(WYE-5)
-pub fn spans_overlap(spans: &Vec<Span>) -> bool {
+pub fn spans_overlap(spans: &Vec<Span>) -> Result<(), Span> {
     if spans.len() == 0 {
-        return false;
+        return Ok(());
     }
 
     for i in 0..(spans.len() - 1) {
         let cur_end = spans[i].end;
         let next_start = spans[i + 1].start;
         if next_start <= cur_end {
-            return true;
+            return Err(Span {
+                start: spans[i].start,
+                end: spans[i + 1].end,
+            });
         }
     }
 
-    return false;
+    return Ok(());
 }
 
 /// TODO(WYE-5)

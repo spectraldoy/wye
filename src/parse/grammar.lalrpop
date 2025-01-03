@@ -130,7 +130,8 @@ AtomicExpr: ast::Expression = {
 SpNamedFuncArg: (String, ast::Expression, Span) =
     <start:@L> <id: Identifier> "=" <e: AtomicExpr> <end:@R> => (id, e, Span { start, end });
 
-Expression: ast::Expression = {
+
+NonLetExpr: ast::Expression = {
     AtomicExpr,
     // Enum variant with field
     <evar: Sp<ProjectedExpr>> <with: Sp<"with">> <field: Sp<AtomicExpr>> =>? {
@@ -177,9 +178,10 @@ Expression: ast::Expression = {
         let app_span = Span::new(func.span.start, args.last().unwrap().span.end);
         let mut spans = vec![func.span];
         spans.extend(args.iter().map(|a| a.span.clone()).collect::<Vec<_>>());
-        if util::spans_overlap(&spans) {
+        let spans_overlap_res = util::spans_overlap(&spans);
+        if spans_overlap_res.is_err() {
             Err(ParseError::User {
-                error: ("Function overlaps with arguments", app_span)
+                error: ("Function or arguments overlap in span", spans_overlap_res.err().unwrap())
             })
         } else {
             Ok(ast::Expression::FuncApplication(
@@ -194,9 +196,10 @@ Expression: ast::Expression = {
         let app_span = Span::new(func.span.start, args.last().unwrap().2.end);
         let mut spans = vec![func.span];
         spans.extend(args.iter().map(|a| a.2.clone()).collect::<Vec<_>>());
-        if util::spans_overlap(&spans) {
+        let spans_overlap_res = util::spans_overlap(&spans);
+        if spans_overlap_res.is_err() {
             Err(ParseError::User {
-                error: ("Function overlaps with arguments", app_span)
+                error: ("Function or arguments overlap in span", spans_overlap_res.err().unwrap())
             })
         } else {
             Ok(ast::Expression::NamedArgsFuncApp(
@@ -239,36 +242,64 @@ Expression: ast::Expression = {
 //     },
 }
 
+// TODO: Typed let expr
+InExpr: ast::Expression = "in" <e: Expression> => e;
+
+LetExpr: ast::Expression = {
+    <start: @L> "let" <var: Sp<Identifier>> <args: Sp<Identifier>*> "=" <e: NonLetExpr> <in_expr: InExpr?> <end: @R>  => {
+        ast::Expression::Let(
+            ast::VarWithValue {
+                name: (var.value, Some(var.span)),
+                args: args.into_iter().map(|a| (a.value, ast::Type::Hole, Some(a.span))).collect::<Vec<_>>(),
+                out_type: (ast::Type::Hole, None),
+                expr: Box::new(e),
+            },
+            Some(Span { start, end, }),
+            if let Some(_) = in_expr {
+                Some(Box::new(in_expr.unwrap()))
+            } else {
+                None
+            }
+        )
+    },
+}
+
+Expression: ast::Expression = {
+    NonLetExpr,
+    LetExpr,
+}
+
 // ****************************************
 // Enum declarations
 // ****************************************
 
-// <tid: Identifier> => (tid, None),
-//     <tid: Sp<Identifier>> <with: Sp<"with">> <field_t: Sp<TypeExpression>> =>? {
-//         if tid.end == with.start {
-//             Err(ParseError::User {
-//                 error: "Type of variant with argument requires space between TypeId and `with` token"
-//             })
-//         } else if with.end == field_t.start {
-//             Err(ParseError::User {
-//                 error: "Type of variant with argument requires space between `with` token and field type"
-//             })
-//         } else {
-//             Ok((tid.value, Some(field_t.value)))
-//         }
-//     }
+SpEnumVariant: (String, Option<ast::Type>, Span) = {
+    <vid: Sp<Identifier>> => (vid.value, None, vid.span),
+    <vid: Sp<Identifier>> <with: Sp<"with">> <field_t: Sp<Type>> =>? {
+        if vid.span.end == with.span.start {
+            Err(ParseError::User {
+                error: ("Type of variant with argument requires space between TypeId and `with` token", Span::new(vid.span.start, with.span.end))
+            })
+        } else if with.span.end == field_t.span.start {
+            Err(ParseError::User {
+                error: ("Type of variant with argument requires space between `with` token and field type", Span::new(with.span.start, field_t.span.end))
+            })
+        } else {
+            Ok((vid.value, Some(field_t.value), Span::new(vid.span.start, field_t.span.end)))
+        }
+    }
+}
 
-// get polytype parsing working
-// then this should be pretty easy
-
-// TODO(WYE-1): Enum variant parsing
-// EnumVariant: ()
-
-// EnumDecl: ast::Statement = {
-//     "enum" <eid: Sp<Identifier>> <p: Sp<PolytypeVar>+> "=" <variants: SepSeqAtLeastOne<EnumVariant, "|">> => {
-
-//     }
-// }
+EnumDecl: ast::Statement = {
+    <start: @L> <enum_: "enum"> <p: PolytypeVar*> <eid: Sp<Identifier>> "=" <variants: SepSeqAtLeastOne<SpEnumVariant, "|">> <end: @R> => {
+        ast::Statement::EnumDecl {
+            name: eid.value,
+            polytype_vars: p,
+            variants: variants.into_iter().map(|(name, typ, span)| (name, typ, Some(span))).collect::<Vec<_>>(),
+            span: Some(Span { start, end })
+        }
+    }
+}
 
 // ****************************************
 // Wye Program
@@ -276,7 +307,7 @@ Expression: ast::Expression = {
 
 pub(crate) Statement: ast::Statement = {
     <e: Expression> => ast::Statement::Expression(e),
-    // EnumDecl,
+    EnumDecl,
 }
 
 pub Program: ast::Program = {
