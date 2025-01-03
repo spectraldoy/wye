@@ -130,82 +130,79 @@ AtomicExpr: ast::Expression = {
 SpNamedFuncArg: (String, ast::Expression, Span) =
     <start:@L> <id: Identifier> "=" <e: AtomicExpr> <end:@R> => (id, e, Span { start, end });
 
-InfixExprHelper<BinOp>: (ast::Expression, ast::Expression, Span) = {
-    <op1: AtomicExpr> <s: Sp<BinOp>> <op2: InfixExpr> => (op1, op2, s.span),
-}
-
 InfixExpr: ast::Expression = {
     #[precedence(level="0")]
     AtomicExpr,
 
     #[precedence(level="1")] #[assoc(side="left")]
-    <ie: Sp<InfixExprHelper<"*">>> => ast::Expression::FuncApplication(
-        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Mult, Some(ie.value.2))),
-        vec![ie.value.0, ie.value.1],
-        Some(ie.span),
+    <start: @L> <op1: InfixExpr> <s: Sp<"*">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Mult, Some(s.span))),
+        vec![op1, op2],
+        Some(Span { start, end }),
     ),
-    <ie: Sp<InfixExprHelper<"/">>> => ast::Expression::FuncApplication(
-        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Div, Some(ie.value.2))),
-        vec![ie.value.0, ie.value.1],
-        Some(ie.span),
+    <start: @L> <op1: InfixExpr> <s: Sp<"/">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Div, Some(s.span))),
+        vec![op1, op2],
+        Some(Span { start, end }),
     ),
-    <ie: Sp<InfixExprHelper<"//">>> => ast::Expression::FuncApplication(
-        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::FloorDiv, Some(ie.value.2))),
-        vec![ie.value.0, ie.value.1],
-        Some(ie.span),
+    <start: @L> <op1: InfixExpr> <s: Sp<"//">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::FloorDiv, Some(s.span))),
+        vec![op1, op2],
+        Some(Span { start, end }),
     ),
 
     #[precedence(level="2")] #[assoc(side="left")]
-    <ie: Sp<InfixExprHelper<"+">>> => ast::Expression::FuncApplication(
-        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Add, Some(ie.value.2))),
-        vec![ie.value.0, ie.value.1],
-        Some(ie.span),
+    <start: @L> <op1: InfixExpr> <s: Sp<"+">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Add, Some(s.span))),
+        vec![op1, op2],
+        Some(Span { start, end }),
     ),
-    <ie: Sp<InfixExprHelper<"-">>> => ast::Expression::FuncApplication(
-        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Sub, Some(ie.value.2))),
-        vec![ie.value.0, ie.value.1],
-        Some(ie.span),
-    ),
-
-    #[precedence(level="3")]
-    <ie: Sp<InfixExprHelper<"==">>> => ast::Expression::FuncApplication(
-        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Eq, Some(ie.value.2))),
-        vec![ie.value.0, ie.value.1],
-        Some(ie.span),
-    ),
-    <ie: Sp<InfixExprHelper<"!=">>> => ast::Expression::FuncApplication(
-        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Neq, Some(ie.value.2))),
-        vec![ie.value.0, ie.value.1],
-        Some(ie.span),
+    <start: @L> <op1: InfixExpr> <s: Sp<"-">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Sub, Some(s.span))),
+        vec![op1, op2],
+        Some(Span { start, end }),
     ),
 
-    #[precedence(level="4")]
-    <ie: Sp<InfixExprHelper<"<">>> => ast::Expression::FuncApplication(
-        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Lt, Some(ie.value.2))),
-        vec![ie.value.0, ie.value.1],
-        Some(ie.span),
+    #[precedence(level="3")] #[assoc(side="left")]
+    <start: @L> <op1: InfixExpr> <s: Sp<"==">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Eq, Some(s.span))),
+        vec![op1, op2],
+        Some(Span { start, end }),
     ),
-    <ie: Sp<InfixExprHelper<">" /*"*/>>> => ast::Expression::FuncApplication(
-        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Gt, Some(ie.value.2))),
-        vec![ie.value.0, ie.value.1],
-        Some(ie.span),
-    ),
-    <ie: Sp<InfixExprHelper<"<=">>> => ast::Expression::FuncApplication(
-        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Leq, Some(ie.value.2))),
-        vec![ie.value.0, ie.value.1],
-        Some(ie.span),
-    ),
-    <ie: Sp<InfixExprHelper<">=" /*"*/>>> => ast::Expression::FuncApplication(
-        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Geq, Some(ie.value.2))),
-        vec![ie.value.0, ie.value.1],
-        Some(ie.span),
+    <start: @L> <op1: InfixExpr> <s: Sp<"!=">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Neq, Some(s.span))),
+        vec![op1, op2],
+        Some(Span { start, end }),
     ),
 
-    #[precedence(level="5")] #[assoc(side="left")]
-    <ie: Sp<InfixExprHelper<"::">>> => ast::Expression::FuncApplication(
-        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Cons, Some(ie.value.2))),
-        vec![ie.value.0, ie.value.1],
-        Some(ie.span),
+    #[precedence(level="4")] #[assoc(side="left")]
+    <start: @L> <op1: InfixExpr> <s: Sp<"<">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Lt, Some(s.span))),
+        vec![op1, op2],
+        Some(Span { start, end }),
+    ),
+    <start: @L> <op1: InfixExpr> <s: Sp<">" /*"*/>> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Gt, Some(s.span))),
+        vec![op1, op2],
+        Some(Span { start, end }),
+    ),
+    <start: @L> <op1: InfixExpr> <s: Sp<"<=">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Leq, Some(s.span))),
+        vec![op1, op2],
+        Some(Span { start, end }),
+    ),
+    <start: @L> <op1: InfixExpr> <s: Sp<">=" /*"*/>> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Geq, Some(s.span))),
+        vec![op1, op2],
+        Some(Span { start, end }),
+    ),
+
+
+    #[precedence(level="4")] #[assoc(side="left")]
+    <start: @L> <op1: InfixExpr> <s: Sp<"::">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Cons, Some(s.span))),
+        vec![op1, op2],
+        Some(Span { start, end }),
     ),
 }
 

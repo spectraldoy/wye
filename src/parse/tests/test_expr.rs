@@ -673,6 +673,155 @@ fn test_parse_infix_binary_op() {
                 None
             )
     );
+    assert!(parser.parse("* 3 4").is_err());
+    assert!(
+        parse(&parser, "(*) 3 4")
+            == FuncApplication(
+                Box::new(BinaryOp(ast::BinaryOp::Mult, None)),
+                vec![IntLiteral(3, None), IntLiteral(4, None)],
+                None,
+            )
+    );
+    assert!(
+        parse(&parser, "1 * 5 + 2 / 4")
+            == FuncApplication(
+                Box::new(BinaryOp(ast::BinaryOp::Add, None)),
+                vec![
+                    FuncApplication(
+                        Box::new(BinaryOp(ast::BinaryOp::Mult, None)),
+                        vec![IntLiteral(1, None), IntLiteral(5, None),],
+                        None,
+                    ),
+                    FuncApplication(
+                        Box::new(BinaryOp(ast::BinaryOp::Div, None)),
+                        vec![IntLiteral(2, None), IntLiteral(4, None),],
+                        None
+                    )
+                ],
+                None
+            )
+    );
+
+    assert!(
+        parse(&parser, "1.5 == 2.5 == 3.5")
+            == FuncApplication(
+                Box::new(BinaryOp(ast::BinaryOp::Eq, None)),
+                vec![
+                    FuncApplication(
+                        Box::new(BinaryOp(ast::BinaryOp::Eq, None)),
+                        vec![
+                            FloatLiteral(util::to_of64(1.5), None),
+                            FloatLiteral(util::to_of64(2.5), None),
+                        ],
+                        None
+                    ),
+                    FloatLiteral(util::to_of64(3.5), None)
+                ],
+                None
+            )
+    );
+
+    assert!(
+        parse(&parser, "(l1 :: l2) * 5")
+            == FuncApplication(
+                Box::new(BinaryOp(ast::BinaryOp::Mult, None)),
+                vec![
+                    FuncApplication(
+                        Box::new(BinaryOp(ast::BinaryOp::Cons, None)),
+                        vec![
+                            Identifier("l1".to_string(), None),
+                            Identifier("l2".to_string(), None),
+                        ],
+                        None,
+                    ),
+                    IntLiteral(5, None),
+                ],
+                None,
+            )
+    );
+
+    assert!(
+        parse(&parser, "a < b + 5")
+            == FuncApplication(
+                Box::new(BinaryOp(ast::BinaryOp::Lt, None)),
+                vec![
+                    Identifier("a".to_string(), None),
+                    FuncApplication(
+                        Box::new(BinaryOp(ast::BinaryOp::Add, None)),
+                        vec![Identifier("b".to_string(), None), IntLiteral(5, None),],
+                        None,
+                    ),
+                ],
+                None,
+            )
+    );
+    assert!(
+        parse(&parser, "(a >= b) + 5")
+            == FuncApplication(
+                Box::new(BinaryOp(ast::BinaryOp::Add, None)),
+                vec![
+                    FuncApplication(
+                        Box::new(BinaryOp(ast::BinaryOp::Geq, None)),
+                        vec![
+                            Identifier("a".to_string(), None),
+                            Identifier("b".to_string(), None),
+                        ],
+                        None,
+                    ),
+                    IntLiteral(5, None),
+                ],
+                None,
+            )
+    );
+
+    assert!(parse(&parser, "(<=)") == BinaryOp(ast::BinaryOp::Leq, None));
+    assert!(
+        parse(&parser, "(//) 4")
+            == FuncApplication(
+                Box::new(BinaryOp(ast::BinaryOp::FloorDiv, None)),
+                vec![IntLiteral(4, None)],
+                None,
+            )
+    );
+    assert!(
+        parse(&parser, "((::) 4) - ((-) -6 \"hi\")")
+            == FuncApplication(
+                Box::new(BinaryOp(ast::BinaryOp::Sub, None)),
+                vec![
+                    FuncApplication(
+                        Box::new(BinaryOp(ast::BinaryOp::Cons, None)),
+                        vec![IntLiteral(4, None)],
+                        None,
+                    ),
+                    FuncApplication(
+                        Box::new(BinaryOp(ast::BinaryOp::Sub, None)),
+                        vec![IntLiteral(-6, None), StringLiteral("hi".to_string(), None),],
+                        None,
+                    ),
+                ],
+                None,
+            )
+    );
+
+    assert!(
+        parse(&parser, "(::) 4  ((-) -6 \"hi\")")
+            == FuncApplication(
+                Box::new(BinaryOp(ast::BinaryOp::Cons, None)),
+                vec![
+                    IntLiteral(4, None),
+                    FuncApplication(
+                        Box::new(BinaryOp(ast::BinaryOp::Sub, None)),
+                        vec![IntLiteral(-6, None), StringLiteral("hi".to_string(), None),],
+                        None,
+                    ),
+                ],
+                None,
+            )
+    );
+
+    assert!(parser.parse("(::) 4 - ((-) -6 \"hi\")").is_err());
+    assert!(parser.parse("a + f b").is_err());
+    assert!(parser.parse("1 >").is_err());
 }
 
 #[test]
