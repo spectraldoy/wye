@@ -1,5 +1,6 @@
 use super::ast::Type::*;
 use super::*;
+use std::collections::HashMap;
 
 #[test]
 fn test_parse_literal() {
@@ -292,21 +293,21 @@ fn test_parse_record_type() {
     assert!(
         parser.parse("{a: int}").unwrap()
             == StructRecord {
-                methods: vec![],
-                values: vec![("a".to_string(), Int)]
+                methods: HashMap::new(),
+                values: HashMap::from([("a".to_string(), Int)])
             }
     );
     assert!(
         parser.parse("{a: float, }").unwrap()
             == StructRecord {
-                methods: vec![],
-                values: vec![("a".to_string(), Float)]
+                methods: HashMap::new(),
+                values: HashMap::from([("a".to_string(), Float)])
             }
     );
 
     let optional_ending_comma_expected = StructRecord {
-        methods: vec![],
-        values: vec![
+        methods: HashMap::new(),
+        values: HashMap::from([
             ("a".to_string(), Int),
             (
                 "b".to_string(),
@@ -316,7 +317,7 @@ fn test_parse_record_type() {
                 ),
             ),
             ("c".to_string(), List(Box::new(Int))),
-        ],
+        ]),
     };
     assert!(
         parser
@@ -365,36 +366,39 @@ fn test_parse_record_type() {
             )
             .unwrap()
             == NominalRecord {
-                methods: vec![],
-                values: vec![
+                methods: HashMap::new(),
+                values: HashMap::from([
                     ("mem1".to_string(), Float),
                     (
                         "mem2".to_string(),
                         StructRecord {
-                            methods: vec![("four".to_string(), Int)],
-                            values: vec![("a".to_string(), TypeId("Three".to_string(), vec![])),]
+                            methods: HashMap::from([("four".to_string(), Int)]),
+                            values: HashMap::from([(
+                                "a".to_string(),
+                                TypeId("Three".to_string(), vec![])
+                            )])
                         }
                     ),
                     ("mem4".to_string(), List(Box::new(Int))),
                     (
                         "mem3".to_string(),
                         NominalRecord {
-                            methods: vec![],
-                            values: vec![(
+                            methods: HashMap::new(),
+                            values: HashMap::from([(
                                 "y".to_string(),
                                 Tuple(vec![
                                     Int,
                                     Float,
                                     None,
                                     StructRecord {
-                                        methods: vec![("u".to_string(), Int)],
-                                        values: vec![]
+                                        methods: HashMap::from([("u".to_string(), Int)]),
+                                        values: HashMap::new(),
                                     }
                                 ])
-                            )]
+                            )])
                         }
                     )
-                ]
+                ])
             }
     );
     assert!(
@@ -408,20 +412,20 @@ fn test_parse_record_type() {
             )
             .unwrap()
             == NominalRecord {
-                methods: vec![
+                methods: HashMap::from([
                     ("a".to_string(), Int),
                     ("b".to_string(), Function(vec![Int, Int])),
-                ],
-                values: vec![(
+                ]),
+                values: HashMap::from([(
                     "u".to_string(),
                     Function(vec![
                         Float,
                         StructRecord {
-                            methods: vec![],
-                            values: vec![("u".to_string(), String)]
+                            methods: HashMap::new(),
+                            values: HashMap::from([("u".to_string(), String)])
                         }
                     ])
-                )]
+                )])
             }
     );
 
@@ -434,4 +438,5 @@ fn test_parse_record_type() {
     assert!(parser.parse("a: int").is_err());
     assert!(parser.parse("{a: int},").is_err());
     assert!(parser.parse("{int}").is_err());
+    assert!(parser.parse("{a: int, a: float}").is_err());
 }

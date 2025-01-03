@@ -5,6 +5,7 @@ use super::ast::VarWithValue;
 use super::span::{Span, UnSpan};
 use super::*;
 use lalrpop_util::ParseError;
+use std::collections::HashMap;
 use util;
 
 fn parse(parser: &grammar::StatementParser, inp: &'static str) -> ast::Expression {
@@ -154,15 +155,17 @@ fn test_parse_record_expr() {
     assert!(
         parse(&parser, "{field: Field.feeld}")
             == StructRecord(
-                vec![(
+                HashMap::from([(
                     "field".to_string(),
-                    Projection(
-                        Box::new(Identifier("Field".to_string(), None)),
-                        "feeld".to_string(),
+                    (
+                        Projection(
+                            Box::new(Identifier("Field".to_string(), None)),
+                            "feeld".to_string(),
+                            None
+                        ),
                         None
-                    ),
-                    None
-                )],
+                    )
+                )]),
                 None
             )
     );
@@ -176,30 +179,31 @@ fn test_parse_record_expr() {
         lint: (\"hi\",)
     }"
         ) == StructRecord(
-            vec![
-                ("bint".to_string(), IntLiteral(3, None), None),
+            HashMap::from([
+                ("bint".to_string(), (IntLiteral(3, None), None)),
                 (
                     "jint".to_string(),
-                    List(vec![IntLiteral(2, None)], None),
-                    None
+                    (List(vec![IntLiteral(2, None)], None), None)
                 ),
-                ("cidnt".to_string(), IntLiteral(1, None), None),
+                ("cidnt".to_string(), (IntLiteral(1, None), None)),
                 (
                     "lint".to_string(),
-                    Tuple(vec![StringLiteral("hi".to_string(), None)], None),
-                    None
+                    (
+                        Tuple(vec![StringLiteral("hi".to_string(), None)], None),
+                        None
+                    )
                 )
-            ],
+            ]),
             None
         )
     );
     assert!(
         parse(&parser, "({one: 2, three: 4})")
             == StructRecord(
-                vec![
-                    ("one".to_string(), IntLiteral(2, None), None),
-                    ("three".to_string(), IntLiteral(4, None), None)
-                ],
+                HashMap::from([
+                    ("one".to_string(), (IntLiteral(2, None), None)),
+                    ("three".to_string(), (IntLiteral(4, None), None))
+                ]),
                 None
             )
     );
@@ -208,10 +212,10 @@ fn test_parse_record_expr() {
         parse(&parser, "({one:2,three:4},)")
             == Tuple(
                 vec![StructRecord(
-                    vec![
-                        ("one".to_string(), IntLiteral(2, None), None),
-                        ("three".to_string(), IntLiteral(4, None), None)
-                    ],
+                    HashMap::from([
+                        ("one".to_string(), (IntLiteral(2, None), None)),
+                        ("three".to_string(), (IntLiteral(4, None), None))
+                    ]),
                     None
                 )],
                 None
@@ -219,11 +223,17 @@ fn test_parse_record_expr() {
     );
     assert!(
         parse(&parser, "{super: 4,}")
-            == StructRecord(vec![("super".to_string(), IntLiteral(4, None), None)], None)
+            == StructRecord(
+                HashMap::from([("super".to_string(), (IntLiteral(4, None), None))]),
+                None
+            )
     );
     assert!(
         parse(&parser, "{|x: 4|}")
-            == NominalRecord(vec![("x".to_string(), IntLiteral(4, None), None)], None)
+            == NominalRecord(
+                HashMap::from([("x".to_string(), (IntLiteral(4, None), None))]),
+                None
+            )
     );
 
     assert!(parser.parse("{}").is_err());
@@ -234,6 +244,7 @@ fn test_parse_record_expr() {
     assert!(parser.parse("{4: thing}").is_err());
     assert!(parser.parse("unclosed: curly}").is_err());
     assert!(parser.parse("{one: two three: four}").is_err());
+    assert!(parser.parse("{a: 2, a: 3}").is_err());
 }
 
 #[test]
@@ -940,10 +951,10 @@ fn test_parse_let() {
                     expr: Box::new(IntLiteral(5, None)),
                 },
                 Some(Box::new(StructRecord(
-                    vec![
-                        ("a".to_string(), Identifier("x".to_string(), None), None),
-                        ("b".to_string(), IntLiteral(8, None), None),
-                    ],
+                    HashMap::from([
+                        ("a".to_string(), (Identifier("x".to_string(), None), None)),
+                        ("b".to_string(), (IntLiteral(8, None), None)),
+                    ]),
                     None,
                 ))),
                 None,

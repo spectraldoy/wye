@@ -1,6 +1,7 @@
 use super::span::{unspanned_vec, OptionSpan, UnSpan};
 use super::util::OptionBox;
 use ordered_float::OrderedFloat;
+use std::collections::HashMap;
 
 /// This file describes the Abstract Syntax Tree for Wye. A Wye program is, at
 /// base, a sequence of Wye statements. At present, there are only 6 allowed Wye
@@ -72,9 +73,9 @@ pub enum Expression {
     List(Vec<Expression>, OptionSpan),
     Tuple(Vec<Expression>, OptionSpan),
     // { <id>: value, ..., <id>: value }
-    StructRecord(Vec<(String, Expression, OptionSpan)>, OptionSpan),
+    StructRecord(HashMap<String, (Expression, OptionSpan)>, OptionSpan),
     // {| <id>: value, ..., <id>: value |}
-    NominalRecord(Vec<(String, Expression, OptionSpan)>, OptionSpan),
+    NominalRecord(HashMap<String, (Expression, OptionSpan)>, OptionSpan),
     // Reference a variable or function from the environment.
     Identifier(String, OptionSpan),
     BinaryOp(BinaryOp, OptionSpan),
@@ -138,12 +139,12 @@ pub enum Type {
     Tuple(Vec<Type>),
     // { method? <id>: <type> }
     NominalRecord {
-        methods: Vec<(String, Type)>,
-        values: Vec<(String, Type)>,
+        methods: HashMap<String, Type>,
+        values: HashMap<String, Type>,
     },
     StructRecord {
-        methods: Vec<(String, Type)>,
-        values: Vec<(String, Type)>,
+        methods: HashMap<String, Type>,
+        values: HashMap<String, Type>,
     },
     // a -> b -> ...
     Function(Vec<Type>),
@@ -315,13 +316,13 @@ impl UnSpan for Expression {
             Self::Tuple(tup, _) => Self::Tuple(unspanned_vec(&tup), None),
             Self::StructRecord(rec, _) => Self::StructRecord(
                 rec.iter()
-                    .map(|r| (r.0.clone(), r.1.unspanned(), None))
+                    .map(|r| (r.0.clone(), (r.1 .0.unspanned(), None)))
                     .collect(),
                 None,
             ),
             Self::NominalRecord(rec, _) => Self::NominalRecord(
                 rec.iter()
-                    .map(|r| (r.0.clone(), r.1.unspanned(), None))
+                    .map(|r| (r.0.clone(), (r.1 .0.unspanned(), None)))
                     .collect(),
                 None,
             ),
