@@ -417,6 +417,9 @@ RecordTypeMember: (String, ast::Type, util::RecordMemberness) = {
     RecordTypeMethod,
 }
 
+SpRecordTypeMember: Spanned<(String, ast::Type, util::RecordMemberness)> = 
+    Sp<RecordTypeMember>;
+
 // The parser can build a list of declared types
 AtomicType: ast::Type = {
     "none" => ast::Type::None,
@@ -427,27 +430,26 @@ AtomicType: ast::Type = {
     "[" <t: Type> "]" => ast::Type::List(Box::new(t)),
     <tup: WyeTuple<Type>> => ast::Type::Tuple(tup),
     <p: PolytypeVar> => ast::Type::Poly(p.name, p.bound),
-    <r: WyeRecord<RecordTypeMember>> =>? {
+    <r: WyeRecord<SpRecordTypeMember>> =>? {
         let mut methods = HashMap::<String, ast::Type>::new();
         let mut values = HashMap::<String, ast::Type>::new();
 
-        for (name, typ, memberness) in r {
+        for mem in r {
+            let (name, typ, memberness) = mem.value;
             match memberness {
                 util::RecordMemberness::Method => {
                     if methods.contains_key(&name) {
                         return Err(ParseError::User {
-                            // TODO: Types should have spans, and strings should be used for errors
-                            error: ("Duplicate method in struct record type", Span::new(0, 0))
-                        })
+                            error: ("Duplicate method in struct", mem.span)
+                        });
                     }
                     methods.insert(name, typ);
                 }
-                util::RecordMemberness::Value  => {
+                util::RecordMemberness::Value => {
                     if values.contains_key(&name) {
                         return Err(ParseError::User {
-                            // TODO: Types should have spans, and strings should be used for errors
-                            error: ("Duplicate value in struct record type", Span::new(0, 0))
-                        })
+                            error: ("Duplicate value in struct", mem.span)
+                        });
                     }
                     values.insert(name, typ);   
                 }
@@ -456,27 +458,26 @@ AtomicType: ast::Type = {
 
         Ok(ast::Type::StructRecord { methods, values })
     },
-    <r: NomRecord<RecordTypeMember>> =>? {
+    <r: NomRecord<SpRecordTypeMember>> =>? {
         let mut methods = HashMap::<String, ast::Type>::new();
         let mut values = HashMap::<String, ast::Type>::new();
 
-        for (name, typ, memberness) in r {
+        for mem in r {
+            let (name, typ, memberness) = mem.value;
             match memberness {
                 util::RecordMemberness::Method => {
                     if methods.contains_key(&name) {
                         return Err(ParseError::User {
-                            // TODO: Types should have spans, and strings should be used for errors
-                            error: ("Duplicate method in nominal record type", Span::new(0, 0))
-                        })
+                            error: ("Duplicate method in nominal", mem.span)
+                        });
                     }
                     methods.insert(name, typ);
                 }
-                util::RecordMemberness::Value  => {
+                util::RecordMemberness::Value => {
                     if values.contains_key(&name) {
                         return Err(ParseError::User {
-                            // TODO: Types should have spans, and strings should be used for errors
-                            error: ("Duplicate value in nominal record type", Span::new(0, 0))
-                        })
+                            error: ("Duplicate value in nominal", mem.span)
+                        });
                     }
                     values.insert(name, typ);   
                 }
