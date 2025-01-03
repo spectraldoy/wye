@@ -28,20 +28,20 @@ pub enum Statement {
     // These, unlike Expressions, are not recursive structures
     EnumDecl {
         name: (String, OptionSpan),
-        polytype_vars: Vec<PolytypeVar>,
+        type_args: Vec<PolytypeVar>,
         variants: Vec<(String, Option<Type>, OptionSpan)>,
         span: OptionSpan,
     },
     // struct <Id> <polytype var>* { <Id>: type,+ }
     StructDecl {
         name: (String, OptionSpan),
-        polytype_vars: Vec<PolytypeVar>,
+        type_args: Vec<PolytypeVar>,
         members: Vec<(String, Type, OptionSpan)>,
     },
-    // interface <Id> <polytype var>* (requires (<Id> | (<Id> <polytype var>+))+)? { (method|val): type|methodimpl }
+    // sig <Id> <polytype var>* (requires (<Id> | (<Id> <polytype var>+))+)? { (method|val): type|methodimpl }
     InterfaceDecl {
         name: (String, OptionSpan),
-        polytype_vars: Vec<PolytypeVar>,
+        type_args: Vec<PolytypeVar>,
         requires: Vec<(String, OptionSpan, Vec<PolytypeVar>)>,
         // Implemented methods
         // name, args, output type, expression
@@ -236,12 +236,12 @@ impl UnSpan for Statement {
             Self::Expression(e) => Self::Expression(e.unspanned()),
             Self::EnumDecl {
                 name,
-                polytype_vars,
+                type_args,
                 variants,
                 span: _,
             } => Self::EnumDecl {
-                name: name.clone(),
-                polytype_vars: unspanned_vec(&polytype_vars),
+                name: (name.0.clone(), None),
+                type_args: unspanned_vec(&type_args),
                 variants: variants
                     .iter()
                     .map(|v| (v.0.clone(), v.1.clone(), None))
@@ -250,11 +250,11 @@ impl UnSpan for Statement {
             },
             Self::StructDecl {
                 name,
-                polytype_vars,
+                type_args,
                 members,
             } => Self::StructDecl {
                 name: (name.0.clone(), None),
-                polytype_vars: unspanned_vec(&polytype_vars),
+                type_args: unspanned_vec(&type_args),
                 members: members
                     .iter()
                     .map(|m| (m.0.clone(), m.1.clone(), None))
@@ -262,14 +262,14 @@ impl UnSpan for Statement {
             },
             Self::InterfaceDecl {
                 name,
-                polytype_vars,
+                type_args,
                 requires,
                 impl_methods,
                 spec_methods,
                 values,
             } => Self::InterfaceDecl {
                 name: (name.0.clone(), None),
-                polytype_vars: unspanned_vec(&polytype_vars),
+                type_args: unspanned_vec(&type_args),
                 requires: requires
                     .iter()
                     .map(|r| (r.0.clone(), None, unspanned_vec(&r.2)))
@@ -292,8 +292,8 @@ impl UnSpan for Statement {
             } => Self::InterfaceImpl {
                 for_struct: (for_struct.0.clone(), None, unspanned_vec(&for_struct.2)),
                 impl_interface: match impl_interface {
-                    Some((name, _, polytype_vars)) => {
-                        Some((name.clone(), None, unspanned_vec(&polytype_vars)))
+                    Some((name, _, type_args)) => {
+                        Some((name.clone(), None, unspanned_vec(&type_args)))
                     }
                     None => None,
                 },

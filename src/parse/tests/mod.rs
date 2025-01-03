@@ -5,6 +5,8 @@ mod test_expr;
 #[cfg(test)]
 mod test_pattern;
 #[cfg(test)]
+mod test_stmt;
+#[cfg(test)]
 mod test_type;
 #[cfg(test)]
 mod util;

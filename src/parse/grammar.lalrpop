@@ -372,7 +372,7 @@ EnumDecl: ast::Statement = {
     <start: @L> <enum_: "enum"> <p: PolytypeVar*> <eid: Sp<Identifier>> "=" <variants: SepSeqAtLeastOne<SpEnumVariant, "|">> <end: @R> => {
         ast::Statement::EnumDecl {
             name: (eid.value, Some(eid.span)),
-            polytype_vars: p,
+            type_args: p,
             variants: variants.into_iter().map(|(name, typ, span)| (name, typ, Some(span))).collect::<Vec<_>>(),
             span: Some(Span { start, end })
         }
