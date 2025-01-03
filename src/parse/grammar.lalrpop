@@ -320,17 +320,16 @@ NonLetExpr: ast::Expression = {
 //     },
 }
 
-// TODO: Typed let expr
 InExpr: ast::Expression = "in" <e: Expression> => e;
 
+// TODO: parse types for typed let expr
 LetExpr: ast::Expression = {
     <start: @L> "let" <rec: "rec"?> <var: Sp<Identifier>> <args: Sp<Identifier>*> "=" <e: NonLetExpr> <in_expr: InExpr?> <end: @R>  => {
         ast::Expression::Let(
             ast::VarWithValue {
                 name: (var.value, Some(var.span)),
-                args: args.into_iter().map(|a| (a.value, ast::Type::Hole, Some(a.span))).collect::<Vec<_>>(),
-                out_type: (ast::Type::Hole, None),
-                recursive: rec.is_some(),
+                args: args.into_iter().map(|a| (a.value, Some(a.span))).collect::<Vec<_>>(),
+                rec: rec.is_some(),
                 expr: Box::new(e),
             },
             if let Some(_) = in_expr {

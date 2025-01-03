@@ -23,6 +23,8 @@ fn test_parse_literal() {
 
     // Ok IntLiteral
     assert!(parse(&parser, "nothing") == Nothing(None));
+    assert!(parse(&parser, "fail") == Fail(None));
+    assert!(parse(&parser, "print") == Print(None));
     assert!(parse(&parser, "4") == IntLiteral(4, None));
     assert!(parse(&parser, "52") == IntLiteral(52, None));
     assert!(parse(&parser, "-1787234") == IntLiteral(-1787234, None));
@@ -560,7 +562,10 @@ fn test_parse_func_application() {
                 None
             ))
     );
-
+    assert!(
+        parse(&parser, "print 4")
+            == FuncApplication(Box::new(Print(None)), vec![IntLiteral(4, None)], None,)
+    );
     assert!(
         parse(&parser, "(+) 4")
             == FuncApplication(
@@ -822,6 +827,7 @@ fn test_parse_infix_binary_op() {
     assert!(parser.parse("(::) 4 - ((-) -6 \"hi\")").is_err());
     assert!(parser.parse("a + f b").is_err());
     assert!(parser.parse("1 >").is_err());
+    assert!(parser.parse("pam f a :: lst").is_err());
 }
 
 #[test]
@@ -834,8 +840,7 @@ fn test_parse_let() {
                 VarWithValue {
                     name: ("x".to_string(), None),
                     args: vec![],
-                    out_type: (ast::Type::Hole, None),
-                    recursive: false,
+                    rec: false,
                     expr: Box::new(IntLiteral(4, None))
                 },
                 None,
@@ -847,9 +852,8 @@ fn test_parse_let() {
             == Let(
                 VarWithValue {
                     name: ("y".to_string(), None),
-                    args: vec![("z".to_string(), ast::Type::Hole, None)],
-                    out_type: (ast::Type::Hole, None),
-                    recursive: false,
+                    args: vec![("z".to_string(), None)],
+                    rec: false,
                     expr: Box::new(FuncApplication(
                         Box::new(Identifier("x".to_string(), None)),
                         vec![IntLiteral(4, None)],
@@ -866,12 +870,181 @@ fn test_parse_let() {
                 VarWithValue {
                     name: ("mu".to_string(), None),
                     args: vec![],
-                    out_type: (ast::Type::Hole, None),
-                    recursive: true,
+                    rec: true,
                     expr: Box::new(IntLiteral(3, None))
                 },
                 None,
                 None
             )
     );
+    assert!(
+        parse(&parser, "let x y = (+) y 4")
+            == Let(
+                VarWithValue {
+                    name: ("x".to_string(), None),
+                    args: vec![("y".to_string(), None)],
+                    rec: false,
+                    expr: Box::new(FuncApplication(
+                        Box::new(BinaryOp(ast::BinaryOp::Add, None)),
+                        vec![Identifier("y".to_string(), None), IntLiteral(4, None),],
+                        None,
+                    ))
+                },
+                None,
+                None,
+            )
+    );
+    assert!(
+        parse(&parser, "let plus_4 x = x + 4")
+            == Let(
+                VarWithValue {
+                    name: ("plus_4".to_string(), None),
+                    args: vec![("x".to_string(), None)],
+                    rec: false,
+                    expr: Box::new(FuncApplication(
+                        Box::new(BinaryOp(ast::BinaryOp::Add, None)),
+                        vec![Identifier("x".to_string(), None), IntLiteral(4, None),],
+                        None,
+                    ))
+                },
+                None,
+                None,
+            )
+    );
+
+    assert!(
+        parse(&parser, "let x = 4 in x + 9")
+            == Let(
+                VarWithValue {
+                    name: ("x".to_string(), None),
+                    args: vec![],
+                    rec: false,
+                    expr: Box::new(IntLiteral(4, None)),
+                },
+                Some(Box::new(FuncApplication(
+                    Box::new(BinaryOp(ast::BinaryOp::Add, None)),
+                    vec![Identifier("x".to_string(), None), IntLiteral(9, None),],
+                    None,
+                ))),
+                None,
+            )
+    );
+
+    assert!(
+        parse(&parser, "let x = 5 in { a: x, b: 8 }")
+            == Let(
+                VarWithValue {
+                    name: ("x".to_string(), None),
+                    args: vec![],
+                    rec: false,
+                    expr: Box::new(IntLiteral(5, None)),
+                },
+                Some(Box::new(StructRecord(
+                    vec![
+                        ("a".to_string(), Identifier("x".to_string(), None), None),
+                        ("b".to_string(), IntLiteral(8, None), None),
+                    ],
+                    None,
+                ))),
+                None,
+            )
+    );
+
+    assert!(
+        parse(&parser, "let rec pam f lst = pam f (a :: lst)")
+            == Let(
+                VarWithValue {
+                    name: ("pam".to_string(), None),
+                    args: vec![("f".to_string(), None), ("lst".to_string(), None),],
+                    rec: true,
+                    expr: Box::new(FuncApplication(
+                        Box::new(Identifier("pam".to_string(), None)),
+                        vec![
+                            Identifier("f".to_string(), None),
+                            FuncApplication(
+                                Box::new(BinaryOp(ast::BinaryOp::Cons, None)),
+                                vec![
+                                    Identifier("a".to_string(), None),
+                                    Identifier("lst".to_string(), None),
+                                ],
+                                None,
+                            )
+                        ],
+                        None,
+                    ))
+                },
+                None,
+                None,
+            )
+    );
+    // multi-let
+    assert!(
+        parse(
+            &parser,
+            "let x = 4 in let y z = x + 4 in let z = y in let x = a + 8 + b"
+        ) == Let(
+            VarWithValue {
+                name: ("x".to_string(), None),
+                args: vec![],
+                rec: false,
+                expr: Box::new(IntLiteral(4, None)),
+            },
+            Some(Box::new(Let(
+                VarWithValue {
+                    name: ("y".to_string(), None),
+                    args: vec![("z".to_string(), None)],
+                    rec: false,
+                    expr: Box::new(FuncApplication(
+                        Box::new(BinaryOp(ast::BinaryOp::Add, None)),
+                        vec![Identifier("x".to_string(), None), IntLiteral(4, None),],
+                        None,
+                    ))
+                },
+                Some(Box::new(Let(
+                    VarWithValue {
+                        name: ("z".to_string(), None),
+                        args: vec![],
+                        rec: false,
+                        expr: Box::new(Identifier("y".to_string(), None))
+                    },
+                    Some(Box::new(Let(
+                        VarWithValue {
+                            name: ("x".to_string(), None),
+                            args: vec![],
+                            rec: false,
+                            expr: Box::new(FuncApplication(
+                                Box::new(BinaryOp(ast::BinaryOp::Add, None)),
+                                vec![
+                                    FuncApplication(
+                                        Box::new(BinaryOp(ast::BinaryOp::Add, None)),
+                                        vec![
+                                            Identifier("a".to_string(), None),
+                                            IntLiteral(8, None),
+                                        ],
+                                        None,
+                                    ),
+                                    Identifier("b".to_string(), None),
+                                ],
+                                None,
+                            ))
+                        },
+                        None,
+                        None,
+                    ))),
+                    None,
+                ))),
+                None,
+            ))),
+            None,
+        )
+    );
+
+    assert!(parser.parse("let x = 4 in x + 9 in 3").is_err());
+    assert!(parser.parse("let x y = ").is_err());
+    assert!(parser.parse("let x let = 5 + x").is_err());
+    assert!(parser.parse("let a = let b = 5").is_err());
+    assert!(parser.parse("let a = b = 5").is_err());
+    assert!(parser.parse("let func (x) y = 4").is_err());
+    assert!(parser.parse("let x = int").is_err());
+    assert!(parser.parse("let = 4").is_err());
 }

@@ -180,9 +180,8 @@ pub enum BinaryOp {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VarWithValue {
     pub name: (String, OptionSpan),
-    pub args: Vec<(String, Type, OptionSpan)>,
-    pub out_type: (Type, OptionSpan),
-    pub recursive: bool,
+    pub args: Vec<(String, OptionSpan)>,
+    pub rec: bool,
     pub expr: Box<Expression>,
 }
 
@@ -391,13 +390,8 @@ impl UnSpan for VarWithValue {
     fn unspanned(&self) -> Self {
         Self {
             name: (self.name.0.clone(), None),
-            args: self
-                .args
-                .iter()
-                .map(|v| (v.0.clone(), v.1.clone(), None))
-                .collect(),
-            out_type: (self.out_type.0.clone(), None),
-            recursive: self.recursive,
+            args: self.args.iter().map(|v| (v.0.clone(), None)).collect(),
+            rec: self.rec,
             expr: Box::new(self.expr.unspanned()),
         }
     }
