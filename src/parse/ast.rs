@@ -1,23 +1,24 @@
-use super::span::{unspanned_vec, OptionSpan, UnSpan};
+use super::span::{unspanned_iter, OptionSpan, UnSpan, GetSpan};
 use super::util::OptionBox;
+use crate::types::Type;
 use ordered_float::OrderedFloat;
 use std::collections::HashMap;
 
 /// This file describes the Abstract Syntax Tree for Wye. A Wye program is, at
-/// base, a sequence of Wye statements. At present, there are only 6 allowed Wye
+/// base, a sequence of Wye statements. At present, there are only 5 allowed Wye
 /// statements:
 /// - Expressions
 /// - Enum declarations
 /// - Struct declarations
 /// - Interface declarations
 /// - Interface implementations
-/// - Main
 ///
 /// Expressions evaluate to values of a particular type. Variables in methods or
 /// let statements may be annotated with types in order to aid the type checker.
 /// It is useful to describe these types in an abstract syntax within the AST.
 
 // TODO(WYE-5): documentation
+// TODO: and keyword for group bindings / mutual recursion
 
 pub type Program = Vec<Statement>;
 
@@ -124,34 +125,6 @@ pub enum Expression {
     Set(AttrSet, OptionSpan),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Type {
-    // Literal types
-    None,
-    Int,
-    Float,
-    String,
-    // (name, type-params). Could be enum or struct, this is not known at parse-time
-    TypeId(String, Vec<Type>),
-    // Identifier for polymorphic type and optional interface bound.
-    Poly(String, Option<String>),
-    List(Box<Type>),
-    Tuple(Vec<Type>),
-    // { method? <id>: <type> }
-    NominalRecord {
-        methods: HashMap<String, Type>,
-        values: HashMap<String, Type>,
-    },
-    StructRecord {
-        methods: HashMap<String, Type>,
-        values: HashMap<String, Type>,
-    },
-    // a -> b -> ...
-    Function(Vec<Type>),
-    // Type to be inferred
-    Hole,
-}
-
 /// Reserved tokens used to denote builtin binary operations, which are
 /// supported only between values of applicable types.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -242,7 +215,7 @@ impl UnSpan for Statement {
                 span: _,
             } => Self::EnumDecl {
                 name: (name.0.clone(), None),
-                type_args: unspanned_vec(&type_args),
+                type_args: unspanned_iter(&type_args),
                 variants: variants
                     .iter()
                     .map(|v| (v.0.clone(), v.1.clone(), None))
@@ -255,7 +228,7 @@ impl UnSpan for Statement {
                 members,
             } => Self::StructDecl {
                 name: (name.0.clone(), None),
-                type_args: unspanned_vec(&type_args),
+                type_args: unspanned_iter(&type_args),
                 members: members
                     .iter()
                     .map(|m| (m.0.clone(), m.1.clone(), None))
@@ -270,12 +243,12 @@ impl UnSpan for Statement {
                 values,
             } => Self::InterfaceDecl {
                 name: (name.0.clone(), None),
-                type_args: unspanned_vec(&type_args),
+                type_args: unspanned_iter(&type_args),
                 requires: requires
                     .iter()
-                    .map(|r| (r.0.clone(), None, unspanned_vec(&r.2)))
+                    .map(|r| (r.0.clone(), None, unspanned_iter(&r.2)))
                     .collect(),
-                impl_methods: unspanned_vec(&impl_methods),
+                impl_methods: unspanned_iter(&impl_methods),
                 spec_methods: spec_methods
                     .iter()
                     .map(|m| (m.0.clone(), m.1.clone(), None))
@@ -291,15 +264,15 @@ impl UnSpan for Statement {
                 attr_sets,
                 method_impls,
             } => Self::InterfaceImpl {
-                for_struct: (for_struct.0.clone(), None, unspanned_vec(&for_struct.2)),
+                for_struct: (for_struct.0.clone(), None, unspanned_iter(&for_struct.2)),
                 impl_interface: match impl_interface {
                     Some((name, _, type_args)) => {
-                        Some((name.clone(), None, unspanned_vec(&type_args)))
+                        Some((name.clone(), None, unspanned_iter(&type_args)))
                     }
                     None => None,
                 },
-                attr_sets: unspanned_vec(&attr_sets),
-                method_impls: unspanned_vec(&method_impls),
+                attr_sets: unspanned_iter(&attr_sets),
+                method_impls: unspanned_iter(&method_impls),
             },
         }
     }
@@ -312,8 +285,8 @@ impl UnSpan for Expression {
             Self::IntLiteral(i, _) => Self::IntLiteral(*i, None),
             Self::FloatLiteral(f, _) => Self::FloatLiteral(*f, None),
             Self::StringLiteral(s, _) => Self::StringLiteral(s.clone(), None),
-            Self::List(lst, _) => Self::List(unspanned_vec(&lst), None),
-            Self::Tuple(tup, _) => Self::Tuple(unspanned_vec(&tup), None),
+            Self::List(lst, _) => Self::List(unspanned_iter(&lst), None),
+            Self::Tuple(tup, _) => Self::Tuple(unspanned_iter(&tup), None),
             Self::StructRecord(rec, _) => Self::StructRecord(
                 rec.iter()
                     .map(|r| (r.0.clone(), (r.1 .0.unspanned(), None)))
@@ -348,7 +321,7 @@ impl UnSpan for Expression {
                 Self::MethodAccess(Box::new(e.unspanned()), id.clone(), None)
             }
             Self::FuncApplication(e, args, _) => {
-                Self::FuncApplication(Box::new(e.unspanned()), unspanned_vec(&args), None)
+                Self::FuncApplication(Box::new(e.unspanned()), unspanned_iter(&args), None)
             }
             Self::NamedArgsFuncApp(e, args, _) => Self::NamedArgsFuncApp(
                 Box::new(e.unspanned()),
@@ -435,10 +408,10 @@ impl UnSpan for Pattern {
             }
             Self::ListCons(s1, s2, _) => Self::ListCons(s1.clone(), s2.clone(), None),
             Self::EmptyList(_) => Self::EmptyList(None),
-            Self::Union(pv, _) => Self::Union(unspanned_vec(&pv), None),
+            Self::Union(pv, _) => Self::Union(unspanned_iter(&pv), None),
             Self::Complement(p, _) => Self::Complement(Box::new(p.unspanned()), None),
-            Self::List(pv, _) => Self::List(unspanned_vec(&pv), None),
-            Self::Tuple(pv, _) => Self::Tuple(unspanned_vec(&pv), None),
+            Self::List(pv, _) => Self::List(unspanned_iter(&pv), None),
+            Self::Tuple(pv, _) => Self::Tuple(unspanned_iter(&pv), None),
             Self::Guarded {
                 pattern,
                 guard,
@@ -453,6 +426,36 @@ impl UnSpan for Pattern {
     }
 }
 
+impl GetSpan for Expression {
+    fn get_span(&self) -> Span {
+        match &self {
+            Self::Nothing(s) => s.unwrap().clone(),
+            Self::IntLiteral(_, s) => s.unwrap().clone(),
+            Self::FloatLiteral(_, s) => s.unwrap().clone(),
+            Self::StringLiteral(_, s) => s.unwrap().clone(),
+            Self::List(_, s) => s.unwrap().clone(),
+            Self::Tuple(_, s) => s.unwrap().clone(),
+            Self::StructRecord(_, s) => s.unwrap().clone(),
+            Self::NominalRecord(_, s) => s.unwrap().clone(),
+            Self::Identifier(_, s) => s.unwrap().clone(),
+            Self::BinaryOp(_, s) => s.unwrap().clone(),
+            Self::Print(s) => s.unwrap().clone(),
+            Self::Fail(s) => s.unwrap().clone(),
+            Self::EnumVariant { span, .. } => span.unwrap().clone(),
+            Self::Projection(_, _, s) => s.unwrap().clone(),
+            Self::MethodAccess(_, _, s) => s.unwrap().clone(),
+            Self::FuncApplication(_, _, s) => s.unwrap().clone(),
+            Self::NamedArgsFuncApp(_, _, s) => s.unwrap().clone(),
+            Self::Match { span, .. } => span.unwrap().clone(),
+            Self::Lambda { span, .. } => span.unwrap().clone(),
+            Self::Let(_, _, s) => s.unwrap().clone(),
+            Self::Set(_, s) => s.unwrap().clone(),
+        }
+    }
+}
+
+
 // TODO: What are the easter eggs in the grammar?
 // null == none
+// nether makes the program execute bottom to top
 // terminate halts the program and prints a link to "I'll be back?"

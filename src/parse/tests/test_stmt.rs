@@ -1,8 +1,8 @@
 use super::ast::PolytypeVar;
 use super::ast::Statement::EnumDecl;
-use super::ast::Type;
 use super::span::UnSpan;
 use super::*;
+use crate::types::Type;
 use std::collections::HashMap;
 
 fn parse_enum_decl(parser: &grammar::StatementParser, inp: &'static str) -> ast::Statement {

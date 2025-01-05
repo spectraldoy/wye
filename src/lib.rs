@@ -1,2 +1,2 @@
 pub mod parse;
-// pub mod typecheck;
+pub mod types;

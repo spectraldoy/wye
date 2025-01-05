@@ -1,5 +1,5 @@
-use super::ast::Type::*;
 use super::*;
+use crate::types::Type::*;
 use std::collections::HashMap;
 
 #[test]
@@ -46,7 +46,7 @@ fn test_parse_list_tuple_type() {
     assert!(
         parser.parse("(none, int, Option, string)").unwrap()
             == Tuple(vec![
-                ast::Type::None,
+                None,
                 Int,
                 TypeId("Option".to_string(), vec![]),
                 String
