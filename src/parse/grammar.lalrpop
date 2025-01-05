@@ -1,5 +1,5 @@
 use super::ast;
-use crate::typesys;
+use crate::types;
 use super::util;
 use super::span::{Spanned, Span};
 use ordered_float::OrderedFloat;
@@ -365,7 +365,7 @@ Expression: ast::Expression = {
 // Enum declarations
 // ****************************************
 
-SpEnumVariant: (String, Option<typesys::Type>, Span) = {
+SpEnumVariant: (String, Option<types::Type>, Span) = {
     <vid: Sp<Identifier>> => (vid.value, None, vid.span),
     <vid: Sp<Identifier>> <with: Sp<"with">> <field_t: Sp<Type>> =>? {
         if vid.span.end == with.span.start {
@@ -410,30 +410,30 @@ pub Program: ast::Program = {
 // Types
 // ****************************************
 
-RecordTypeMethod: (String, typesys::Type, util::RecordMemberness) = 
+RecordTypeMethod: (String, types::Type, util::RecordMemberness) = 
     "method" <m: Identifier> ":" <t: Type> => (m, t, util::RecordMemberness::Method);
 
-RecordTypeMember: (String, typesys::Type, util::RecordMemberness) = {
+RecordTypeMember: (String, types::Type, util::RecordMemberness) = {
     <r: RecordField<Type>> => (r.0, r.1, util::RecordMemberness::Value),
     RecordTypeMethod,
 }
 
-SpRecordTypeMember: Spanned<(String, typesys::Type, util::RecordMemberness)> = 
+SpRecordTypeMember: Spanned<(String, types::Type, util::RecordMemberness)> = 
     Sp<RecordTypeMember>;
 
 // The parser can build a list of declared types
-AtomicType: typesys::Type = {
-    "none" => typesys::Type::None,
-    "int" => typesys::Type::Int,
-    "float" => typesys::Type::Float,
-    "string" => typesys::Type::String,
-    <tid: Identifier> => typesys::Type::TypeId(tid, vec![]),
-    "[" <t: Type> "]" => typesys::Type::List(Box::new(t)),
-    <tup: WyeTuple<Type>> => typesys::Type::Tuple(tup),
-    <p: PolytypeVar> => typesys::Type::Poly(p.name, p.bound),
+AtomicType: types::Type = {
+    "none" => types::Type::None,
+    "int" => types::Type::Int,
+    "float" => types::Type::Float,
+    "string" => types::Type::String,
+    <tid: Identifier> => types::Type::TypeId(tid, vec![]),
+    "[" <t: Type> "]" => types::Type::List(Box::new(t)),
+    <tup: WyeTuple<Type>> => types::Type::Tuple(tup),
+    <p: PolytypeVar> => types::Type::Poly(p.name, p.bound),
     <r: WyeRecord<SpRecordTypeMember>> =>? {
-        let mut methods = HashMap::<String, typesys::Type>::new();
-        let mut values = HashMap::<String, typesys::Type>::new();
+        let mut methods = HashMap::<String, types::Type>::new();
+        let mut values = HashMap::<String, types::Type>::new();
 
         for mem in r {
             let (name, typ, memberness) = mem.value;
@@ -457,11 +457,11 @@ AtomicType: typesys::Type = {
             }
         }
 
-        Ok(typesys::Type::StructRecord { methods, values })
+        Ok(types::Type::StructRecord { methods, values })
     },
     <r: NomRecord<SpRecordTypeMember>> =>? {
-        let mut methods = HashMap::<String, typesys::Type>::new();
-        let mut values = HashMap::<String, typesys::Type>::new();
+        let mut methods = HashMap::<String, types::Type>::new();
+        let mut values = HashMap::<String, types::Type>::new();
 
         for mem in r {
             let (name, typ, memberness) = mem.value;
@@ -485,19 +485,19 @@ AtomicType: typesys::Type = {
             }
         }
 
-        Ok(typesys::Type::NominalRecord { methods, values })
+        Ok(types::Type::NominalRecord { methods, values })
     },
     "(" <t: Type> ")" => t,
 }
 
-NonFuncType: typesys::Type = {
+NonFuncType: types::Type = {
     AtomicType,
-    <tparams: AtomicType+> <tid: Identifier> => typesys::Type::TypeId(tid, tparams),
+    <tparams: AtomicType+> <tid: Identifier> => types::Type::TypeId(tid, tparams),
 }
 
-pub(crate) Type: typesys::Type = {
+pub(crate) Type: types::Type = {
     NonFuncType,
-    <ftypes: SepSeqAtLeastTwo<NonFuncType, "->" /*"*/>> => typesys::Type::Function(ftypes),
+    <ftypes: SepSeqAtLeastTwo<NonFuncType, "->" /*"*/>> => types::Type::Function(ftypes),
 }
 
 // pub Expression: Spanned<ast::Expression> = {
@@ -618,7 +618,7 @@ pub(crate) Type: typesys::Type = {
 
 // // Program
 
-// TypeVariantDeclType: (String, Option<typesys::TypeExpression>) = {
+// TypeVariantDeclType: (String, Option<types::TypeExpression>) = {
 //     <tid: Identifier> => (tid, None),
 //     <tid: Sp<Identifier>> <with: Sp<"with">> <field_t: Sp<TypeExpression>> =>? {
 //         if tid.end == with.start {
@@ -786,5 +786,5 @@ NomRecord<MemberType>: Vec<MemberType> =
 
 
 /// An identifier with a type annotation.
-// TypedIdentifier: (String, typesys::Type) =
+// TypedIdentifier: (String, types::Type) =
 //     <id: Identifier> ":" <te: TypeExpression> => (id, te);

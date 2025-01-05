@@ -1,4 +1,4 @@
-use super::span::{unspanned_iter, OptionSpan, UnSpan, GetSpan};
+use super::span::{unspanned_seq, GetSpan, OptionSpan, Span, UnSpan};
 use super::util::OptionBox;
 use crate::types::Type;
 use ordered_float::OrderedFloat;
@@ -215,7 +215,7 @@ impl UnSpan for Statement {
                 span: _,
             } => Self::EnumDecl {
                 name: (name.0.clone(), None),
-                type_args: unspanned_iter(&type_args),
+                type_args: unspanned_seq(&type_args),
                 variants: variants
                     .iter()
                     .map(|v| (v.0.clone(), v.1.clone(), None))
@@ -228,7 +228,7 @@ impl UnSpan for Statement {
                 members,
             } => Self::StructDecl {
                 name: (name.0.clone(), None),
-                type_args: unspanned_iter(&type_args),
+                type_args: unspanned_seq(&type_args),
                 members: members
                     .iter()
                     .map(|m| (m.0.clone(), m.1.clone(), None))
@@ -243,12 +243,12 @@ impl UnSpan for Statement {
                 values,
             } => Self::InterfaceDecl {
                 name: (name.0.clone(), None),
-                type_args: unspanned_iter(&type_args),
+                type_args: unspanned_seq(&type_args),
                 requires: requires
                     .iter()
-                    .map(|r| (r.0.clone(), None, unspanned_iter(&r.2)))
+                    .map(|r| (r.0.clone(), None, unspanned_seq(&r.2)))
                     .collect(),
-                impl_methods: unspanned_iter(&impl_methods),
+                impl_methods: unspanned_seq(&impl_methods),
                 spec_methods: spec_methods
                     .iter()
                     .map(|m| (m.0.clone(), m.1.clone(), None))
@@ -264,15 +264,15 @@ impl UnSpan for Statement {
                 attr_sets,
                 method_impls,
             } => Self::InterfaceImpl {
-                for_struct: (for_struct.0.clone(), None, unspanned_iter(&for_struct.2)),
+                for_struct: (for_struct.0.clone(), None, unspanned_seq(&for_struct.2)),
                 impl_interface: match impl_interface {
                     Some((name, _, type_args)) => {
-                        Some((name.clone(), None, unspanned_iter(&type_args)))
+                        Some((name.clone(), None, unspanned_seq(&type_args)))
                     }
                     None => None,
                 },
-                attr_sets: unspanned_iter(&attr_sets),
-                method_impls: unspanned_iter(&method_impls),
+                attr_sets: unspanned_seq(&attr_sets),
+                method_impls: unspanned_seq(&method_impls),
             },
         }
     }
@@ -285,8 +285,8 @@ impl UnSpan for Expression {
             Self::IntLiteral(i, _) => Self::IntLiteral(*i, None),
             Self::FloatLiteral(f, _) => Self::FloatLiteral(*f, None),
             Self::StringLiteral(s, _) => Self::StringLiteral(s.clone(), None),
-            Self::List(lst, _) => Self::List(unspanned_iter(&lst), None),
-            Self::Tuple(tup, _) => Self::Tuple(unspanned_iter(&tup), None),
+            Self::List(lst, _) => Self::List(unspanned_seq(&lst), None),
+            Self::Tuple(tup, _) => Self::Tuple(unspanned_seq(&tup), None),
             Self::StructRecord(rec, _) => Self::StructRecord(
                 rec.iter()
                     .map(|r| (r.0.clone(), (r.1 .0.unspanned(), None)))
@@ -321,7 +321,7 @@ impl UnSpan for Expression {
                 Self::MethodAccess(Box::new(e.unspanned()), id.clone(), None)
             }
             Self::FuncApplication(e, args, _) => {
-                Self::FuncApplication(Box::new(e.unspanned()), unspanned_iter(&args), None)
+                Self::FuncApplication(Box::new(e.unspanned()), unspanned_seq(&args), None)
             }
             Self::NamedArgsFuncApp(e, args, _) => Self::NamedArgsFuncApp(
                 Box::new(e.unspanned()),
@@ -408,10 +408,10 @@ impl UnSpan for Pattern {
             }
             Self::ListCons(s1, s2, _) => Self::ListCons(s1.clone(), s2.clone(), None),
             Self::EmptyList(_) => Self::EmptyList(None),
-            Self::Union(pv, _) => Self::Union(unspanned_iter(&pv), None),
+            Self::Union(pv, _) => Self::Union(unspanned_seq(&pv), None),
             Self::Complement(p, _) => Self::Complement(Box::new(p.unspanned()), None),
-            Self::List(pv, _) => Self::List(unspanned_iter(&pv), None),
-            Self::Tuple(pv, _) => Self::Tuple(unspanned_iter(&pv), None),
+            Self::List(pv, _) => Self::List(unspanned_seq(&pv), None),
+            Self::Tuple(pv, _) => Self::Tuple(unspanned_seq(&pv), None),
             Self::Guarded {
                 pattern,
                 guard,
@@ -429,31 +429,30 @@ impl UnSpan for Pattern {
 impl GetSpan for Expression {
     fn get_span(&self) -> Span {
         match &self {
-            Self::Nothing(s) => s.unwrap().clone(),
-            Self::IntLiteral(_, s) => s.unwrap().clone(),
-            Self::FloatLiteral(_, s) => s.unwrap().clone(),
-            Self::StringLiteral(_, s) => s.unwrap().clone(),
-            Self::List(_, s) => s.unwrap().clone(),
-            Self::Tuple(_, s) => s.unwrap().clone(),
-            Self::StructRecord(_, s) => s.unwrap().clone(),
-            Self::NominalRecord(_, s) => s.unwrap().clone(),
-            Self::Identifier(_, s) => s.unwrap().clone(),
-            Self::BinaryOp(_, s) => s.unwrap().clone(),
-            Self::Print(s) => s.unwrap().clone(),
-            Self::Fail(s) => s.unwrap().clone(),
-            Self::EnumVariant { span, .. } => span.unwrap().clone(),
-            Self::Projection(_, _, s) => s.unwrap().clone(),
-            Self::MethodAccess(_, _, s) => s.unwrap().clone(),
-            Self::FuncApplication(_, _, s) => s.unwrap().clone(),
-            Self::NamedArgsFuncApp(_, _, s) => s.unwrap().clone(),
-            Self::Match { span, .. } => span.unwrap().clone(),
-            Self::Lambda { span, .. } => span.unwrap().clone(),
-            Self::Let(_, _, s) => s.unwrap().clone(),
-            Self::Set(_, s) => s.unwrap().clone(),
+            Self::Nothing(s) => s.as_ref().unwrap().clone(),
+            Self::IntLiteral(_, s) => s.as_ref().unwrap().clone(),
+            Self::FloatLiteral(_, s) => s.as_ref().unwrap().clone(),
+            Self::StringLiteral(_, s) => s.as_ref().unwrap().clone(),
+            Self::List(_, s) => s.as_ref().unwrap().clone(),
+            Self::Tuple(_, s) => s.as_ref().unwrap().clone(),
+            Self::StructRecord(_, s) => s.as_ref().unwrap().clone(),
+            Self::NominalRecord(_, s) => s.as_ref().unwrap().clone(),
+            Self::Identifier(_, s) => s.as_ref().unwrap().clone(),
+            Self::BinaryOp(_, s) => s.as_ref().unwrap().clone(),
+            Self::Print(s) => s.as_ref().unwrap().clone(),
+            Self::Fail(s) => s.as_ref().unwrap().clone(),
+            Self::EnumVariant { span, .. } => span.as_ref().unwrap().clone(),
+            Self::Projection(_, _, s) => s.as_ref().unwrap().clone(),
+            Self::MethodAccess(_, _, s) => s.as_ref().unwrap().clone(),
+            Self::FuncApplication(_, _, s) => s.as_ref().unwrap().clone(),
+            Self::NamedArgsFuncApp(_, _, s) => s.as_ref().unwrap().clone(),
+            Self::Match { span, .. } => span.as_ref().unwrap().clone(),
+            Self::Lambda { span, .. } => span.as_ref().unwrap().clone(),
+            Self::Let(_, _, s) => s.as_ref().unwrap().clone(),
+            Self::Set(_, s) => s.as_ref().unwrap().clone(),
         }
     }
 }
-
 
 // TODO: What are the easter eggs in the grammar?
 // null == none
