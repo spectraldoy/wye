@@ -8,8 +8,6 @@ mod test_pattern;
 mod test_stmt;
 #[cfg(test)]
 mod test_type;
-#[cfg(test)]
-mod util;
 
 // Statements
 

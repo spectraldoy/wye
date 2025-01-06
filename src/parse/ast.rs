@@ -426,6 +426,7 @@ impl UnSpan for Pattern {
     }
 }
 
+#[cfg(not(test))]
 impl GetSpan for Expression {
     fn get_span(&self) -> Span {
         match &self {

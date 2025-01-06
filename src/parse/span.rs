@@ -68,6 +68,10 @@ where
         .collect::<Vec<T>>()
 }
 
+// get type checking on functions working
+// do I really have to return to this stupid spans problem
+//
+
 pub trait GetSpan {
     fn get_span(&self) -> Span;
 }

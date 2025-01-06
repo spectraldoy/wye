@@ -14,6 +14,7 @@ use std::collections::HashMap;
 // and cannot be specialized, unlike type variables.
 
 pub(super) struct TypeContext {
+    // Next unused number for generating a new type variable name
     next_available_num: u128,
     // name -> type mapping for variables declared in the program
     pub typings: HashMap<String, Type>,
@@ -88,6 +89,7 @@ pub(super) fn type_check_expr(
         Expression::Nothing(_) => Ok((Type::None, HashMap::new())),
         Expression::IntLiteral(_, _) => Ok((Type::Int, HashMap::new())),
         Expression::FloatLiteral(_, _) => Ok((Type::Float, HashMap::new())),
+        Expression::StringLiteral(_, _) => Ok((Type::String, HashMap::new())),
         Expression::List(exprs, _) => type_check_list(&exprs[..], ctx),
         Expression::Let(varwithval, in_expr_opt, span) => {
             if let Some(in_expr) = in_expr_opt {
@@ -143,7 +145,7 @@ fn type_check_list(
 
     // Now unify all of the elem types
     let mut cur_unified_type = elem_types[0].clone();
-    for (i, typ) in elem_types[1..].iter().enumerate() {
+    for (i, typ) in elem_types.iter().enumerate().skip(1) {
         let mut unif_subst = HashMap::new();
         let unif_res = infer::unify(&cur_unified_type, typ, &mut unif_subst);
         if unif_res.is_err() {
@@ -167,7 +169,7 @@ fn type_check_list(
         ctx.apply_subst(&composed_subst);
     }
 
-    Ok((cur_unified_type, composed_subst))
+    Ok((Type::List(Box::new(cur_unified_type)), composed_subst))
 }
 
 /// Type check a let that does not have an in expression.

@@ -82,7 +82,10 @@ pub fn unify(typ1: &Type, typ2: &Type, cur_subst: &mut HashMap<u128, Type>) -> R
         (Type::Variable(num), t) | (t, Type::Variable(num)) => {
             cur_subst.insert(*num, t.clone());
         }
-        _ => todo!(),
+        // Actually there are still TODOs here
+        _ => {
+            return Err("Unify ahh!".to_string());
+        }
     }
 
     Ok(())

@@ -4,9 +4,9 @@ use super::ast::Statement::Expression;
 use super::ast::VarWithValue;
 use super::span::{Span, UnSpan};
 use super::*;
+use crate::test_util::to_of64;
 use lalrpop_util::ParseError;
 use std::collections::HashMap;
-use util;
 
 fn parse(parser: &grammar::StatementParser, inp: &'static str) -> ast::Expression {
     let out = parser.parse(inp).unwrap().unspanned();
@@ -34,10 +34,10 @@ fn test_parse_literal() {
     assert!(parser.parse("0527").is_err());
     assert!(parser.parse("-000343").is_err());
     // Ok FloatLiteral
-    assert!(parse(&parser, "5.0") == FloatLiteral(util::to_of64(5.0), None));
-    assert!(parse(&parser, "1.0e-9") == FloatLiteral(util::to_of64(1e-9), None));
-    assert!(parse(&parser, "0.23124") == FloatLiteral(util::to_of64(0.23124), None));
-    assert!(parse(&parser, "1.2222E100") == FloatLiteral(util::to_of64(1.2222E100), None));
+    assert!(parse(&parser, "5.0") == FloatLiteral(to_of64(5.0), None));
+    assert!(parse(&parser, "1.0e-9") == FloatLiteral(to_of64(1e-9), None));
+    assert!(parse(&parser, "0.23124") == FloatLiteral(to_of64(0.23124), None));
+    assert!(parse(&parser, "1.2222E100") == FloatLiteral(to_of64(1.2222E100), None));
     // Err FloatLiteral
     assert!(parser.parse("00.9").is_err());
     assert!(parser.parse("4.").is_err());
@@ -60,9 +60,7 @@ fn test_parse_list() {
     let parser = grammar::StatementParser::new();
 
     assert!(parse(&parser, "[]") == List(vec![], None));
-    assert!(
-        parse(&parser, "[-1.0e6]") == List(vec![FloatLiteral(util::to_of64(-1.0e6), None)], None)
-    );
+    assert!(parse(&parser, "[-1.0e6]") == List(vec![FloatLiteral(to_of64(-1.0e6), None)], None));
     assert!(
         parse(&parser, "[4, 5]") == List(vec![IntLiteral(4, None), IntLiteral(5, None),], None)
     );
@@ -73,7 +71,7 @@ fn test_parse_list() {
                     StringLiteral("buh".to_string(), None),
                     IntLiteral(4, None),
                     IntLiteral(5, None),
-                    FloatLiteral(util::to_of64(7.0), None),
+                    FloatLiteral(to_of64(7.0), None),
                     IntLiteral(8, None),
                     StringLiteral("⏰".to_string(), None)
                 ],
@@ -89,13 +87,13 @@ fn test_parse_list() {
             vec![
                 IntLiteral(1, None),
                 StringLiteral("wow ಣ".to_string(), None),
-                FloatLiteral(util::to_of64(1.0), None),
+                FloatLiteral(to_of64(1.0), None),
                 IntLiteral(2, None),
                 List(
                     vec![
                         IntLiteral(46, None),
                         IntLiteral(47, None),
-                        FloatLiteral(util::to_of64(-9.85), None),
+                        FloatLiteral(to_of64(-9.85), None),
                     ],
                     None
                 ),
@@ -134,10 +132,7 @@ fn test_parse_tuple() {
     assert!(
         parse(&parser, "(3, -7.25)")
             == Tuple(
-                vec![
-                    IntLiteral(3, None),
-                    FloatLiteral(util::to_of64(-7.25), None)
-                ],
+                vec![IntLiteral(3, None), FloatLiteral(to_of64(-7.25), None)],
                 None
             )
     );
@@ -388,7 +383,7 @@ fn test_parse_enum_variant() {
                                     "Leaf".to_string(),
                                     None
                                 ),
-                                FloatLiteral(util::to_of64(-2.5), None)
+                                FloatLiteral(to_of64(-2.5), None)
                             ],
                             None
                         ))
@@ -425,7 +420,7 @@ fn test_parse_enum_variant() {
                 enum_id: "Tupy".to_string(),
                 variant: "MaybeTuple".to_string(),
                 span: None,
-                field: Box::new(FloatLiteral(util::to_of64(-5.2), None))
+                field: Box::new(FloatLiteral(to_of64(-5.2), None))
             }
     );
 
@@ -494,11 +489,7 @@ fn test_parse_func_application() {
             == NamedArgsFuncApp(
                 Box::new(Identifier("hello".to_string(), None)),
                 vec![
-                    (
-                        "a".to_string(),
-                        FloatLiteral(util::to_of64(4.5), None),
-                        None
-                    ),
+                    ("a".to_string(), FloatLiteral(to_of64(4.5), None), None),
                     ("br".to_string(), IntLiteral(8, None), None)
                 ],
                 None
@@ -531,7 +522,7 @@ fn test_parse_func_application() {
         parse(&parser, "f -7.9")
             == FuncApplication(
                 Box::new(Identifier("f".to_string(), None)),
-                vec![FloatLiteral(util::to_of64(-7.9), None)],
+                vec![FloatLiteral(to_of64(-7.9), None)],
                 None
             )
     );
@@ -629,7 +620,7 @@ fn test_parse_func_application() {
                             "y".to_string(),
                             None,
                         )),
-                        vec![FloatLiteral(util::to_of64(-5.6), None)],
+                        vec![FloatLiteral(to_of64(-5.6), None)],
                         None
                     ),
                     EnumVariant {
@@ -726,12 +717,12 @@ fn test_parse_infix_binary_op() {
                     FuncApplication(
                         Box::new(BinaryOp(ast::BinaryOp::Eq, None)),
                         vec![
-                            FloatLiteral(util::to_of64(1.5), None),
-                            FloatLiteral(util::to_of64(2.5), None),
+                            FloatLiteral(to_of64(1.5), None),
+                            FloatLiteral(to_of64(2.5), None),
                         ],
                         None
                     ),
-                    FloatLiteral(util::to_of64(3.5), None)
+                    FloatLiteral(to_of64(3.5), None)
                 ],
                 None
             )
