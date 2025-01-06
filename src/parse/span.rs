@@ -2,7 +2,7 @@
 /// positions in the text of a program. This struct captures those byte
 /// positions along with the node value so that line numbers and other
 /// information can be reported with errors.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Span {
     pub start: usize,
     pub end: usize,

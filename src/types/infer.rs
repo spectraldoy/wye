@@ -18,6 +18,7 @@ pub fn apply_subst_type(subst: &HashMap<u128, Type>, typ: &Type) -> Type {
         Type::List(t) => Type::List(Box::new(apply_subst_type(subst, t))),
         Type::Tuple(elem_types) => Type::Tuple(apply_subst_type_vec(subst, elem_types)),
         Type::Function(arg_types) => Type::Function(apply_subst_type_vec(subst, arg_types)),
+        // most things here are TODO!
         _ => typ.clone(),
     }
 }
