@@ -291,13 +291,13 @@ fn test_parse_function_type() {
     assert!(
         parser.parse("'a -> ('a -> 'a) -> 'a").unwrap()
             == Function(
-                Box::new(Poly("a".to_string(), None)),
+                Box::new(Poly("a".to_string(), Option::None)),
                 Box::new(Function(
                     Box::new(Function(
-                        Box::new(Poly("a".to_string(), None)),
-                        Box::new(Poly("a".to_string(), None)),
+                        Box::new(Poly("a".to_string(), Option::None)),
+                        Box::new(Poly("a".to_string(), Option::None)),
                     )),
-                    Box::new(Poly("a".to_string(), None))
+                    Box::new(Poly("a".to_string(), Option::None))
                 ))
             )
     );

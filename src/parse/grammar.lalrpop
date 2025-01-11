@@ -499,8 +499,14 @@ NonFuncType: types::Type = {
 
 pub(crate) Type: types::Type = {
     NonFuncType,
-    <ftypes: SepSeqAtLeastTwo<NonFuncType, "->" /*"*/>> => {
-        types::Type::Function(types::collect_functype(&ftypes[..]))
+    <ftypes: SepSeqAtLeastTwo<NonFuncType, "->" /*"*/>> =>? {
+        let func_type_res = types::collect_functype(&ftypes[..]);
+        if func_type_res.is_err() {
+            return Err(ParseError::User {
+                error: (func_type_res.err().unwrap(), Span::new(0, 0))
+            });
+        }
+        Ok(func_type_res.unwrap())
     },
 }
 

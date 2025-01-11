@@ -40,7 +40,7 @@ fn apply_subst_subst(
     subst_applied_to: &HashMap<usize, Type>,
 ) -> HashMap<usize, Type> {
     // Apply subst_to_apply to every element of subst_applied_to
-    let mut output = subst_applied_to
+    let output = subst_applied_to
         .iter()
         .map(|(varnum, typ)| (*varnum, apply_subst_type(subst_to_apply, typ)))
         .collect();
@@ -68,9 +68,9 @@ pub fn unify(typ1: &Type, typ2: &Type, cur_subst: &mut HashMap<usize, Type>) -> 
         | (Type::Float, Type::Float)
         | (Type::String, Type::String) => {}
         (Type::List(t1), Type::List(t2)) => unify(t1, t2, cur_subst)?,
-        (Type::Function(f1_arg, f1_ret), Type::Function(f1_arg, f2_ret)) => {
+        (Type::Function(f1_arg, f1_ret), Type::Function(f2_arg, f2_ret)) => {
             unify(f1_arg, f2_arg, cur_subst)?;
-            unify(f1_ret, f2_ret, cur_subst)
+            unify(f1_ret, f2_ret, cur_subst)?
         }
         (Type::Variable(num1), Type::Variable(num2)) => {
             cur_subst.insert(*num1, Type::Variable(*num2));

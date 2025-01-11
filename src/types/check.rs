@@ -44,7 +44,7 @@ impl TypeContext {
 
     /// Apply a set of type constraints to the names currently declared
     /// in the type context
-    pub fn apply_subst(&mut self, subst: &HashMap<usize, Type>) {
+    pub fn ingest_subst(&mut self, subst: &HashMap<usize, Type>) {
         for typ in self.typings.values_mut() {
             *typ = infer::apply_subst_type(subst, &typ);
         }
@@ -99,7 +99,7 @@ pub(super) fn type_check_expr(
         Expression::BinaryOp(bop, _) => type_check_binary_op(bop, ctx),
         Expression::FuncApplication(func, args, _) => {
             let (func_type, func_subst) = type_check_expr(func, ctx)?;
-            type_check_func_app(func_type, func_subst, args, ctx)
+            type_check_func_app(func_type, func_subst, func.get_span(), args, ctx)
         }
         Expression::Let(varwithval, in_expr_opt, span) => {
             if let Some(in_expr) = in_expr_opt {
@@ -159,7 +159,7 @@ fn type_check_list(
         // Apply the substitution to the current type
         composed_subst = infer::compose_substs(&unif_subst, &composed_subst);
         cur_unified_type = infer::apply_subst_type(&composed_subst, &cur_unified_type);
-        ctx.apply_subst(&composed_subst);
+        ctx.ingest_subst(&composed_subst);
     }
 
     Ok((Type::List(Box::new(cur_unified_type)), composed_subst))
@@ -190,6 +190,7 @@ fn type_check_binary_op(
 fn type_check_func_app(
     func_type: Type,
     input_subst: HashMap<usize, Type>,
+    func_span: span::Span,
     args: &[Expression],
     ctx: &mut TypeContext,
 ) -> Result<(Type, HashMap<usize, Type>), ()> {
@@ -204,27 +205,26 @@ fn type_check_func_app(
         (arg_type, ret_type)
     } else {
         ctx.type_errors.insert(
-            func.get_span(),
+            func_span,
             format!("Expected function type but got {:?}", func_type),
         );
         return Err(());
     };
 
     // Type check the first arg
-    let first_arg = args[0];
-    let (first_arg_type, first_arg_subst) = type_check_expr(&first_arg, ctx)?;
+    let (first_arg_type, first_arg_subst) = type_check_expr(&args[0], ctx)?;
     let mut composed_subst = infer::compose_substs(&first_arg_subst, &input_subst);
 
     // From the function
     let expected_arg_type = infer::apply_subst_type(&composed_subst, &expected_arg_type);
 
     // Unify the expected argument type of the function and the actual type of the first argument
-    let unif_subst = HashMap::new();
+    let mut unif_subst = HashMap::new();
     let unif_res = infer::unify(&expected_arg_type, &first_arg_type, &mut unif_subst);
+    let func_and_first_arg_span = span::widest_span(&[func_span, args[0].get_span()]).unwrap();
     if unif_res.is_err() {
-        let error_span = span::widest_span(&[func.get_span(), args[0].get_span()]);
         ctx.type_errors.insert(
-            error_span,
+            func_and_first_arg_span,
             format!(
                 "Could not unify expected argument type {:?} with actual {:?}",
                 expected_arg_type, first_arg_type,
@@ -235,10 +235,16 @@ fn type_check_func_app(
     // Incorporate the unification substitution into the current substitution
     composed_subst = infer::compose_substs(&unif_subst, &composed_subst);
     // Apply this substitution to the relevant types
-    let ret_type = infer::apply_subst(&composed_subst, &ret_type);
+    let ret_type = infer::apply_subst_type(&composed_subst, &ret_type);
 
     // Recurse to type the rest of the application.
-    type_check_func_app(ret_type, composed_subst, &args[1..], ctx)
+    type_check_func_app(
+        ret_type,
+        composed_subst,
+        func_and_first_arg_span,
+        &args[1..],
+        ctx,
+    )
 }
 
 // TODO: rename TypeContext to TypeChecker and have all these functions in
@@ -260,7 +266,7 @@ fn type_check_nonempty_expr_slice(
         composed_subst = infer::compose_substs(&elem_subst, &composed_subst);
         // Apply to the output type and the context
         elem_types.push(infer::apply_subst_type(&composed_subst, &elem_type));
-        ctx.apply_subst(&composed_subst);
+        ctx.ingest_subst(&composed_subst);
     }
     Ok((elem_types, composed_subst))
 }
@@ -296,14 +302,20 @@ fn type_check_let(
     let func_type = if args.len() == 0 {
         output_type.clone()
     } else {
-        collect_functype(&arg_types[..]);
+        let func_type_res = collect_functype(&arg_types[..]);
+        if func_type_res.is_err() {
+            ctx.type_errors
+                .insert(span, func_type_res.err().unwrap().to_string());
+            return Err(());
+        }
+        func_type_res.unwrap()
     };
     ctx.typings.insert(name.clone(), func_type);
 
     // Type check the expression, apply the obtained substitutions to the environment
     // and to the type of the expression
     let (expr_type, expr_subst) = type_check_expr(expr, ctx)?;
-    ctx.apply_subst(&expr_subst);
+    ctx.ingest_subst(&expr_subst);
     let expr_type = infer::apply_subst_type(&expr_subst, &expr_type);
 
     // Unify expr_type and output_type
@@ -324,7 +336,7 @@ fn type_check_let(
         return Err(());
     }
     let final_subst = infer::compose_substs(&expr_subst, &unif_subst);
-    ctx.apply_subst(&final_subst);
+    ctx.ingest_subst(&final_subst);
     let final_type = ctx.typings.get(name).unwrap();
     Ok((final_type.clone(), final_subst))
 }

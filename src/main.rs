@@ -2,6 +2,7 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use wye::parse::grammar;
+use wye::types::check;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -21,8 +22,8 @@ fn main() {
             println!("{:?}", parser.parse(wye_program.as_str()));
         }
         "typecheck" | "tc" => {
-            let _ = parser.parse(wye_program.as_str()).unwrap();
-            todo!();
+            let parsed_prog = parser.parse(wye_program.as_str()).unwrap();
+            println!("{:?}", check::type_check_program(&parsed_prog));
         }
         _ => {
             println!("Unknown or unimplemented language action: {}", action);

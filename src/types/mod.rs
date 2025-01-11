@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-mod check;
+pub mod check;
 mod infer;
 
 #[cfg(test)]
@@ -50,7 +50,7 @@ pub fn collect_functype(types: &[Type]) -> Result<Type, &'static str> {
         return Ok(types[0].clone());
     }
 
-    output_type = collect_functype(&types[1..])?;
+    let output_type = collect_functype(&types[1..])?;
     Ok(Type::Function(
         Box::new(types[0].clone()),
         Box::new(output_type),
