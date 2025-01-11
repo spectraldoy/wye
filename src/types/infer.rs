@@ -3,7 +3,7 @@ use super::Type;
 use std::collections::HashMap;
 
 /// Apply a substitution set to a type
-pub fn apply_subst_type(subst: &HashMap<u128, Type>, typ: &Type) -> Type {
+pub fn apply_subst_type(subst: &HashMap<usize, Type>, typ: &Type) -> Type {
     match typ {
         Type::Variable(num) => {
             if subst.contains_key(num) {
@@ -17,14 +17,17 @@ pub fn apply_subst_type(subst: &HashMap<u128, Type>, typ: &Type) -> Type {
         }
         Type::List(t) => Type::List(Box::new(apply_subst_type(subst, t))),
         Type::Tuple(elem_types) => Type::Tuple(apply_subst_type_vec(subst, elem_types)),
-        Type::Function(arg_types) => Type::Function(apply_subst_type_vec(subst, arg_types)),
+        Type::Function(arg, ret) => Type::Function(
+            Box::new(apply_subst_type(subst, arg)),
+            Box::new(apply_subst_type(subst, ret)),
+        ),
         // most things here are TODO!
         _ => typ.clone(),
     }
 }
 
 /// Apply a substitution set
-fn apply_subst_type_vec(subst: &HashMap<u128, Type>, type_vec: &Vec<Type>) -> Vec<Type> {
+fn apply_subst_type_vec(subst: &HashMap<usize, Type>, type_vec: &Vec<Type>) -> Vec<Type> {
     type_vec
         .iter()
         .map(|typ| apply_subst_type(subst, typ))
@@ -33,31 +36,31 @@ fn apply_subst_type_vec(subst: &HashMap<u128, Type>, type_vec: &Vec<Type>) -> Ve
 
 /// Apply a substitution to another substitution. TODO(WYE-5): describe what this actually means
 fn apply_subst_subst(
-    subst_to_apply: &HashMap<u128, Type>,
-    subst_applied_to: &HashMap<u128, Type>,
-) -> HashMap<u128, Type> {
-    let mut output = subst_applied_to.clone();
-    for (varnum, _) in subst_applied_to {
-        if subst_to_apply.contains_key(&varnum) {
-            output.insert(*varnum, subst_to_apply.get(&varnum).unwrap().clone());
-        }
-    }
+    subst_to_apply: &HashMap<usize, Type>,
+    subst_applied_to: &HashMap<usize, Type>,
+) -> HashMap<usize, Type> {
+    // Apply subst_to_apply to every element of subst_applied_to
+    let mut output = subst_applied_to
+        .iter()
+        .map(|(varnum, typ)| (*varnum, apply_subst_type(subst_to_apply, typ)))
+        .collect();
 
     output
 }
 
 /// TODO: documentation
 pub fn compose_substs(
-    subst_to_apply: &HashMap<u128, Type>,
-    subst_applied_to: &HashMap<u128, Type>,
-) -> HashMap<u128, Type> {
-    // apply subst1 to subst2 then update with subst1
+    subst_to_apply: &HashMap<usize, Type>,
+    subst_applied_to: &HashMap<usize, Type>,
+) -> HashMap<usize, Type> {
+    // apply subst_to_apply to subst_applied_to then fill in with the rest of
+    // subst_to_apply that was not in subst_applied_to
     let mut output = apply_subst_subst(subst_to_apply, subst_applied_to);
     output.extend(subst_to_apply.clone());
     output
 }
 
-pub fn unify(typ1: &Type, typ2: &Type, cur_subst: &mut HashMap<u128, Type>) -> Result<(), String> {
+pub fn unify(typ1: &Type, typ2: &Type, cur_subst: &mut HashMap<usize, Type>) -> Result<(), String> {
     // TODO: get rid of the returns and use expression syntax
     match (typ1, typ2) {
         (Type::None, Type::None)
@@ -65,16 +68,9 @@ pub fn unify(typ1: &Type, typ2: &Type, cur_subst: &mut HashMap<u128, Type>) -> R
         | (Type::Float, Type::Float)
         | (Type::String, Type::String) => {}
         (Type::List(t1), Type::List(t2)) => unify(t1, t2, cur_subst)?,
-        (Type::Function(arg_types1), Type::Function(arg_types2)) => {
-            if arg_types1.len() != arg_types2.len() {
-                return Err("function ahh!".to_string());
-            }
-            for (arg_type1, arg_type2) in arg_types1.iter().zip(arg_types2.iter()) {
-                let res = unify(arg_type1, arg_type2, cur_subst);
-                if res.is_err() {
-                    return res;
-                }
-            }
+        (Type::Function(f1_arg, f1_ret), Type::Function(f1_arg, f2_ret)) => {
+            unify(f1_arg, f2_arg, cur_subst)?;
+            unify(f1_ret, f2_ret, cur_subst)
         }
         (Type::Variable(num1), Type::Variable(num2)) => {
             cur_subst.insert(*num1, Type::Variable(*num2));

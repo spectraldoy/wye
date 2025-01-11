@@ -334,6 +334,8 @@ NonLetExpr: ast::Expression = {
 //     },
 }
 
+// TODO: what if we got rid of let-in? Every let was just a let-in?
+// We introduce variables non-polymorphically through lambdas, eh?
 InExpr: ast::Expression = "in" <e: Expression> => e;
 
 // TODO: parse types for typed let expr
@@ -497,7 +499,9 @@ NonFuncType: types::Type = {
 
 pub(crate) Type: types::Type = {
     NonFuncType,
-    <ftypes: SepSeqAtLeastTwo<NonFuncType, "->" /*"*/>> => types::Type::Function(ftypes),
+    <ftypes: SepSeqAtLeastTwo<NonFuncType, "->" /*"*/>> => {
+        types::Type::Function(types::collect_functype(&ftypes[..]))
+    },
 }
 
 // pub Expression: Spanned<ast::Expression> = {

@@ -208,73 +208,98 @@ fn test_parse_type_identifier() {
 fn test_parse_function_type() {
     let parser = grammar::TypeParser::new();
 
-    assert!(parser.parse("int -> float").unwrap() == Function(vec![Int, Float]));
+    assert!(parser.parse("int -> float").unwrap() == Function(Box::new(Int), Box::new(Float),));
     assert!(
         parser.parse("X -> Y").unwrap()
-            == Function(vec![
-                TypeId("X".to_string(), vec![]),
-                TypeId("Y".to_string(), vec![])
-            ])
+            == Function(
+                Box::new(TypeId("X".to_string(), vec![])),
+                Box::new(TypeId("Y".to_string(), vec![]))
+            )
     );
-    assert!(parser.parse("int -> none -> string").unwrap() == Function(vec![Int, None, String]));
+    assert!(
+        parser.parse("int -> none -> string").unwrap()
+            == Function(
+                Box::new(Int),
+                Box::new(Function(Box::new(None), Box::new(String),))
+            )
+    );
     assert!(
         parser.parse("'a Tree -> int").unwrap()
-            == Function(vec![
-                TypeId(
+            == Function(
+                Box::new(TypeId(
                     "Tree".to_string(),
                     vec![Poly("a".to_string(), Option::None)]
-                ),
-                Int
-            ])
+                )),
+                Box::new(Int)
+            )
     );
-    assert!(parser.parse("(int) -> (float)").unwrap() == Function(vec![Int, Float]));
-    assert!(parser.parse("(int -> float)").unwrap() == Function(vec![Int, Float]));
+    assert!(parser.parse("(int) -> (float)").unwrap() == Function(Box::new(Int), Box::new(Float),));
+    assert!(parser.parse("(int -> float)").unwrap() == Function(Box::new(Int), Box::new(Float),));
     assert!(
         parser.parse("(int -> float) -> string").unwrap()
-            == Function(vec![Function(vec![Int, Float]), String])
+            == Function(
+                Box::new(Function(Box::new(Int), Box::new(Float),)),
+                Box::new(String)
+            )
     );
     assert!(
         parser.parse("int->   float   ->string ->Option").unwrap()
-            == Function(vec![
-                Int,
-                Float,
-                String,
-                TypeId("Option".to_string(), vec![])
-            ])
+            == Function(
+                Box::new(Int),
+                Box::new(Function(
+                    Box::new(Float),
+                    Box::new(Function(
+                        Box::new(String),
+                        Box::new(TypeId("Option".to_string(), vec![])),
+                    ))
+                ))
+            )
     );
     assert!(
         parser.parse("'a -> 'b -> c").unwrap()
-            == Function(vec![
-                Poly("a".to_string(), Option::None),
-                Poly("b".to_string(), Option::None),
-                TypeId("c".to_string(), vec![])
-            ])
+            == Function(
+                Box::new(Poly("a".to_string(), Option::None)),
+                Box::new(Function(
+                    Box::new(Poly("b".to_string(), Option::None)),
+                    Box::new(TypeId("c".to_string(), vec![])),
+                ))
+            )
     );
     assert!(
-        parser.parse("int -> (float -> string)").unwrap()
-            == Function(vec![Int, Function(vec![Float, String])])
+        parser.parse("int -> (float -> string) -> none").unwrap()
+            == Function(
+                Box::new(Int),
+                Box::new(Function(
+                    Box::new(Function(Box::new(Float), Box::new(String),)),
+                    Box::new(None),
+                ))
+            )
     );
     assert!(
         parser.parse("int -> Num'a Option -> string").unwrap()
-            == Function(vec![
-                Int,
-                TypeId(
-                    "Option".to_string(),
-                    vec![Poly("a".to_string(), Some("Num".to_string()))]
-                ),
-                String,
-            ])
+            == Function(
+                Box::new(Int),
+                Box::new(Function(
+                    Box::new(TypeId(
+                        "Option".to_string(),
+                        vec![Poly("a".to_string(), Some("Num".to_string()))]
+                    )),
+                    Box::new(String)
+                ))
+            )
     );
     assert!(
         parser.parse("'a -> ('a -> 'a) -> 'a").unwrap()
-            == Function(vec![
-                Poly("a".to_string(), Option::None),
-                Function(vec![
-                    Poly("a".to_string(), Option::None),
-                    Poly("a".to_string(), Option::None)
-                ]),
-                Poly("a".to_string(), Option::None),
-            ])
+            == Function(
+                Box::new(Poly("a".to_string(), None)),
+                Box::new(Function(
+                    Box::new(Function(
+                        Box::new(Poly("a".to_string(), None)),
+                        Box::new(Poly("a".to_string(), None)),
+                    )),
+                    Box::new(Poly("a".to_string(), None))
+                ))
+            )
     );
 
     assert!(parser.parse("int (->) float").is_err());
@@ -414,17 +439,17 @@ fn test_parse_record_type() {
             == NominalRecord {
                 methods: HashMap::from([
                     ("a".to_string(), Int),
-                    ("b".to_string(), Function(vec![Int, Int])),
+                    ("b".to_string(), Function(Box::new(Int), Box::new(Int))),
                 ]),
                 values: HashMap::from([(
                     "u".to_string(),
-                    Function(vec![
-                        Float,
-                        StructRecord {
+                    Function(
+                        Box::new(Float),
+                        Box::new(StructRecord {
                             methods: HashMap::new(),
                             values: HashMap::from([("u".to_string(), String)])
-                        }
-                    ])
+                        })
+                    )
                 )])
             }
     );

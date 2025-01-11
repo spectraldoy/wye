@@ -1,8 +1,8 @@
 /// Type checking
 use super::infer;
-use super::Type;
+use super::{collect_functype, Type};
 use crate::parse::ast;
-use crate::parse::ast::{Expression, Program, Statement};
+use crate::parse::ast::{BinaryOp, Expression, Program, Statement};
 use crate::parse::span;
 use crate::parse::span::GetSpan;
 use std::collections::HashMap;
@@ -15,7 +15,7 @@ use std::collections::HashMap;
 
 pub(super) struct TypeContext {
     // Next unused number for generating a new type variable name
-    next_available_num: u128,
+    next_available_num: usize,
     // name -> type mapping for variables declared in the program
     pub typings: HashMap<String, Type>,
     // var name and name of bound
@@ -36,7 +36,7 @@ impl TypeContext {
 
     /// Creates a new type variable of the form π{num} and
     /// adds it to the typings with
-    pub fn genvar(&mut self) -> u128 {
+    pub fn genvar(&mut self) -> usize {
         let next_num = self.next_available_num;
         self.next_available_num += 1;
         next_num
@@ -44,7 +44,7 @@ impl TypeContext {
 
     /// Apply a set of type constraints to the names currently declared
     /// in the type context
-    pub fn apply_subst(&mut self, subst: &HashMap<u128, Type>) {
+    pub fn apply_subst(&mut self, subst: &HashMap<usize, Type>) {
         for typ in self.typings.values_mut() {
             *typ = infer::apply_subst_type(subst, &typ);
         }
@@ -57,6 +57,9 @@ pub fn type_check_program(prog: &Program) -> Result<(), HashMap<span::Span, Stri
     for stmt in prog {
         let _ = type_check_statement(stmt, &mut ctx);
     }
+
+    // TODO: at the end of this, all remaining unconstrained type variables
+    // need to be generalized to polytypes.
 
     if (&ctx.type_errors).is_empty() {
         Ok(())
@@ -81,16 +84,23 @@ fn type_check_statement(stmt: &Statement, ctx: &mut TypeContext) -> Result<(), (
 }
 
 /// Return the inferred sub-expr type, and resulting substitutions for inference
+/// This function and every mutually recursive function it calls is  responsible
+/// for applying the resulting substitution to the resulting type, and the context.
 pub(super) fn type_check_expr(
     expr: &Expression,
     ctx: &mut TypeContext,
-) -> Result<(Type, HashMap<u128, Type>), ()> {
-    let recur_res = match expr {
+) -> Result<(Type, HashMap<usize, Type>), ()> {
+    match expr {
         Expression::Nothing(_) => Ok((Type::None, HashMap::new())),
         Expression::IntLiteral(_, _) => Ok((Type::Int, HashMap::new())),
         Expression::FloatLiteral(_, _) => Ok((Type::Float, HashMap::new())),
         Expression::StringLiteral(_, _) => Ok((Type::String, HashMap::new())),
         Expression::List(exprs, _) => type_check_list(&exprs[..], ctx),
+        Expression::BinaryOp(bop, _) => type_check_binary_op(bop, ctx),
+        Expression::FuncApplication(func, args, _) => {
+            let (func_type, func_subst) = type_check_expr(func, ctx)?;
+            type_check_func_app(func_type, func_subst, args, ctx)
+        }
         Expression::Let(varwithval, in_expr_opt, span) => {
             if let Some(in_expr) = in_expr_opt {
                 type_check_let_in(varwithval, in_expr, span.as_ref().unwrap().clone(), ctx)
@@ -99,25 +109,24 @@ pub(super) fn type_check_expr(
             }
         }
         _ => todo!(),
-    };
-    if recur_res.is_err() {
-        return recur_res;
     }
-    let (typ, subst) = recur_res.unwrap();
-    ctx.apply_subst(&subst);
-    let typ = infer::apply_subst_type(&subst, &typ);
-    return Ok((typ, subst));
 }
 
-// This seems much more complicated than it needs to be. Can it be unraveled?
-// It's possible there are too many ctx.apply_subst s
+// TODO: rename substitution to constraint
+/// Type check a slice of expressions that are meant to be the contents
+/// of a List expression
 fn type_check_list(
     exprs: &[Expression],
     ctx: &mut TypeContext,
-) -> Result<(Type, HashMap<u128, Type>), ()> {
+) -> Result<(Type, HashMap<usize, Type>), ()> {
     if exprs.len() == 0 {
         // Empty lists always type to [t] where t is a new type variable.
         let new_typevar = ctx.genvar();
+        // TODO: this should be a true polytype - a forall
+        // When it is referenced from the environment, it should be instantiated to
+        // a new type variable
+        // This would happen in let statements where these type variables
+        // Are elevated to polytypes with the name pi{x} or something
         return Ok((
             Type::List(Box::new(Type::Variable(new_typevar))),
             HashMap::new(),
@@ -125,23 +134,7 @@ fn type_check_list(
     }
 
     // Type check each expression
-    let mut elem_types = vec![];
-    let mut elem_substs = vec![];
-    for expr in exprs {
-        let (elem_type, elem_subst) = type_check_expr(expr, ctx)?;
-        elem_types.push(elem_type);
-        elem_substs.push(elem_subst);
-    }
-
-    let mut composed_subst = HashMap::new();
-    for (i, subst) in elem_substs.iter().enumerate() {
-        // Apply each obtained substitution to the environment
-        ctx.apply_subst(subst);
-        // And to the type of the corresponding recursively obtained element
-        elem_types[i] = infer::apply_subst_type(subst, &elem_types[i]);
-        // And compose them all together
-        composed_subst = infer::compose_substs(&composed_subst, subst);
-    }
+    let (elem_types, mut composed_subst) = type_check_nonempty_expr_slice(exprs, ctx)?;
 
     // Now unify all of the elem types
     let mut cur_unified_type = elem_types[0].clone();
@@ -154,7 +147,7 @@ fn type_check_list(
             ctx.type_errors.insert(
                 error_span,
                 format!(
-                    "Could not unify types of elements in list. Got {:?} which is not compatiable with {:?}: {}",
+                    "Could not unify types of elements in list. Got {:?} which is not compatible with {:?}: {}",
                     typ,
                     cur_unified_type,
                     unif_res.err().unwrap(),
@@ -172,12 +165,112 @@ fn type_check_list(
     Ok((Type::List(Box::new(cur_unified_type)), composed_subst))
 }
 
+/// Produce the type of builtin binary operations
+/// BIG TODO: type variables need bounds
+fn type_check_binary_op(
+    bop: &BinaryOp,
+    ctx: &mut TypeContext,
+) -> Result<(Type, HashMap<usize, Type>), ()> {
+    let newvar = ctx.genvar();
+    let new_type = match bop {
+        BinaryOp::Add => Type::Function(
+            Box::new(Type::Variable(newvar)),
+            Box::new(Type::Function(
+                Box::new(Type::Variable(newvar)),
+                Box::new(Type::Variable(newvar)),
+            )),
+        ),
+        _ => todo!(),
+    };
+    Ok((new_type, HashMap::new()))
+}
+
+/// Type check a function application. This takes in the type and substitutions obtained from type
+/// checking the actual function so that recursion is easier.
+fn type_check_func_app(
+    func_type: Type,
+    input_subst: HashMap<usize, Type>,
+    args: &[Expression],
+    ctx: &mut TypeContext,
+) -> Result<(Type, HashMap<usize, Type>), ()> {
+    // If the function has no arguments, then its type is not changed in any way, as it
+    // is not applied.
+    if args.len() == 0 {
+        return Ok((func_type, input_subst));
+    }
+
+    // Expect the function expression to have Function type
+    let (expected_arg_type, ret_type) = if let Type::Function(arg_type, ret_type) = func_type {
+        (arg_type, ret_type)
+    } else {
+        ctx.type_errors.insert(
+            func.get_span(),
+            format!("Expected function type but got {:?}", func_type),
+        );
+        return Err(());
+    };
+
+    // Type check the first arg
+    let first_arg = args[0];
+    let (first_arg_type, first_arg_subst) = type_check_expr(&first_arg, ctx)?;
+    let mut composed_subst = infer::compose_substs(&first_arg_subst, &input_subst);
+
+    // From the function
+    let expected_arg_type = infer::apply_subst_type(&composed_subst, &expected_arg_type);
+
+    // Unify the expected argument type of the function and the actual type of the first argument
+    let unif_subst = HashMap::new();
+    let unif_res = infer::unify(&expected_arg_type, &first_arg_type, &mut unif_subst);
+    if unif_res.is_err() {
+        let error_span = span::widest_span(&[func.get_span(), args[0].get_span()]);
+        ctx.type_errors.insert(
+            error_span,
+            format!(
+                "Could not unify expected argument type {:?} with actual {:?}",
+                expected_arg_type, first_arg_type,
+            ),
+        );
+        return Err(());
+    }
+    // Incorporate the unification substitution into the current substitution
+    composed_subst = infer::compose_substs(&unif_subst, &composed_subst);
+    // Apply this substitution to the relevant types
+    let ret_type = infer::apply_subst(&composed_subst, &ret_type);
+
+    // Recurse to type the rest of the application.
+    type_check_func_app(ret_type, composed_subst, &args[1..], ctx)
+}
+
+// TODO: rename TypeContext to TypeChecker and have all these functions in
+// the impl of it
+// TODO: move this function around
+/// Returns a vec of types of the expressions in the slice, and the substitution
+/// composed by all of the substitutions induced by typing the expressions
+fn type_check_nonempty_expr_slice(
+    exprs: &[Expression],
+    ctx: &mut TypeContext,
+) -> Result<(Vec<Type>, HashMap<usize, Type>), ()> {
+    let mut elem_types = vec![];
+    let mut composed_subst = HashMap::new();
+    for expr in exprs {
+        // Recursively type check each expression
+        // need to unify no
+        let (elem_type, elem_subst) = type_check_expr(expr, ctx)?;
+        // Compose the obtained substitutions together
+        composed_subst = infer::compose_substs(&elem_subst, &composed_subst);
+        // Apply to the output type and the context
+        elem_types.push(infer::apply_subst_type(&composed_subst, &elem_type));
+        ctx.apply_subst(&composed_subst);
+    }
+    Ok((elem_types, composed_subst))
+}
+
 /// Type check a let that does not have an in expression.
 fn type_check_let(
     varwithval: &ast::VarWithValue,
     span: span::Span,
     ctx: &mut TypeContext,
-) -> Result<(Type, HashMap<u128, Type>), ()> {
+) -> Result<(Type, HashMap<usize, Type>), ()> {
     let ast::VarWithValue {
         name: (name, _),
         args,
@@ -203,7 +296,7 @@ fn type_check_let(
     let func_type = if args.len() == 0 {
         output_type.clone()
     } else {
-        Type::Function(arg_types)
+        collect_functype(&arg_types[..]);
     };
     ctx.typings.insert(name.clone(), func_type);
 
@@ -243,6 +336,6 @@ fn type_check_let_in(
     in_expr: &Expression,
     span: span::Span,
     ctx: &mut TypeContext,
-) -> Result<(Type, HashMap<u128, Type>), ()> {
+) -> Result<(Type, HashMap<usize, Type>), ()> {
     todo!()
 }

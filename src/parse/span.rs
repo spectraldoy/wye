@@ -68,9 +68,19 @@ where
         .collect::<Vec<T>>()
 }
 
-// get type checking on functions working
+// TODO: once again the spans story could improve
 // do I really have to return to this stupid spans problem
-//
+// Maybe a global const?
+
+// #[cfg(test)]
+// pub const IGNORE_SPANS: bool = true;
+// #[cfg(not(test))]
+// pub const IGNORE_SPANS: bool = false;
+// then use Span::new() everywhere, which defaults
+// to usize::MAX, usize::MAX when IGNORE spans is
+// true. Then we can have a dummy span constant that
+// is basically checked for equality everywhere
+// and there is none of this unspanned or unwrapping bs
 
 pub trait GetSpan {
     fn get_span(&self) -> Span;

@@ -6,6 +6,10 @@ mod infer;
 #[cfg(test)]
 mod tests;
 
+// In the Ocaml compiler, function types are
+// a -> b
+// but function expressions are vecs
+// TODO: labeled, omittable func args
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
     // Literal types
@@ -28,10 +32,27 @@ pub enum Type {
         methods: HashMap<String, Type>,
         values: HashMap<String, Type>,
     },
-    // a -> b -> ...
-    Function(Vec<Type>),
+    // a -> (b -> (...))
+    Function(Box<Type>, Box<Type>),
     // Type variable during inference
     // The argument is the "name" of the variable
     // TODO: type variables can be constrained by bounds
-    Variable(u128),
+    Variable(usize),
+}
+
+/// Utility function for collecting a sequence of types meant to represent
+/// the type signature of a function, into a Type::Function.
+pub fn collect_functype(types: &[Type]) -> Result<Type, &'static str> {
+    if types.len() == 0 {
+        return Err("At least 2 types are required to construct a function");
+    }
+    if types.len() == 1 {
+        return Ok(types[0].clone());
+    }
+
+    output_type = collect_functype(&types[1..])?;
+    Ok(Type::Function(
+        Box::new(types[0].clone()),
+        Box::new(output_type),
+    ))
 }
