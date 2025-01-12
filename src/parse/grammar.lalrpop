@@ -4,7 +4,7 @@ use super::util;
 use super::span::{Spanned, Span};
 use ordered_float::OrderedFloat;
 use lalrpop_util::ParseError;
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 
 grammar;
 
@@ -434,8 +434,8 @@ AtomicType: types::Type = {
     <tup: WyeTuple<Type>> => types::Type::Tuple(tup),
     <p: PolytypeVar> => types::Type::Poly(p.name, p.bound),
     <r: WyeRecord<SpRecordTypeMember>> =>? {
-        let mut methods = HashMap::<String, types::Type>::new();
-        let mut values = HashMap::<String, types::Type>::new();
+        let mut methods = BTreeMap::<String, types::Type>::new();
+        let mut values = BTreeMap::<String, types::Type>::new();
 
         for mem in r {
             let (name, typ, memberness) = mem.value;
@@ -462,8 +462,8 @@ AtomicType: types::Type = {
         Ok(types::Type::StructRecord { methods, values })
     },
     <r: NomRecord<SpRecordTypeMember>> =>? {
-        let mut methods = HashMap::<String, types::Type>::new();
-        let mut values = HashMap::<String, types::Type>::new();
+        let mut methods = BTreeMap::<String, types::Type>::new();
+        let mut values = BTreeMap::<String, types::Type>::new();
 
         for mem in r {
             let (name, typ, memberness) = mem.value;
@@ -502,6 +502,7 @@ pub(crate) Type: types::Type = {
     <ftypes: SepSeqAtLeastTwo<NonFuncType, "->" /*"*/>> =>? {
         let func_type_res = types::collect_functype(&ftypes[..]);
         if func_type_res.is_err() {
+            // TODO: this span should be better
             return Err(ParseError::User {
                 error: (func_type_res.err().unwrap(), Span::new(0, 0))
             });

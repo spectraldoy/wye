@@ -1,3 +1,4 @@
+use super::bound::{SetBound, StructBound};
 /// Type checking
 use super::infer;
 use super::{collect_functype, Type};
@@ -11,35 +12,77 @@ use std::collections::HashMap;
 // Something that will only be dealt with once we have working
 // type inference with polymorphic types?
 // Note: Wye polymorphic types assert true, total polymorphism
-// and cannot be specialized, unlike type variables.
+// and cannot be specialized at the top level, unlike type variables.
 
 pub(super) struct TypeContext {
-    // Next unused number for generating a new type variable name
+    /// Next unused number for generating a new type variable or bound name.
     next_available_num: usize,
-    // name -> type mapping for variables declared in the program
+    /// name -> type mapping for variables declared in the program
     pub typings: HashMap<String, Type>,
-    // var name and name of bound
+    /// var name and name of bound
     quantified_typevars: HashMap<String, Option<String>>,
-    // Collect errors here to be all reported together after type checking
+    /// Collect errors here to be all reported together after type checking
     pub type_errors: HashMap<span::Span, String>,
+    /// Bounds induced by declared or inferred types, which can be checked against.
+    /// Maps name of bound -> Bound struct.
+    set_bounds: HashMap<String, SetBound>,
+    struct_bounds: HashMap<String, StructBound>,
 }
 
 impl TypeContext {
     pub fn new() -> Self {
+        let set_bounds = HashMap::from([
+            (
+                "Add".to_string(),
+                SetBound::from([
+                    Type::Int,
+                    Type::Float,
+                    // TODO: Type::List(Box::new(Type::Poly(self.genname("π"), None))),
+                    Type::String,
+                ]),
+            ),
+            ("Sub".to_string(), SetBound::from([Type::Int, Type::Float])),
+            ("Mult".to_string(), SetBound::from([Type::Int, Type::Float])),
+            ("Div".to_string(), SetBound::from([Type::Float])),
+            ("FloorDiv".to_string(), SetBound::from([Type::Float])),
+            (
+                "Lt".to_string(),
+                SetBound::from([Type::Int, Type::Float, Type::String]),
+            ),
+            (
+                "Leq".to_string(),
+                SetBound::from([Type::Int, Type::Float, Type::String]),
+            ),
+            (
+                "Gt".to_string(),
+                SetBound::from([Type::Int, Type::Float, Type::String]),
+            ),
+            (
+                "Geq".to_string(),
+                SetBound::from([Type::Int, Type::Float, Type::String]),
+            ),
+        ]);
+
         Self {
             next_available_num: 0,
             typings: HashMap::new(),
             quantified_typevars: HashMap::new(),
             type_errors: HashMap::new(),
+            set_bounds,
+            struct_bounds: HashMap::new(),
         }
     }
 
-    /// Creates a new type variable of the form π{num} and
-    /// adds it to the typings with
+    /// Advances the num next available for generating names.
     pub fn genvar(&mut self) -> usize {
         let next_num = self.next_available_num;
         self.next_available_num += 1;
         next_num
+    }
+
+    /// Creates a new String name for a bound or polytype
+    pub fn genname(&mut self, prefix: String) -> String {
+        format!("{}{}", prefix, self.genvar())
     }
 
     /// Apply a set of type constraints to the names currently declared
@@ -128,7 +171,7 @@ fn type_check_list(
         // This would happen in let statements where these type variables
         // Are elevated to polytypes with the name pi{x} or something
         return Ok((
-            Type::List(Box::new(Type::Variable(new_typevar))),
+            Type::List(Box::new(Type::Variable(new_typevar, None))),
             HashMap::new(),
         ));
     }
@@ -173,13 +216,13 @@ fn type_check_binary_op(
 ) -> Result<(Type, HashMap<usize, Type>), ()> {
     let newvar = ctx.genvar();
     let new_type = match bop {
-        BinaryOp::Add => Type::Function(
-            Box::new(Type::Variable(newvar)),
-            Box::new(Type::Function(
-                Box::new(Type::Variable(newvar)),
-                Box::new(Type::Variable(newvar)),
-            )),
-        ),
+        BinaryOp::Add => {
+            let argtype = Type::Variable(newvar, Some("Plus".to_string()));
+            Type::Function(
+                Box::new(argtype.clone()),
+                Box::new(Type::Function(Box::new(argtype.clone()), Box::new(argtype))),
+            )
+        }
         _ => todo!(),
     };
     Ok((new_type, HashMap::new()))
@@ -288,12 +331,12 @@ fn type_check_let(
     let mut arg_types = vec![];
     for arg in args {
         // TODO: check for duplicate argument names
-        let new_type = Type::Variable(ctx.genvar());
+        let new_type = Type::Variable(ctx.genvar(), None);
         arg_types.push(new_type.clone());
         ctx.typings.insert(arg.0.clone(), new_type);
     }
     // Also create a type variable for the output type of the function
-    let output_type = Type::Variable(ctx.genvar());
+    let output_type = Type::Variable(ctx.genvar(), None);
     arg_types.push(output_type.clone());
 
     // If recursion is allowed, then the current function should be added to

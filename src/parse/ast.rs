@@ -168,7 +168,7 @@ pub struct AttrSet {
     pub new_expr: Box<Expression>,
 }
 
-/// ' (bound)? name
+/// (bound)?'name
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PolytypeVar {
     pub name: String,

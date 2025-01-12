@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
+mod bound;
 pub mod check;
 mod infer;
 
@@ -10,7 +11,7 @@ mod tests;
 // a -> b
 // but function expressions are vecs
 // TODO: labeled, omittable func args
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Type {
     // Literal types
     None,
@@ -25,19 +26,21 @@ pub enum Type {
     Tuple(Vec<Type>),
     // { method? <id>: <type> }
     NominalRecord {
-        methods: HashMap<String, Type>,
-        values: HashMap<String, Type>,
+        methods: BTreeMap<String, Type>,
+        values: BTreeMap<String, Type>,
     },
     StructRecord {
-        methods: HashMap<String, Type>,
-        values: HashMap<String, Type>,
+        methods: BTreeMap<String, Type>,
+        values: BTreeMap<String, Type>,
     },
     // a -> (b -> (...))
+    // hold argument type, return type
+    // TODO: argument label
     Function(Box<Type>, Box<Type>),
-    // Type variable during inference
+    // Type variable during inference, and optional Bound, which
+    // can be the name of a signature, or of an anonymous struct.
     // The argument is the "name" of the variable
-    // TODO: type variables can be constrained by bounds
-    Variable(usize),
+    Variable(usize, Option<String>),
 }
 
 /// Utility function for collecting a sequence of types meant to represent

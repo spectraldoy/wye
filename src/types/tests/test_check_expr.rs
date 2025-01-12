@@ -1,9 +1,10 @@
 use super::Type::*;
 use super::*;
-use crate::parse::ast::Expression;
+use crate::parse::ast::{BinaryOp, Expression};
 use crate::test_util::to_of64;
 // override the imported Type::None
 use crate::parse::span::{GetSpan, Span};
+use check::type_check_expr;
 use std::collections::HashMap;
 use Option::None;
 
@@ -65,7 +66,7 @@ fn test_check_list() {
     );
     assert_eq!(
         test_check_expr(Expression::List(vec![], None)).unwrap(),
-        List(Box::new(Variable(0)))
+        List(Box::new(Variable(0, None)))
     );
 
     assert!(test_check_expr(Expression::List(
@@ -76,4 +77,20 @@ fn test_check_list() {
         None
     ))
     .is_err());
+}
+
+#[test]
+fn test_check_func_application() {
+    assert_eq!(
+        test_check_expr(Expression::FuncApplication(
+            Box::new(Expression::BinaryOp(BinaryOp::Add, None)),
+            vec![
+                Expression::IntLiteral(4, None),
+                Expression::IntLiteral(5, None),
+            ],
+            None,
+        ))
+        .unwrap(),
+        Int
+    );
 }

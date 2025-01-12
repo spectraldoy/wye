@@ -1,0 +1,13 @@
+
+enum 'a LinkedList = Leaf | List with ('a, LinkedList);
+
+sig Hash {
+    method hash: int;
+}
+
+nominal Hash'k 'v HashTable {
+    members: ['v LinkedList],
+}
+
+
+

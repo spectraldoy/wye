@@ -5,7 +5,10 @@ use std::collections::HashMap;
 /// Apply a substitution set to a type
 pub fn apply_subst_type(subst: &HashMap<usize, Type>, typ: &Type) -> Type {
     match typ {
-        Type::Variable(num) => {
+        // Unification with bounds is slightly harder. Always need to pick
+        // The more specific bound. What if there are multiple bounds?
+        // Then variables should have a set of bounds, right?
+        Type::Variable(num, _) => {
             if subst.contains_key(num) {
                 subst.get(num).unwrap().clone()
             } else {
@@ -72,10 +75,10 @@ pub fn unify(typ1: &Type, typ2: &Type, cur_subst: &mut HashMap<usize, Type>) -> 
             unify(f1_arg, f2_arg, cur_subst)?;
             unify(f1_ret, f2_ret, cur_subst)?
         }
-        (Type::Variable(num1), Type::Variable(num2)) => {
-            cur_subst.insert(*num1, Type::Variable(*num2));
+        (Type::Variable(num1, _), Type::Variable(num2, _)) => {
+            cur_subst.insert(*num1, Type::Variable(*num2, None));
         }
-        (Type::Variable(num), t) | (t, Type::Variable(num)) => {
+        (Type::Variable(num, _), t) | (t, Type::Variable(num, _)) => {
             cur_subst.insert(*num, t.clone());
         }
         // Actually there are still TODOs here
