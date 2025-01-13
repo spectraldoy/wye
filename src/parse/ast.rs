@@ -1,5 +1,6 @@
 use super::span::{unspanned_seq, GetSpan, OptionSpan, Span, UnSpan};
 use super::util::OptionBox;
+use crate::types::structure::Flex;
 use crate::types::Type;
 use ordered_float::OrderedFloat;
 use std::collections::HashMap;
@@ -74,9 +75,8 @@ pub enum Expression {
     List(Vec<Expression>, OptionSpan),
     Tuple(Vec<Expression>, OptionSpan),
     // { <id>: value, ..., <id>: value }
-    StructRecord(HashMap<String, (Expression, OptionSpan)>, OptionSpan),
-    // {| <id>: value, ..., <id>: value |}
-    NominalRecord(HashMap<String, (Expression, OptionSpan)>, OptionSpan),
+    // Record expressions only have fields, no methods
+    Record(HashMap<String, (Expression, OptionSpan)>, Flex, OptionSpan),
     // Reference a variable or function from the environment.
     Identifier(String, OptionSpan),
     BinaryOp(BinaryOp, OptionSpan),
@@ -287,16 +287,11 @@ impl UnSpan for Expression {
             Self::StringLiteral(s, _) => Self::StringLiteral(s.clone(), None),
             Self::List(lst, _) => Self::List(unspanned_seq(&lst), None),
             Self::Tuple(tup, _) => Self::Tuple(unspanned_seq(&tup), None),
-            Self::StructRecord(rec, _) => Self::StructRecord(
+            Self::Record(rec, flex, _) => Self::Record(
                 rec.iter()
                     .map(|r| (r.0.clone(), (r.1 .0.unspanned(), None)))
                     .collect(),
-                None,
-            ),
-            Self::NominalRecord(rec, _) => Self::NominalRecord(
-                rec.iter()
-                    .map(|r| (r.0.clone(), (r.1 .0.unspanned(), None)))
-                    .collect(),
+                flex.clone(),
                 None,
             ),
             Self::Identifier(id, _) => Self::Identifier(id.clone(), None),
@@ -436,8 +431,7 @@ impl GetSpan for Expression {
             Self::StringLiteral(_, s) => s.as_ref().unwrap().clone(),
             Self::List(_, s) => s.as_ref().unwrap().clone(),
             Self::Tuple(_, s) => s.as_ref().unwrap().clone(),
-            Self::StructRecord(_, s) => s.as_ref().unwrap().clone(),
-            Self::NominalRecord(_, s) => s.as_ref().unwrap().clone(),
+            Self::Record(_, _, s) => s.as_ref().unwrap().clone(),
             Self::Identifier(_, s) => s.as_ref().unwrap().clone(),
             Self::BinaryOp(_, s) => s.as_ref().unwrap().clone(),
             Self::Print(s) => s.as_ref().unwrap().clone(),

@@ -1,5 +1,4 @@
-use super::bound::{SetBound, StructBound};
-/// Type checking
+//! Type checking
 use super::infer;
 use super::{collect_functype, Type};
 use crate::parse::ast;
@@ -14,6 +13,7 @@ use std::collections::HashMap;
 // Note: Wye polymorphic types assert true, total polymorphism
 // and cannot be specialized at the top level, unlike type variables.
 
+// Bounds can conflict. We need a way to resolve bounds.
 pub(super) struct TypeContext {
     /// Next unused number for generating a new type variable or bound name.
     next_available_num: usize,
@@ -23,53 +23,47 @@ pub(super) struct TypeContext {
     quantified_typevars: HashMap<String, Option<String>>,
     /// Collect errors here to be all reported together after type checking
     pub type_errors: HashMap<span::Span, String>,
-    /// Bounds induced by declared or inferred types, which can be checked against.
-    /// Maps name of bound -> Bound struct.
-    set_bounds: HashMap<String, SetBound>,
-    struct_bounds: HashMap<String, StructBound>,
 }
 
 impl TypeContext {
     pub fn new() -> Self {
-        let set_bounds = HashMap::from([
-            (
-                "Add".to_string(),
-                SetBound::from([
-                    Type::Int,
-                    Type::Float,
-                    // TODO: Type::List(Box::new(Type::Poly(self.genname("π"), None))),
-                    Type::String,
-                ]),
-            ),
-            ("Sub".to_string(), SetBound::from([Type::Int, Type::Float])),
-            ("Mult".to_string(), SetBound::from([Type::Int, Type::Float])),
-            ("Div".to_string(), SetBound::from([Type::Float])),
-            ("FloorDiv".to_string(), SetBound::from([Type::Float])),
-            (
-                "Lt".to_string(),
-                SetBound::from([Type::Int, Type::Float, Type::String]),
-            ),
-            (
-                "Leq".to_string(),
-                SetBound::from([Type::Int, Type::Float, Type::String]),
-            ),
-            (
-                "Gt".to_string(),
-                SetBound::from([Type::Int, Type::Float, Type::String]),
-            ),
-            (
-                "Geq".to_string(),
-                SetBound::from([Type::Int, Type::Float, Type::String]),
-            ),
-        ]);
+        // let set_bounds = HashMap::from([
+        //     (
+        //         "Add".to_string(),
+        //         SetBound::from([
+        //             Type::Int,
+        //             Type::Float,
+        //             // TODO: Type::List(Box::new(Type::Poly(self.genname("π"), None))),
+        //             Type::String,
+        //         ]),
+        //     ),
+        //     ("Sub".to_string(), SetBound::from([Type::Int, Type::Float])),
+        //     ("Mult".to_string(), SetBound::from([Type::Int, Type::Float])),
+        //     ("Div".to_string(), SetBound::from([Type::Float])),
+        //     ("FloorDiv".to_string(), SetBound::from([Type::Float])),
+        //     (
+        //         "Lt".to_string(),
+        //         SetBound::from([Type::Int, Type::Float, Type::String]),
+        //     ),
+        //     (
+        //         "Leq".to_string(),
+        //         SetBound::from([Type::Int, Type::Float, Type::String]),
+        //     ),
+        //     (
+        //         "Gt".to_string(),
+        //         SetBound::from([Type::Int, Type::Float, Type::String]),
+        //     ),
+        //     (
+        //         "Geq".to_string(),
+        //         SetBound::from([Type::Int, Type::Float, Type::String]),
+        //     ),
+        // ]);
 
         Self {
             next_available_num: 0,
             typings: HashMap::new(),
             quantified_typevars: HashMap::new(),
             type_errors: HashMap::new(),
-            set_bounds,
-            struct_bounds: HashMap::new(),
         }
     }
 

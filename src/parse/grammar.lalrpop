@@ -1,10 +1,11 @@
 use super::ast;
 use crate::types;
+use crate::types::structure::{Structure, Flex};
 use super::util;
 use super::span::{Spanned, Span};
 use ordered_float::OrderedFloat;
 use lalrpop_util::ParseError;
-use std::collections::{HashMap, BTreeMap};
+use std::collections::HashMap;
 
 grammar;
 
@@ -121,7 +122,7 @@ AtomicExpr: ast::Expression = {
                 error: ("Duplicate field in struct record expression", record_span.unwrap())
             });
         }
-        Ok(ast::Expression::StructRecord(record_elems, record_span))
+        Ok(ast::Expression::Record(record_elems, Flex::Permissive, record_span))
     },
     <r: Sp<NomRecord<SpRecordExprField>>> =>? {
         let record_span = Some(r.span);
@@ -135,7 +136,7 @@ AtomicExpr: ast::Expression = {
                 error: ("Duplicate field in nominal record expression", record_span.unwrap())
             });
         }
-        Ok(ast::Expression::NominalRecord(record_elems, record_span))
+        Ok(ast::Expression::Record(record_elems, Flex::Exact, record_span))
     },
     ProjectedExpr,
     "(" <e: Expression> ")" => e,
@@ -433,9 +434,10 @@ AtomicType: types::Type = {
     "[" <t: Type> "]" => types::Type::List(Box::new(t)),
     <tup: WyeTuple<Type>> => types::Type::Tuple(tup),
     <p: PolytypeVar> => types::Type::Poly(p.name, p.bound),
+    // Structural record
     <r: WyeRecord<SpRecordTypeMember>> =>? {
-        let mut methods = BTreeMap::<String, types::Type>::new();
-        let mut values = BTreeMap::<String, types::Type>::new();
+        let mut methods = HashMap::<String, types::Type>::new();
+        let mut values = HashMap::<String, types::Type>::new();
 
         for mem in r {
             let (name, typ, memberness) = mem.value;
@@ -459,11 +461,12 @@ AtomicType: types::Type = {
             }
         }
 
-        Ok(types::Type::StructRecord { methods, values })
+        Ok(types::Type::Record(Structure { methods, values, flex: Flex::Permissive }))
     },
+    // Nominal record
     <r: NomRecord<SpRecordTypeMember>> =>? {
-        let mut methods = BTreeMap::<String, types::Type>::new();
-        let mut values = BTreeMap::<String, types::Type>::new();
+        let mut methods = HashMap::<String, types::Type>::new();
+        let mut values = HashMap::<String, types::Type>::new();
 
         for mem in r {
             let (name, typ, memberness) = mem.value;
@@ -487,7 +490,7 @@ AtomicType: types::Type = {
             }
         }
 
-        Ok(types::Type::NominalRecord { methods, values })
+        Ok(types::Type::Record(Structure { methods, values, flex: Flex::Exact }))
     },
     "(" <t: Type> ")" => t,
 }

@@ -1,8 +1,8 @@
-use std::collections::BTreeMap;
+use std::collections::{HashMap, HashSet};
 
-mod bound;
 pub mod check;
 mod infer;
+pub(crate) mod structure;
 
 #[cfg(test)]
 mod tests;
@@ -11,7 +11,7 @@ mod tests;
 // a -> b
 // but function expressions are vecs
 // TODO: labeled, omittable func args
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
     // Literal types
     None,
@@ -24,22 +24,15 @@ pub enum Type {
     Poly(String, Option<String>),
     List(Box<Type>),
     Tuple(Vec<Type>),
-    // { method? <id>: <type> }
-    NominalRecord {
-        methods: BTreeMap<String, Type>,
-        values: BTreeMap<String, Type>,
-    },
-    StructRecord {
-        methods: BTreeMap<String, Type>,
-        values: BTreeMap<String, Type>,
-    },
+    // { method? <id>: <type> } or {| method? <id?: type |}
+    Record(structure::Structure),
     // a -> (b -> (...))
     // hold argument type, return type
     // TODO: argument label
     Function(Box<Type>, Box<Type>),
-    // Type variable during inference, and optional Bound, which
-    // can be the name of a signature, or of an anonymous struct.
-    // The argument is the "name" of the variable
+    // Type variable during inference. Also holds the names of signatures
+    // that it satisfies, and a collected structural type which is the intersection
+    // of the signatures that it satisfies.
     Variable(usize, Option<String>),
 }
 

@@ -1,4 +1,5 @@
 use super::*;
+use crate::types::structure::{Flex, Structure};
 use crate::types::Type::*;
 use std::collections::HashMap;
 
@@ -317,20 +318,22 @@ fn test_parse_record_type() {
 
     assert!(
         parser.parse("{a: int}").unwrap()
-            == StructRecord {
+            == Record(Structure {
                 methods: HashMap::new(),
-                values: HashMap::from([("a".to_string(), Int)])
-            }
+                values: HashMap::from([("a".to_string(), Int)]),
+                flex: Flex::Permissive,
+            })
     );
     assert!(
         parser.parse("{a: float, }").unwrap()
-            == StructRecord {
+            == Record(Structure {
                 methods: HashMap::new(),
-                values: HashMap::from([("a".to_string(), Float)])
-            }
+                values: HashMap::from([("a".to_string(), Float)]),
+                flex: Flex::Permissive,
+            })
     );
 
-    let optional_ending_comma_expected = StructRecord {
+    let optional_ending_comma_expected = Record(Structure {
         methods: HashMap::new(),
         values: HashMap::from([
             ("a".to_string(), Int),
@@ -343,7 +346,8 @@ fn test_parse_record_type() {
             ),
             ("c".to_string(), List(Box::new(Int))),
         ]),
-    };
+        flex: Flex::Permissive,
+    });
     assert!(
         parser
             .parse(
@@ -390,24 +394,25 @@ fn test_parse_record_type() {
     |}"
             )
             .unwrap()
-            == NominalRecord {
+            == Record(Structure {
                 methods: HashMap::new(),
                 values: HashMap::from([
                     ("mem1".to_string(), Float),
                     (
                         "mem2".to_string(),
-                        StructRecord {
+                        Record(Structure {
                             methods: HashMap::from([("four".to_string(), Int)]),
                             values: HashMap::from([(
                                 "a".to_string(),
                                 TypeId("Three".to_string(), vec![])
-                            )])
-                        }
+                            )]),
+                            flex: Flex::Permissive
+                        })
                     ),
                     ("mem4".to_string(), List(Box::new(Int))),
                     (
                         "mem3".to_string(),
-                        NominalRecord {
+                        Record(Structure {
                             methods: HashMap::new(),
                             values: HashMap::from([(
                                 "y".to_string(),
@@ -415,16 +420,19 @@ fn test_parse_record_type() {
                                     Int,
                                     Float,
                                     None,
-                                    StructRecord {
+                                    Record(Structure {
                                         methods: HashMap::from([("u".to_string(), Int)]),
                                         values: HashMap::new(),
-                                    }
-                                ])
-                            )])
-                        }
+                                        flex: Flex::Permissive,
+                                    })
+                                ]),
+                            )]),
+                            flex: Flex::Exact,
+                        })
                     )
-                ])
-            }
+                ]),
+                flex: Flex::Exact,
+            })
     );
     assert!(
         parser
@@ -436,7 +444,7 @@ fn test_parse_record_type() {
     |}"
             )
             .unwrap()
-            == NominalRecord {
+            == Record(Structure {
                 methods: HashMap::from([
                     ("a".to_string(), Int),
                     ("b".to_string(), Function(Box::new(Int), Box::new(Int))),
@@ -445,13 +453,15 @@ fn test_parse_record_type() {
                     "u".to_string(),
                     Function(
                         Box::new(Float),
-                        Box::new(StructRecord {
+                        Box::new(Record(Structure {
                             methods: HashMap::new(),
-                            values: HashMap::from([("u".to_string(), String)])
-                        })
+                            values: HashMap::from([("u".to_string(), String)]),
+                            flex: Flex::Permissive,
+                        }))
                     )
-                )])
-            }
+                )]),
+                flex: Flex::Exact,
+            })
     );
 
     assert!(parser.parse("{4: int}").is_err());

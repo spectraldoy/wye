@@ -2,6 +2,7 @@ use super::ast::PolytypeVar;
 use super::ast::Statement::EnumDecl;
 use super::span::UnSpan;
 use super::*;
+use crate::types::structure::{Flex, Structure};
 use crate::types::Type;
 use std::collections::HashMap;
 
@@ -96,14 +97,15 @@ fn test_parse_enum_decl() {
             }],
             variants: vec![
                 ("Leaf".to_string(), None, None),
-                ("Node".to_string(), Some(Type::StructRecord {
+                ("Node".to_string(), Some(Type::Record(Structure {
                     methods: HashMap::new(),
                     values: HashMap::from([
                         ("val".to_string(), Type::Poly("a".to_string(), None)),
                         ("left".to_string(), Type::TypeId("bin_tree".to_string(), vec![Type::Poly("a".to_string(), None)])),
                         ("right".to_string(), Type::TypeId("bin_tree".to_string(), vec![Type::Poly("a".to_string(), None)])),
                     ]),
-                }), None)
+                    flex: Flex::Permissive,
+                })), None)
             ],
             span: None,
         }

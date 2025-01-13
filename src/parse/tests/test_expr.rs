@@ -5,6 +5,7 @@ use super::ast::VarWithValue;
 use super::span::{Span, UnSpan};
 use super::*;
 use crate::test_util::to_of64;
+use crate::types::structure::Flex;
 use lalrpop_util::ParseError;
 use std::collections::HashMap;
 
@@ -149,7 +150,7 @@ fn test_parse_record_expr() {
 
     assert!(
         parse(&parser, "{field: Field.feeld}")
-            == StructRecord(
+            == Record(
                 HashMap::from([(
                     "field".to_string(),
                     (
@@ -161,6 +162,7 @@ fn test_parse_record_expr() {
                         None
                     )
                 )]),
+                Flex::Permissive,
                 None
             )
     );
@@ -173,7 +175,7 @@ fn test_parse_record_expr() {
         cidnt: (1),
         lint: (\"hi\",)
     }"
-        ) == StructRecord(
+        ) == Record(
             HashMap::from([
                 ("bint".to_string(), (IntLiteral(3, None), None)),
                 (
@@ -189,16 +191,18 @@ fn test_parse_record_expr() {
                     )
                 )
             ]),
+            Flex::Permissive,
             None
         )
     );
     assert!(
         parse(&parser, "({one: 2, three: 4})")
-            == StructRecord(
+            == Record(
                 HashMap::from([
                     ("one".to_string(), (IntLiteral(2, None), None)),
                     ("three".to_string(), (IntLiteral(4, None), None))
                 ]),
+                Flex::Permissive,
                 None
             )
     );
@@ -206,11 +210,12 @@ fn test_parse_record_expr() {
     assert!(
         parse(&parser, "({one:2,three:4},)")
             == Tuple(
-                vec![StructRecord(
+                vec![Record(
                     HashMap::from([
                         ("one".to_string(), (IntLiteral(2, None), None)),
                         ("three".to_string(), (IntLiteral(4, None), None))
                     ]),
+                    Flex::Permissive,
                     None
                 )],
                 None
@@ -218,15 +223,17 @@ fn test_parse_record_expr() {
     );
     assert!(
         parse(&parser, "{super: 4,}")
-            == StructRecord(
+            == Record(
                 HashMap::from([("super".to_string(), (IntLiteral(4, None), None))]),
+                Flex::Permissive,
                 None
             )
     );
     assert!(
         parse(&parser, "{|x: 4|}")
-            == NominalRecord(
+            == Record(
                 HashMap::from([("x".to_string(), (IntLiteral(4, None), None))]),
+                Flex::Exact,
                 None
             )
     );
@@ -941,11 +948,12 @@ fn test_parse_let() {
                     rec: false,
                     expr: Box::new(IntLiteral(5, None)),
                 },
-                Some(Box::new(StructRecord(
+                Some(Box::new(Record(
                     HashMap::from([
                         ("a".to_string(), (Identifier("x".to_string(), None), None)),
                         ("b".to_string(), (IntLiteral(8, None), None)),
                     ]),
+                    Flex::Permissive,
                     None,
                 ))),
                 None,
