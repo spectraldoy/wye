@@ -99,7 +99,7 @@ Appendix:
 
 % --- Title ---
 \title{
-\textsc{Wye: A Compiled,, Functional, Object-Oriented Language} \\
+\textsc{Wye: A Compiled, Functional, Object-Oriented Language} \\
 \vspace{2ex}
 \large{\textsc{Version \version}}\\
 \vspace{2ex}
@@ -113,19 +113,19 @@ Appendix:
 
 % --- Abstract --- 
 \begin{abstract}
-One day, I thought to myself, ``I'm going to write a compiler." But, for what?
-This document answers that question.
-
 Wye is a statically-, strongly-, and structurally-typed, functional, object-oriented language,
-heavily inspired by Haskell, Rust, and OCaml. Wye tries to prevent some of the nuisances
-that arise in modern industry-grade languages. Nevertheless, it retains a firm basis in functional
-programming, indeed alluding in its name to the upside-down \texttt{y} of the lambda calculus.
+heavily inspired by Haskell, Rust, and OCaml. Wye recognizes there is a conceptual burden
+imposed the type system in many languages that can inhibit the development of programs.
+In response to these issues, as well to explore the beauty of type theory in both its mathematical and
+practical incarnations, Wye centers around structural object typing and type inference.
+Nevertheless, Wye retains a firm basis in functional programming,
+indeed alluding in its name to the upside-down \texttt{y} of the lambda calculus.
 
 This document compiles the full specification of the Wye language: its syntax, semantics,
 type system, and intermediate representation.
 \end{abstract}
 
-% WYE: only structs can hold state. You cannot define methods on anon records
+% WYE: only struct objects can hold state. You cannot define methods on anon records
 % anon records should not be allowed to change state with methods. If you want
 % to store state, then declare a struct
 
@@ -135,37 +135,40 @@ type system, and intermediate representation.
 % overloaded. The :: operator could be more useful to for things other than list construction
 
 % TODO: also change the syntax for implementing an interface
-% impl 'Ordered X
+% impl 'Ordered X | impl Ordered'X
 % There should also be a builtin Indexable interface - lists should be indexable
+% or GetItem or something like htat
 
 % <: for subtype syntax
+
+% for the minimal release, we can get rid of methods on records, and consider having
+% nominality of record matching as per-argument, or with {< } and {> } constructs.
+% This makes structural subtyping much more expressive
+% Also methods and values may need to be stored in a specific order so that their
+% compilation is deterministic. However, they will never be deleted, with the current
+% syntax we have in Wye. Maybe an ordered map can be optimized with this info.
 
 
 % --- Body ---
 \section{Introduction}
-A programming language should enable the programmer, not hinder them. Overly permissive
-language constructs such as inheritance and duck typing can make programs behave in
-unexpected ways; clunky syntax, such as fully-qualified names, simply distract from and obstruct the
-design process, preventing programmers from focusing on their work. Wye strives to avoid these
-encumbrances, to be simple yet still useful.
+Wye is a statically-, strongly-, and structurally-typed functional, object-oriented language,
+heavily inspired by Haskell, Rust, and OCaml. In recognition that the type system can have
+a drastic impact on the tendency of programmers to write maintainable or unintelligible programs,
+Wye invests a great deal in building a safe, expressive, yet straightforward type system.
 
-To this end, Wye features straightforward syntax, emphasizing functional over
-object-oriented programming. Wye invests heavily in its type system, as powerful and expressive
-types not only accelerate  the development of correct programs, but also showcase the true
-beauty of type theory. Wye extends the Hindley-Milner type system (which
-underlies languages like OCaml and Haskell), with abstract data types, nominal and structural
-records, and bounded interfaces, all while retaining perfect type inference.
+A specific point of interest is in facilitating design work through the language. Design work is inherently
+unaware of its final form; however, explicitly-typed languages like C++ require that you know
+the types of your entities before you've completely fleshed out your thoughts. On the other hand,
+dynamically-typed languages like JavaScript and Python can be especially convenient during the
+design phase, affording an open space to play; but, they readily become unintelligible,
+unmaintainable, messy, and sorts of other undesirable adjectives.
 
-Wye does not innovate anything. It is not intended to push the envelope
-or to be at the bleeding edge of programming language research. Even though it originates
-from deep study of programming language and type theory, Wye emphasizes usability over
-theoretical significance.
-It does not include esoteric types, nor language constructs that are
-sparingly useful, and is kept in check by real-world programming use-cases.
-
-Most importantly, Wye was designed to be compiled. Not to be compiled \textit{efficiently} --
-just to be compiled. This project is considered incomplete, or proceeding in the wrong direction,
-as long as Wye has no working compiler.
+Wye seeks to strike a balance between these two extremes. How can a language be designed so
+that it both supports design work, while also encouraging maintainability and intelligibility? I currently
+do not know the answer. But a hypothesis is examined in this work -- extend basic functional programming
+(which is generally very academic, but which has perfect type inference) with structural object types
+and interface programming with bounds (features present in most industry-grade object-oriented
+languages).
 
 \section{Syntax}
 A Wye program is stored in a \tt{.wye} file and is, in its most abstract
@@ -265,7 +268,7 @@ $TypeDeclaration$ system of Wye is used to define it in the Wye prelude.
 
 One-line Wye comments begin with \tt{\%} and mark all following text until
 the next carriage return or newline as whitespace. Multiline Wye comments begin
-with \tt{\[\%} and end with \tt{\%\]}.
+with \tt{[\%} and end with \tt{\%]}.
 
 In Wye, the application of functions is always written in postfix notation,
 except for certain reserved binary operators (such as \tt{+} and

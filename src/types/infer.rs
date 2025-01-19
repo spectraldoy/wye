@@ -1,3 +1,4 @@
+use super::structure::Structure;
 /// Utility functions for type inference
 use super::Type;
 use std::collections::HashMap;
@@ -89,3 +90,42 @@ pub fn unify(typ1: &Type, typ2: &Type, cur_subst: &mut HashMap<usize, Type>) -> 
 
     Ok(())
 }
+
+fn unify_structures(struct1: &Structure, struct2: &Structure) {
+    match typ {
+        Type::Record(Structure {
+            methods: typ_methods,
+            values: typ_values,
+            flex,
+        }) => {
+            let mut cur_subst = HashMap::new();
+            // self's methods amd values should be a subset of typ's
+            for (self_attr, typ_attr) in [(&self.methods, typ_methods), (&self.values, typ_values)]
+            {
+                for (field_name, field_type) in self_attr {
+                    if !typ_attr.contains_key(field_name) {
+                        return false;
+                    }
+
+                    let unif_res = infer::unify(
+                        field_type,
+                        self_attr.get(field_name).unwrap(),
+                        &mut cur_subst,
+                    );
+                    if unif_res.is_err() {
+                        return false;
+                    }
+                }
+
+                if self.flex == Flex::Exact {}
+            }
+
+            true
+        }
+        _ => false,
+    }
+}
+
+// unify structural types
+// when do we need the list of signature names satisfied by a variable?
+// I can just get the structure from the context and check that a variable satisfies the structure.

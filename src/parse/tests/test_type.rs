@@ -92,6 +92,7 @@ fn test_parse_polymorphic_type() {
 fn test_parse_type_identifier() {
     let parser = grammar::TypeParser::new();
 
+    assert!(parser.parse("self").unwrap() == Selftype);
     assert!(parser.parse("X").unwrap() == TypeId("X".to_string(), vec![]));
     assert!(
         parser.parse("'a Y").unwrap()

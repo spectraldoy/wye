@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 /// Flexibility of the structural type, for reusing functionality between
 /// nominal and structural records
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Flex {
     Permissive,
     CollectExact,
@@ -14,7 +14,7 @@ pub enum Flex {
 
 // TODO: use Structure everywhere, and unify nominal and structure records
 /// The basic definition of a structural type
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Structure {
     // TODO: polytype variables
     pub methods: HashMap<String, Type>,
@@ -28,6 +28,25 @@ impl Structure {
             methods,
             values,
             flex,
+        }
+    }
+
+    pub fn from_values<I>(values: I) -> Self
+    where
+        I: IntoIterator<Item = (String, Type)>,
+    {
+        Self {
+            methods: HashMap::new(),
+            values: HashMap::from(values),
+            flex,
+        }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            methods: HashMap::new(),
+            values: HashMap::new(),
+            flex: Flex::Permissive,
         }
     }
 

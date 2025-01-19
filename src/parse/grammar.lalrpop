@@ -430,6 +430,7 @@ AtomicType: types::Type = {
     "int" => types::Type::Int,
     "float" => types::Type::Float,
     "string" => types::Type::String,
+    "self" => types::Type::Selftype,
     <tid: Identifier> => types::Type::TypeId(tid, vec![]),
     "[" <t: Type> "]" => types::Type::List(Box::new(t)),
     <tup: WyeTuple<Type>> => types::Type::Tuple(tup),

@@ -1,11 +1,12 @@
 //! Type checking
 use super::infer;
+use super::structure::Structure;
 use super::{collect_functype, Type};
 use crate::parse::ast;
 use crate::parse::ast::{BinaryOp, Expression, Program, Statement};
 use crate::parse::span;
 use crate::parse::span::GetSpan;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 // TODO: are constraints about type schemes? Perhaps that is
 // Something that will only be dealt with once we have working
@@ -13,7 +14,7 @@ use std::collections::HashMap;
 // Note: Wye polymorphic types assert true, total polymorphism
 // and cannot be specialized at the top level, unlike type variables.
 
-// Bounds can conflict. We need a way to resolve bounds.
+// TODO: Bounds can conflict. We need a way to resolve bounds.
 pub(super) struct TypeContext {
     /// Next unused number for generating a new type variable or bound name.
     next_available_num: usize,
@@ -23,47 +24,38 @@ pub(super) struct TypeContext {
     quantified_typevars: HashMap<String, Option<String>>,
     /// Collect errors here to be all reported together after type checking
     pub type_errors: HashMap<span::Span, String>,
+    /// Map from signature name to the structural type it induces
+    signatures: HashMap<String, Structure>,
+    /// Map from type to the set of signatures it satisfies
+    signas_satisfied_by: BTreeMap<Type, HashSet<String>>,
 }
 
 impl TypeContext {
     pub fn new() -> Self {
-        // let set_bounds = HashMap::from([
-        //     (
-        //         "Add".to_string(),
-        //         SetBound::from([
-        //             Type::Int,
-        //             Type::Float,
-        //             // TODO: Type::List(Box::new(Type::Poly(self.genname("π"), None))),
-        //             Type::String,
-        //         ]),
-        //     ),
-        //     ("Sub".to_string(), SetBound::from([Type::Int, Type::Float])),
-        //     ("Mult".to_string(), SetBound::from([Type::Int, Type::Float])),
-        //     ("Div".to_string(), SetBound::from([Type::Float])),
-        //     ("FloorDiv".to_string(), SetBound::from([Type::Float])),
-        //     (
-        //         "Lt".to_string(),
-        //         SetBound::from([Type::Int, Type::Float, Type::String]),
-        //     ),
-        //     (
-        //         "Leq".to_string(),
-        //         SetBound::from([Type::Int, Type::Float, Type::String]),
-        //     ),
-        //     (
-        //         "Gt".to_string(),
-        //         SetBound::from([Type::Int, Type::Float, Type::String]),
-        //     ),
-        //     (
-        //         "Geq".to_string(),
-        //         SetBound::from([Type::Int, Type::Float, Type::String]),
-        //     ),
-        // ]);
+        // TODO: rest of the builtin signatures
+        let builtin_signatures = HashMap::from([(
+            "Add".to_string(),
+            Structure::from_values([(
+                "plus".to_string(),
+                Type::Function(Box::new(Type::Selftype), Box::new(Type::Selftype)),
+            )]),
+        )]);
+        let builtin_signas_satisfied_by = BTreeMap::from([
+            Type::Int,
+            HashSet::from(["Add".to_string()]),
+            Type::Float,
+            HashSet::from(["Add".to_string()]),
+            Type::String,
+            HashSet::from(["Add".to_string()]),
+        ]);
 
         Self {
             next_available_num: 0,
             typings: HashMap::new(),
             quantified_typevars: HashMap::new(),
             type_errors: HashMap::new(),
+            signatures: builtin_signatures,
+            signas_satisfied_by: builtin_signas_satisfied_by,
         }
     }
 
@@ -85,6 +77,11 @@ impl TypeContext {
         for typ in self.typings.values_mut() {
             *typ = infer::apply_subst_type(subst, &typ);
         }
+    }
+
+    /// Returns the Structural type induced by a signature, if one exists
+    pub fn get_signature(&self, signame: &String) -> Option<Structure> {
+        self.signatures.get(signame)
     }
 }
 
@@ -165,7 +162,7 @@ fn type_check_list(
         // This would happen in let statements where these type variables
         // Are elevated to polytypes with the name pi{x} or something
         return Ok((
-            Type::List(Box::new(Type::Variable(new_typevar, None))),
+            Type::List(Box::new(Type::Variable(new_typevar, Structure::empty()))),
             HashMap::new(),
         ));
     }
@@ -211,11 +208,10 @@ fn type_check_binary_op(
     let newvar = ctx.genvar();
     let new_type = match bop {
         BinaryOp::Add => {
-            let argtype = Type::Variable(newvar, Some("Plus".to_string()));
-            Type::Function(
-                Box::new(argtype.clone()),
-                Box::new(Type::Function(Box::new(argtype.clone()), Box::new(argtype))),
-            )
+            let signame = "Add".to_string();
+            let add_structure = ctx.get_signature(&signame).unwrap();
+            // TODO what do I do about self types? Unify them later?
+            Type::Variable(newvar, add_structure)
         }
         _ => todo!(),
     };
@@ -325,12 +321,12 @@ fn type_check_let(
     let mut arg_types = vec![];
     for arg in args {
         // TODO: check for duplicate argument names
-        let new_type = Type::Variable(ctx.genvar(), None);
+        let new_type = Type::Variable(ctx.genvar(), Structure::empty());
         arg_types.push(new_type.clone());
         ctx.typings.insert(arg.0.clone(), new_type);
     }
     // Also create a type variable for the output type of the function
-    let output_type = Type::Variable(ctx.genvar(), None);
+    let output_type = Type::Variable(ctx.genvar(), Structure::empty());
     arg_types.push(output_type.clone());
 
     // If recursion is allowed, then the current function should be added to
