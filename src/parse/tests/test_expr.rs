@@ -7,7 +7,7 @@ use super::*;
 use crate::test_util::to_of64;
 use crate::types::structure::Flex;
 use lalrpop_util::ParseError;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 fn parse(parser: &grammar::StatementParser, inp: &'static str) -> ast::Expression {
     let out = parser.parse(inp).unwrap().unspanned();
@@ -151,7 +151,7 @@ fn test_parse_record_expr() {
     assert!(
         parse(&parser, "{field: Field.feeld}")
             == Record(
-                HashMap::from([(
+                BTreeMap::from([(
                     "field".to_string(),
                     (
                         Projection(
@@ -176,7 +176,7 @@ fn test_parse_record_expr() {
         lint: (\"hi\",)
     }"
         ) == Record(
-            HashMap::from([
+            BTreeMap::from([
                 ("bint".to_string(), (IntLiteral(3, None), None)),
                 (
                     "jint".to_string(),
@@ -198,7 +198,7 @@ fn test_parse_record_expr() {
     assert!(
         parse(&parser, "({one: 2, three: 4})")
             == Record(
-                HashMap::from([
+                BTreeMap::from([
                     ("one".to_string(), (IntLiteral(2, None), None)),
                     ("three".to_string(), (IntLiteral(4, None), None))
                 ]),
@@ -211,7 +211,7 @@ fn test_parse_record_expr() {
         parse(&parser, "({one:2,three:4},)")
             == Tuple(
                 vec![Record(
-                    HashMap::from([
+                    BTreeMap::from([
                         ("one".to_string(), (IntLiteral(2, None), None)),
                         ("three".to_string(), (IntLiteral(4, None), None))
                     ]),
@@ -224,7 +224,7 @@ fn test_parse_record_expr() {
     assert!(
         parse(&parser, "{super: 4,}")
             == Record(
-                HashMap::from([("super".to_string(), (IntLiteral(4, None), None))]),
+                BTreeMap::from([("super".to_string(), (IntLiteral(4, None), None))]),
                 Flex::Permissive,
                 None
             )
@@ -232,7 +232,7 @@ fn test_parse_record_expr() {
     assert!(
         parse(&parser, "{|x: 4|}")
             == Record(
-                HashMap::from([("x".to_string(), (IntLiteral(4, None), None))]),
+                BTreeMap::from([("x".to_string(), (IntLiteral(4, None), None))]),
                 Flex::Exact,
                 None
             )
@@ -263,8 +263,15 @@ fn test_parse_identifier() {
     assert!(parse(&parser, "___01") == Identifier("___01".to_string(), None));
     assert!(parse(&parser, "___") == Identifier("___".to_string(), None));
     assert!(parse(&parser, "(<)") == BinaryOp(ast::BinaryOp::Lt, None));
+
     assert!(parse(&parser, "(+)") == BinaryOp(ast::BinaryOp::Add, None));
-    assert!(parse(&parser, "(//)") == BinaryOp(ast::BinaryOp::FloorDiv, None));
+    assert!(parse(&parser, "(+.)") == BinaryOp(ast::BinaryOp::FlAdd, None));
+    assert!(parse(&parser, "(-)") == BinaryOp(ast::BinaryOp::Sub, None));
+    assert!(parse(&parser, "(-.)") == BinaryOp(ast::BinaryOp::FlSub, None));
+    assert!(parse(&parser, "(*)") == BinaryOp(ast::BinaryOp::Mult, None));
+    assert!(parse(&parser, "(*.)") == BinaryOp(ast::BinaryOp::FlMult, None));
+    assert!(parse(&parser, "(/)") == BinaryOp(ast::BinaryOp::FloorDiv, None));
+    assert!(parse(&parser, "(/.)") == BinaryOp(ast::BinaryOp::Div, None));
 
     assert!(parser.parse("string").is_err());
     assert!(parser.parse("with").is_err());
@@ -273,6 +280,7 @@ fn test_parse_identifier() {
     assert!(parser.parse("(-").is_err());
     assert!(parser.parse("a*").is_err());
     assert!(parser.parse("//)").is_err());
+    assert!(parser.parse("/.)").is_err());
     assert!(parser.parse("yel⏰o").is_err());
     assert!(parser.parse("31232abcd").is_err());
     assert!(parser.parse("Hel)lo").is_err());
@@ -472,7 +480,7 @@ fn test_parse_enum_variant() {
             )
     );
 
-    assert!(parser.parse("xs*.bruh").is_err());
+    assert!(parser.parse("xs*+bruh").is_err());
     assert!(parser.parse("x.8").is_err());
     assert!(parser.parse("Yu.p with [8, 78").is_err());
     assert!(parser.parse("Option.Some int").is_err());
@@ -707,7 +715,7 @@ fn test_parse_infix_binary_op() {
                         None,
                     ),
                     FuncApplication(
-                        Box::new(BinaryOp(ast::BinaryOp::Div, None)),
+                        Box::new(BinaryOp(ast::BinaryOp::FloorDiv, None)),
                         vec![IntLiteral(2, None), IntLiteral(4, None),],
                         None
                     )
@@ -790,7 +798,7 @@ fn test_parse_infix_binary_op() {
 
     assert!(parse(&parser, "(<=)") == BinaryOp(ast::BinaryOp::Leq, None));
     assert!(
-        parse(&parser, "(//) 4")
+        parse(&parser, "(/) 4")
             == FuncApplication(
                 Box::new(BinaryOp(ast::BinaryOp::FloorDiv, None)),
                 vec![IntLiteral(4, None)],
@@ -949,7 +957,7 @@ fn test_parse_let() {
                     expr: Box::new(IntLiteral(5, None)),
                 },
                 Some(Box::new(Record(
-                    HashMap::from([
+                    BTreeMap::from([
                         ("a".to_string(), (Identifier("x".to_string(), None), None)),
                         ("b".to_string(), (IntLiteral(8, None), None)),
                     ]),

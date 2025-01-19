@@ -4,7 +4,7 @@ use super::span::UnSpan;
 use super::*;
 use crate::types::structure::{Flex, Structure};
 use crate::types::Type;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 fn parse_enum_decl(parser: &grammar::StatementParser, inp: &'static str) -> ast::Statement {
     let out = parser.parse(inp).unwrap().unspanned();
@@ -98,8 +98,8 @@ fn test_parse_enum_decl() {
             variants: vec![
                 ("Leaf".to_string(), None, None),
                 ("Node".to_string(), Some(Type::Record(Structure {
-                    methods: HashMap::new(),
-                    values: HashMap::from([
+                    methods: BTreeMap::new(),
+                    values: BTreeMap::from([
                         ("val".to_string(), Type::Poly("a".to_string(), None)),
                         ("left".to_string(), Type::TypeId("bin_tree".to_string(), vec![Type::Poly("a".to_string(), None)])),
                         ("right".to_string(), Type::TypeId("bin_tree".to_string(), vec![Type::Poly("a".to_string(), None)])),

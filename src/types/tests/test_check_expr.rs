@@ -5,7 +5,6 @@ use crate::test_util::to_of64;
 // override the imported Type::None
 use crate::parse::span::{GetSpan, Span};
 use check::type_check_expr;
-use std::collections::HashMap;
 use Option::None;
 
 #[cfg(test)]
@@ -66,7 +65,7 @@ fn test_check_list() {
     );
     assert_eq!(
         test_check_expr(Expression::List(vec![], None)).unwrap(),
-        List(Box::new(Variable(0, None)))
+        List(Box::new(Variable(0)))
     );
 
     assert!(test_check_expr(Expression::List(

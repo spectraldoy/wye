@@ -1,5 +1,3 @@
-use std::collections::{HashMap, HashSet};
-
 pub mod check;
 mod infer;
 pub(crate) mod structure;
@@ -18,8 +16,6 @@ pub enum Type {
     Int,
     Float,
     String,
-    // Denotes selftype (I hope this doesn't bite me later)
-    Selftype,
     // (name, type-params). Could be enum or struct, this is not known at parse-time
     TypeId(String, Vec<Type>),
     List(Box<Type>),
@@ -30,9 +26,8 @@ pub enum Type {
     // hold argument type, return type
     // TODO: argument label
     Function(Box<Type>, Box<Type>),
-    // Type variable during inference. Potentially holds a set of types
-    // it can be.
-    Variable(usize, structure::Structure),
+    // Type variable during inference.
+    Variable(usize),
     // Identifier for polymorphic type and optional interface bound.
     // Maybe this needs to be a structural bound as well?
     Poly(String, Option<String>),

@@ -1,4 +1,4 @@
-use super::structure::Structure;
+use super::structure::{Flex, Structure};
 /// Utility functions for type inference
 use super::Type;
 use std::collections::HashMap;
@@ -9,7 +9,7 @@ pub fn apply_subst_type(subst: &HashMap<usize, Type>, typ: &Type) -> Type {
         // Unification with bounds is slightly harder. Always need to pick
         // The more specific bound. What if there are multiple bounds?
         // Then variables should have a set of bounds, right?
-        Type::Variable(num, _) => {
+        Type::Variable(num) => {
             if subst.contains_key(num) {
                 subst.get(num).unwrap().clone()
             } else {
@@ -76,10 +76,10 @@ pub fn unify(typ1: &Type, typ2: &Type, cur_subst: &mut HashMap<usize, Type>) -> 
             unify(f1_arg, f2_arg, cur_subst)?;
             unify(f1_ret, f2_ret, cur_subst)?
         }
-        (Type::Variable(num1, _), Type::Variable(num2, _)) => {
-            cur_subst.insert(*num1, Type::Variable(*num2, None));
+        (Type::Variable(num1), Type::Variable(num2)) => {
+            cur_subst.insert(*num1, Type::Variable(*num2));
         }
-        (Type::Variable(num, _), t) | (t, Type::Variable(num, _)) => {
+        (Type::Variable(num), t) | (t, Type::Variable(num)) => {
             cur_subst.insert(*num, t.clone());
         }
         // Actually there are still TODOs here
@@ -91,39 +91,9 @@ pub fn unify(typ1: &Type, typ2: &Type, cur_subst: &mut HashMap<usize, Type>) -> 
     Ok(())
 }
 
-fn unify_structures(struct1: &Structure, struct2: &Structure) {
-    match typ {
-        Type::Record(Structure {
-            methods: typ_methods,
-            values: typ_values,
-            flex,
-        }) => {
-            let mut cur_subst = HashMap::new();
-            // self's methods amd values should be a subset of typ's
-            for (self_attr, typ_attr) in [(&self.methods, typ_methods), (&self.values, typ_values)]
-            {
-                for (field_name, field_type) in self_attr {
-                    if !typ_attr.contains_key(field_name) {
-                        return false;
-                    }
-
-                    let unif_res = infer::unify(
-                        field_type,
-                        self_attr.get(field_name).unwrap(),
-                        &mut cur_subst,
-                    );
-                    if unif_res.is_err() {
-                        return false;
-                    }
-                }
-
-                if self.flex == Flex::Exact {}
-            }
-
-            true
-        }
-        _ => false,
-    }
+// TODO: this should return a result containing the unified structure, or error
+fn unify_structures(struct1: &Structure, struct2: &Structure) -> Result<Structure, String> {
+    todo!()
 }
 
 // unify structural types

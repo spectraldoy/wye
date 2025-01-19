@@ -1,7 +1,7 @@
 use super::*;
 use crate::types::structure::{Flex, Structure};
 use crate::types::Type::*;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 #[test]
 fn test_parse_literal() {
@@ -92,7 +92,6 @@ fn test_parse_polymorphic_type() {
 fn test_parse_type_identifier() {
     let parser = grammar::TypeParser::new();
 
-    assert!(parser.parse("self").unwrap() == Selftype);
     assert!(parser.parse("X").unwrap() == TypeId("X".to_string(), vec![]));
     assert!(
         parser.parse("'a Y").unwrap()
@@ -320,23 +319,23 @@ fn test_parse_record_type() {
     assert!(
         parser.parse("{a: int}").unwrap()
             == Record(Structure {
-                methods: HashMap::new(),
-                values: HashMap::from([("a".to_string(), Int)]),
+                methods: BTreeMap::new(),
+                values: BTreeMap::from([("a".to_string(), Int)]),
                 flex: Flex::Permissive,
             })
     );
     assert!(
         parser.parse("{a: float, }").unwrap()
             == Record(Structure {
-                methods: HashMap::new(),
-                values: HashMap::from([("a".to_string(), Float)]),
+                methods: BTreeMap::new(),
+                values: BTreeMap::from([("a".to_string(), Float)]),
                 flex: Flex::Permissive,
             })
     );
 
     let optional_ending_comma_expected = Record(Structure {
-        methods: HashMap::new(),
-        values: HashMap::from([
+        methods: BTreeMap::new(),
+        values: BTreeMap::from([
             ("a".to_string(), Int),
             (
                 "b".to_string(),
@@ -396,14 +395,14 @@ fn test_parse_record_type() {
             )
             .unwrap()
             == Record(Structure {
-                methods: HashMap::new(),
-                values: HashMap::from([
+                methods: BTreeMap::new(),
+                values: BTreeMap::from([
                     ("mem1".to_string(), Float),
                     (
                         "mem2".to_string(),
                         Record(Structure {
-                            methods: HashMap::from([("four".to_string(), Int)]),
-                            values: HashMap::from([(
+                            methods: BTreeMap::from([("four".to_string(), Int)]),
+                            values: BTreeMap::from([(
                                 "a".to_string(),
                                 TypeId("Three".to_string(), vec![])
                             )]),
@@ -414,16 +413,16 @@ fn test_parse_record_type() {
                     (
                         "mem3".to_string(),
                         Record(Structure {
-                            methods: HashMap::new(),
-                            values: HashMap::from([(
+                            methods: BTreeMap::new(),
+                            values: BTreeMap::from([(
                                 "y".to_string(),
                                 Tuple(vec![
                                     Int,
                                     Float,
                                     None,
                                     Record(Structure {
-                                        methods: HashMap::from([("u".to_string(), Int)]),
-                                        values: HashMap::new(),
+                                        methods: BTreeMap::from([("u".to_string(), Int)]),
+                                        values: BTreeMap::new(),
                                         flex: Flex::Permissive,
                                     })
                                 ]),
@@ -446,17 +445,17 @@ fn test_parse_record_type() {
             )
             .unwrap()
             == Record(Structure {
-                methods: HashMap::from([
+                methods: BTreeMap::from([
                     ("a".to_string(), Int),
                     ("b".to_string(), Function(Box::new(Int), Box::new(Int))),
                 ]),
-                values: HashMap::from([(
+                values: BTreeMap::from([(
                     "u".to_string(),
                     Function(
                         Box::new(Float),
                         Box::new(Record(Structure {
-                            methods: HashMap::new(),
-                            values: HashMap::from([("u".to_string(), String)]),
+                            methods: BTreeMap::new(),
+                            values: BTreeMap::from([("u".to_string(), String)]),
                             flex: Flex::Permissive,
                         }))
                     )

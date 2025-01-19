@@ -5,7 +5,7 @@ use super::util;
 use super::span::{Spanned, Span};
 use ordered_float::OrderedFloat;
 use lalrpop_util::ParseError;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 grammar;
 
@@ -65,17 +65,24 @@ FloatLiteral: OrderedFloat<f64> =
 
 /// Builtin binary operators.
 BinaryOp: ast::BinaryOp = {
+    // Integer operators
     "+"  => ast::BinaryOp::Add,
     "-"  => ast::BinaryOp::Sub,
     "*"  => ast::BinaryOp::Mult,
-    "/"  => ast::BinaryOp::Div,
-    "//" => ast::BinaryOp::FloorDiv,
+    "/" => ast::BinaryOp::FloorDiv,
+    // Float operators
+    "+."  => ast::BinaryOp::FlAdd,
+    "-."  => ast::BinaryOp::FlSub,
+    "*."  => ast::BinaryOp::FlMult,
+    "/."  => ast::BinaryOp::Div,
+    // Comparators
     "<"  => ast::BinaryOp::Lt,
     ">"  => ast::BinaryOp::Gt,
     "<=" => ast::BinaryOp::Leq,
     ">=" => ast::BinaryOp::Geq,
     "==" => ast::BinaryOp::Eq,
     "!=" => ast::BinaryOp::Neq,
+    // List construction
     "::" => ast::BinaryOp::Cons,
 }
 
@@ -116,7 +123,7 @@ AtomicExpr: ast::Expression = {
         let num_entries = r.value.len();
         let record_elems = r.value.into_iter().map(|spanned_string_expr|
             (spanned_string_expr.value.0.clone(), (spanned_string_expr.value.1.clone(), Some(spanned_string_expr.span.clone())))
-        ).collect::<HashMap<String, _>>();
+        ).collect::<BTreeMap<String, _>>();
         if record_elems.len() != num_entries {
             return Err(ParseError::User {
                 error: ("Duplicate field in struct record expression", record_span.unwrap())
@@ -130,7 +137,7 @@ AtomicExpr: ast::Expression = {
         let num_entries = r.value.len();
         let record_elems = r.value.into_iter().map(|spanned_string_expr|
             (spanned_string_expr.value.0.clone(), (spanned_string_expr.value.1.clone(), Some(spanned_string_expr.span.clone())))
-        ).collect::<HashMap<String, _>>();
+        ).collect::<BTreeMap<String, _>>();
         if record_elems.len() != num_entries {
             return Err(ParseError::User {
                 error: ("Duplicate field in nominal record expression", record_span.unwrap())
@@ -155,13 +162,18 @@ InfixExpr: ast::Expression = {
         vec![op1, op2],
         Some(Span { start, end }),
     ),
-    <start: @L> <op1: InfixExpr> <s: Sp<"/">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
-        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Div, Some(s.span))),
+    <start: @L> <op1: InfixExpr> <s: Sp<"*.">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::FlMult, Some(s.span))),
         vec![op1, op2],
         Some(Span { start, end }),
     ),
-    <start: @L> <op1: InfixExpr> <s: Sp<"//">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
+    <start: @L> <op1: InfixExpr> <s: Sp<"/">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
         Box::new(ast::Expression::BinaryOp(ast::BinaryOp::FloorDiv, Some(s.span))),
+        vec![op1, op2],
+        Some(Span { start, end }),
+    ),
+    <start: @L> <op1: InfixExpr> <s: Sp<"/.">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Div, Some(s.span))),
         vec![op1, op2],
         Some(Span { start, end }),
     ),
@@ -174,6 +186,16 @@ InfixExpr: ast::Expression = {
     ),
     <start: @L> <op1: InfixExpr> <s: Sp<"-">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
         Box::new(ast::Expression::BinaryOp(ast::BinaryOp::Sub, Some(s.span))),
+        vec![op1, op2],
+        Some(Span { start, end }),
+    ),
+    <start: @L> <op1: InfixExpr> <s: Sp<"+.">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::FlAdd, Some(s.span))),
+        vec![op1, op2],
+        Some(Span { start, end }),
+    ),
+    <start: @L> <op1: InfixExpr> <s: Sp<"-.">> <op2: InfixExpr> <end: @R> => ast::Expression::FuncApplication(
+        Box::new(ast::Expression::BinaryOp(ast::BinaryOp::FlSub, Some(s.span))),
         vec![op1, op2],
         Some(Span { start, end }),
     ),
@@ -430,15 +452,14 @@ AtomicType: types::Type = {
     "int" => types::Type::Int,
     "float" => types::Type::Float,
     "string" => types::Type::String,
-    "self" => types::Type::Selftype,
     <tid: Identifier> => types::Type::TypeId(tid, vec![]),
     "[" <t: Type> "]" => types::Type::List(Box::new(t)),
     <tup: WyeTuple<Type>> => types::Type::Tuple(tup),
     <p: PolytypeVar> => types::Type::Poly(p.name, p.bound),
     // Structural record
     <r: WyeRecord<SpRecordTypeMember>> =>? {
-        let mut methods = HashMap::<String, types::Type>::new();
-        let mut values = HashMap::<String, types::Type>::new();
+        let mut methods = BTreeMap::<String, types::Type>::new();
+        let mut values = BTreeMap::<String, types::Type>::new();
 
         for mem in r {
             let (name, typ, memberness) = mem.value;
@@ -466,8 +487,8 @@ AtomicType: types::Type = {
     },
     // Nominal record
     <r: NomRecord<SpRecordTypeMember>> =>? {
-        let mut methods = HashMap::<String, types::Type>::new();
-        let mut values = HashMap::<String, types::Type>::new();
+        let mut methods = BTreeMap::<String, types::Type>::new();
+        let mut values = BTreeMap::<String, types::Type>::new();
 
         for mem in r {
             let (name, typ, memberness) = mem.value;

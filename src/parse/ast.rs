@@ -3,7 +3,7 @@ use super::util::OptionBox;
 use crate::types::structure::Flex;
 use crate::types::Type;
 use ordered_float::OrderedFloat;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// This file describes the Abstract Syntax Tree for Wye. A Wye program is, at
 /// base, a sequence of Wye statements. At present, there are only 5 allowed Wye
@@ -76,7 +76,7 @@ pub enum Expression {
     Tuple(Vec<Expression>, OptionSpan),
     // { <id>: value, ..., <id>: value }
     // Record expressions only have fields, no methods
-    Record(HashMap<String, (Expression, OptionSpan)>, Flex, OptionSpan),
+    Record(BTreeMap<String, (Expression, OptionSpan)>, Flex, OptionSpan),
     // Reference a variable or function from the environment.
     Identifier(String, OptionSpan),
     BinaryOp(BinaryOp, OptionSpan),
@@ -131,16 +131,22 @@ pub enum Expression {
 pub enum BinaryOp {
     /// Arithmetic operations.
     Add,
+    FlAdd,
     Sub,
+    FlSub,
     Mult,
+    FlMult,
     Div,
     FloorDiv,
 
-    /// Comparators.
+    /// Ordering Comparators
+    /// TODO: these should be implemented using a Comparable signature.
     Lt,
     Gt,
     Leq,
     Geq,
+
+    /// Equality Comparators
     Eq,
     Neq,
 
