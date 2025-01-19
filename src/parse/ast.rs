@@ -136,8 +136,8 @@ pub enum BinaryOp {
     FlSub,
     Mult,
     FlMult,
-    Div,
     FloorDiv,
+    Div,
 
     /// Ordering Comparators
     /// TODO: these should be implemented using a Comparable signature.
@@ -147,6 +147,7 @@ pub enum BinaryOp {
     Geq,
 
     /// Equality Comparators
+    /// TODO: identity equality
     Eq,
     Neq,
 

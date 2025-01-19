@@ -9,7 +9,7 @@ mod tests;
 // a -> b
 // but function expressions are vecs
 // TODO: labeled, omittable func args
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Type {
     // Literal types
     None,
@@ -31,6 +31,8 @@ pub enum Type {
     // Identifier for polymorphic type and optional interface bound.
     // Maybe this needs to be a structural bound as well?
     Poly(String, Option<String>),
+    // Type of module that can be opened to unwrap a namespace
+    Module,
 }
 
 // None, Int, Float, String, enums, structs, lists, functions, these

@@ -92,4 +92,38 @@ fn test_check_func_application() {
         .unwrap(),
         Int
     );
+
+    assert_eq!(
+        test_check_expr(Expression::FuncApplication(
+            Box::new(Expression::BinaryOp(BinaryOp::FlSub, None)),
+            vec![
+                Expression::FloatLiteral(to_of64(9.5), None),
+                Expression::FloatLiteral(to_of64(25.2), None),
+            ],
+            None,
+        ))
+        .unwrap(),
+        Float
+    );
+
+    assert_eq!(
+        test_check_expr(Expression::BinaryOp(BinaryOp::Eq, None)).unwrap(),
+        Type::Function(
+            Box::new(Type::Variable(0)),
+            Box::new(Type::Function(
+                Box::new(Type::Variable(0)),
+                Box::new(Type::TypeId("bool".to_string(), vec![])),
+            ))
+        )
+    );
+
+    assert!(test_check_expr(Expression::FuncApplication(
+        Box::new(Expression::BinaryOp(BinaryOp::Add, None)),
+        vec![
+            Expression::IntLiteral(4, None),
+            Expression::FloatLiteral(to_of64(5.0), None),
+        ],
+        None,
+    ))
+    .is_err());
 }

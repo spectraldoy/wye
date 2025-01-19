@@ -5,7 +5,7 @@ use crate::parse::ast;
 use crate::parse::ast::{BinaryOp, Expression, Program, Statement};
 use crate::parse::span;
 use crate::parse::span::GetSpan;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // TODO: are constraints about type schemes? Perhaps that is
 // Something that will only be dealt with once we have working
@@ -24,16 +24,30 @@ pub(super) struct TypeContext {
     /// Collect errors here to be all reported together after type checking
     /// This can be a vec of String by the way
     pub type_errors: HashMap<span::Span, String>,
+    /// Map from enumeration name to its variants and fields
+    enumerations: HashMap<String, HashSet<(String, Option<Type>)>>,
+    /// Map from variant name to enumeration name and fieldtype
+    enum_variant_types: HashMap<String, (String, Option<Type>)>,
 }
 
 impl TypeContext {
     pub fn new() -> Self {
-        Self {
+        let mut out = Self {
             next_available_num: 0,
             typings: HashMap::new(),
             quantified_typevars: HashMap::new(),
             type_errors: HashMap::new(),
-        }
+            enumerations: HashMap::new(),
+            enum_variant_types: HashMap::new(),
+        };
+
+        // Builtins
+        out.define_enumeration(
+            "bool".to_string(),
+            [("true".to_string(), None), ("false".to_string(), None)],
+        );
+
+        out
     }
 
     /// Advances the num next available for generating names.
@@ -43,16 +57,25 @@ impl TypeContext {
         next_num
     }
 
-    /// Creates a new String name for a bound or polytype
-    pub fn genname(&mut self, prefix: String) -> String {
-        format!("{}{}", prefix, self.genvar())
-    }
-
     /// Apply a set of type constraints to the names currently declared
     /// in the type context
     pub fn ingest_subst(&mut self, subst: &HashMap<usize, Type>) {
         for typ in self.typings.values_mut() {
             *typ = infer::apply_subst_type(subst, &typ);
+        }
+    }
+
+    /// Turn an enumeration definition into the relevant data structures
+    /// that allow efficient analysis
+    fn define_enumeration<I>(&mut self, enumname: String, variants: I)
+    where
+        I: IntoIterator<Item = (String, Option<Type>)> + Clone,
+    {
+        self.enumerations
+            .insert(enumname.clone(), HashSet::from_iter(variants.clone()));
+        for (varname, fieldtype) in variants {
+            self.enum_variant_types
+                .insert(varname.clone(), (enumname.clone(), fieldtype.clone()));
         }
     }
 }
@@ -177,10 +200,23 @@ fn type_check_binary_op(
     bop: &BinaryOp,
     ctx: &mut TypeContext,
 ) -> Result<(Type, HashMap<usize, Type>), ()> {
+    fn binary_func_type(argtype: Type, rettype: Type) -> Type {
+        Type::Function(
+            Box::new(argtype.clone()),
+            Box::new(Type::Function(Box::new(argtype), Box::new(rettype))),
+        )
+    }
+
     let new_type = match bop {
-        BinaryOp::Add => Type::Function(
-            Box::new(Type::Int),
-            Box::new(Type::Function(Box::new(Type::Int), Box::new(Type::Int))),
+        BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mult | BinaryOp::FloorDiv => {
+            binary_func_type(Type::Int, Type::Int)
+        }
+        BinaryOp::FlAdd | BinaryOp::FlSub | BinaryOp::FlMult | BinaryOp::Div => {
+            binary_func_type(Type::Float, Type::Float)
+        }
+        BinaryOp::Eq | BinaryOp::Neq => binary_func_type(
+            Type::Variable(ctx.genvar()),
+            Type::TypeId("bool".to_string(), vec![]),
         ),
         _ => todo!(),
     };

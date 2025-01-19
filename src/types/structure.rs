@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 /// Flexibility of the structural type, for reusing functionality between
 /// nominal and structural records
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Flex {
     Permissive,
     CollectExact,
@@ -13,7 +13,7 @@ pub enum Flex {
 
 // TODO: use Structure everywhere, and unify nominal and structure records
 /// The basic definition of a structural type
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Structure {
     // TODO: polytype variables
     pub methods: BTreeMap<String, Type>,
