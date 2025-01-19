@@ -2,7 +2,7 @@ use super::ast;
 use crate::types;
 use crate::types::structure::{Structure, Flex};
 use super::util;
-use super::span::{Spanned, Span};
+use super::span::{Spanned, Span, widest_span};
 use ordered_float::OrderedFloat;
 use lalrpop_util::ParseError;
 use std::collections::BTreeMap;
@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 grammar;
 
 extern {
-    type Error = (&'static str, Span);
+    type Error = (String, Span);
 }
 
 // ****************************************
@@ -118,32 +118,40 @@ AtomicExpr: ast::Expression = {
     <lst: Sp<NonemptyList<Expression>>> => ast::Expression::List(lst.value, Some(lst.span)),
     <t: Sp<WyeTuple<Expression>>> => ast::Expression::Tuple(t.value, Some(t.span)),
     <r: Sp<WyeRecord<SpRecordExprField>>> =>? {
-        let record_span = Some(r.span);
-        // spanned_string_expr: Spanned<(String, Expression)>
-        let num_entries = r.value.len();
-        let record_elems = r.value.into_iter().map(|spanned_string_expr|
-            (spanned_string_expr.value.0.clone(), (spanned_string_expr.value.1.clone(), Some(spanned_string_expr.span.clone())))
-        ).collect::<BTreeMap<String, _>>();
-        if record_elems.len() != num_entries {
-            return Err(ParseError::User {
-                error: ("Duplicate field in struct record expression", record_span.unwrap())
-            });
+        let mut record_elems = BTreeMap::new();
+        for spanned_string_expr in r.value {
+            let field_name = spanned_string_expr.value.0;
+            let field_expr = spanned_string_expr.value.1;
+            let field_span = spanned_string_expr.span;
+            if record_elems.contains_key(&field_name) {
+                return Err(ParseError::User {
+                    error: (
+                        format!("Duplicate field {field_name} in structural record"),
+                        field_span
+                    )
+                })
+            }
+            record_elems.insert(field_name, (field_expr, Some(field_span)));
         }
-        Ok(ast::Expression::Record(record_elems, Flex::Permissive, record_span))
+        Ok(ast::Expression::Record(record_elems, Flex::Permissive, Some(r.span)))
     },
     <r: Sp<NomRecord<SpRecordExprField>>> =>? {
-        let record_span = Some(r.span);
-        // spanned_string_expr: Spanned<(String, Expression)>
-        let num_entries = r.value.len();
-        let record_elems = r.value.into_iter().map(|spanned_string_expr|
-            (spanned_string_expr.value.0.clone(), (spanned_string_expr.value.1.clone(), Some(spanned_string_expr.span.clone())))
-        ).collect::<BTreeMap<String, _>>();
-        if record_elems.len() != num_entries {
-            return Err(ParseError::User {
-                error: ("Duplicate field in nominal record expression", record_span.unwrap())
-            });
+        let mut record_elems = BTreeMap::new();
+        for spanned_string_expr in r.value {
+            let field_name = spanned_string_expr.value.0;
+            let field_expr = spanned_string_expr.value.1;
+            let field_span = spanned_string_expr.span;
+            if record_elems.contains_key(&field_name) {
+                return Err(ParseError::User {
+                    error: (
+                        format!("Duplicate field {field_name} in exact record"),
+                        field_span
+                    )
+                })
+            }
+            record_elems.insert(field_name, (field_expr, Some(field_span)));
         }
-        Ok(ast::Expression::Record(record_elems, Flex::Exact, record_span))
+        Ok(ast::Expression::Record(record_elems, Flex::Exact, Some(r.span)))
     },
     ProjectedExpr,
     "(" <e: Expression> ")" => e,
@@ -252,11 +260,12 @@ NonLetExpr: ast::Expression = {
     <evar: Sp<ProjectedExpr>> <with: Sp<"with">> <field: Sp<NonLetExpr>> =>? {
         if evar.span.end == with.span.start {
             return Err(ParseError::User {
-                error: ("Space required between enum variant and `with` token", Span::new(evar.span.start, with.span.end))
+                // TODO: report the exact variant
+                error: (format!("Space required between enum variant and `with` token"), Span::new(evar.span.start, with.span.end))
             });
         } else if with.span.end == field.span.start {
             return Err(ParseError::User {
-                error: ("Space required between `with` token and enum field", Span::new(with.span.start, field.span.end))
+                error: (format!("Space required between `with` token and enum field"), Span::new(with.span.start, field.span.end))
             });
         }
         let proj_res = util::flatten_projection(&evar.value);
@@ -268,14 +277,14 @@ NonLetExpr: ast::Expression = {
         let proj = proj_res.unwrap();
         if proj.len() != 2 {
             return Err(ParseError::User {
-                error: ("Only enum variants can have `with` fields, and variants are of the form <Id>.<Id>", evar.span)
+                error: (format!("Only enum variants can have `with` fields, and variants are of the form <Id>.<Id>"), evar.span)
             });
         }
         let (enum_id, variant) = match (&proj[0], &proj[1]) {
             (ast::Expression::Identifier(eid, _), ast::Expression::Identifier(var, _)) => (eid.clone(), var.clone()),
             _ => {
                 return Err(ParseError::User {
-                    error: ("Only enum variants can have `with` fields, not arbitrary projected expressions", evar.span)
+                    error: (format!("Only enum variants can have `with` fields, not arbitrary projected expressions"), evar.span)
                 })
             }
         };
@@ -296,7 +305,7 @@ NonLetExpr: ast::Expression = {
         let spans_overlap_res = util::spans_overlap(&spans);
         if spans_overlap_res.is_err() {
             Err(ParseError::User {
-                error: ("Function or arguments overlap in span", spans_overlap_res.err().unwrap())
+                error: (format!("Function or arguments overlap in span"), spans_overlap_res.err().unwrap())
             })
         } else {
             Ok(ast::Expression::FuncApplication(
@@ -314,7 +323,7 @@ NonLetExpr: ast::Expression = {
         let spans_overlap_res = util::spans_overlap(&spans);
         if spans_overlap_res.is_err() {
             Err(ParseError::User {
-                error: ("Function or arguments overlap in span", spans_overlap_res.err().unwrap())
+                error: (format!("Function or arguments overlap in span"), spans_overlap_res.err().unwrap())
             })
         } else {
             Ok(ast::Expression::NamedArgsFuncApp(
@@ -395,11 +404,11 @@ SpEnumVariant: (String, Option<types::Type>, Span) = {
     <vid: Sp<Identifier>> <with: Sp<"with">> <field_t: Sp<Type>> =>? {
         if vid.span.end == with.span.start {
             Err(ParseError::User {
-                error: ("Type of variant with argument requires space between TypeId and `with` token", Span::new(vid.span.start, with.span.end))
+                error: (format!("Type of variant with argument requires space between TypeId and `with` token"), Span::new(vid.span.start, with.span.end))
             })
         } else if with.span.end == field_t.span.start {
             Err(ParseError::User {
-                error: ("Type of variant with argument requires space between `with` token and field type", Span::new(with.span.start, field_t.span.end))
+                error: (format!("Type of variant with argument requires space between `with` token and field type"), Span::new(with.span.start, field_t.span.end))
             })
         } else {
             Ok((vid.value, Some(field_t.value), Span::new(vid.span.start, field_t.span.end)))
@@ -467,7 +476,7 @@ AtomicType: types::Type = {
                 util::RecordMemberness::Method => {
                     if methods.contains_key(&name) {
                         return Err(ParseError::User {
-                            error: ("Duplicate method in struct", mem.span)
+                            error: (format!("Duplicate method {name} in struct"), mem.span)
                         });
                     }
                     methods.insert(name, typ);
@@ -475,7 +484,7 @@ AtomicType: types::Type = {
                 util::RecordMemberness::Value => {
                     if values.contains_key(&name) {
                         return Err(ParseError::User {
-                            error: ("Duplicate value in struct", mem.span)
+                            error: (format!("Duplicate value {name} in struct"), mem.span)
                         });
                     }
                     values.insert(name, typ);   
@@ -496,7 +505,7 @@ AtomicType: types::Type = {
                 util::RecordMemberness::Method => {
                     if methods.contains_key(&name) {
                         return Err(ParseError::User {
-                            error: ("Duplicate method in nominal", mem.span)
+                            error: (format!("Duplicate method {name} in nominal"), mem.span)
                         });
                     }
                     methods.insert(name, typ);
@@ -504,7 +513,7 @@ AtomicType: types::Type = {
                 util::RecordMemberness::Value => {
                     if values.contains_key(&name) {
                         return Err(ParseError::User {
-                            error: ("Duplicate value in nominal", mem.span)
+                            error: (format!("Duplicate value {name} in nominal"), mem.span)
                         });
                     }
                     values.insert(name, typ);   

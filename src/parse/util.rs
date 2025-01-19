@@ -24,7 +24,7 @@ pub fn spans_overlap(spans: &Vec<Span>) -> Result<(), Span> {
 }
 
 /// TODO(WYE-5)
-pub fn flatten_projection(expr: &ast::Expression) -> Result<Vec<ast::Expression>, &'static str> {
+pub fn flatten_projection(expr: &ast::Expression) -> Result<Vec<ast::Expression>, String> {
     match &expr {
         ast::Expression::Identifier(_, _) => Ok(vec![expr.clone()]),
         ast::Expression::Projection(p, id, _) => {
@@ -37,7 +37,9 @@ pub fn flatten_projection(expr: &ast::Expression) -> Result<Vec<ast::Expression>
             Ok(projections)
         }
         // TODO(WYE-9): Use String for errors
-        _ => Err("Called flatten_projection on non-Projection Expression"),
+        _ => Err(format!(
+            "Called flatten_projection on non-Projection Expression"
+        )),
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,37 +47,3 @@ pub enum RecordMemberness {
     Value,
     Method,
 }
-
-// // Collects an expression of the form func arg1 arg2 ...arg_n
-// // into the evaluation order ( ... ( (func arg1) arg2 )...) arg_n)
-// // TODO: this needs to be better. Also is the mapper necessary?
-// // You don't need a type parameter but an instance parameter almost.
-// pub fn collect_function<T: Clone>(
-//     first_func: Spanned<T>,
-//     args: Vec<Spanned<T>>,
-//     mapper: fn(T, T) -> T,
-// ) -> Result<T, &'static str> {
-//     if args.len() < 1 {
-//         return Err("Not enough arguments to be a function application");
-//     }
-
-//     // Check spans do not overlap
-
-//     let mut spans = vec![(first_func.start, first_func.end)];
-//     args.iter().for_each(|a| spans.push((a.start, a.end)));
-//     if spans_overlap(&spans) {
-//         return Err("Space required between tokens to constitute a syntactically valid function application");
-//     }
-
-//     // If we reach this point, spans are ok
-//     if args.len() == 1 {
-//         Ok(mapper(first_func.value, args[0].value.clone()))
-//     } else {
-//         let actual_func =
-//             collect_function::<T>(first_func, args[..args.len() - 1].to_vec(), mapper);
-//         match actual_func {
-//             Ok(func) => Ok(mapper(func, args[args.len() - 1].value.clone())),
-//             Err(e) => Err(e),
-//         }
-//     }
-// }

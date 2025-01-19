@@ -57,9 +57,9 @@ pub enum Type {
 
 /// Utility function for collecting a sequence of types meant to represent
 /// the type signature of a function, into a Type::Function.
-pub fn collect_functype(types: &[Type]) -> Result<Type, &'static str> {
+pub fn collect_functype(types: &[Type]) -> Result<Type, String> {
     if types.len() == 0 {
-        return Err("At least 2 types are required to construct a function");
+        return Err("At least 2 types are required to construct a function".to_string());
     }
     if types.len() == 1 {
         return Ok(types[0].clone());
